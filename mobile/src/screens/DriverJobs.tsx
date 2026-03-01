@@ -49,22 +49,65 @@ export const DriverJobs = () => {
         return () => clearInterval(interval);
     }, [isOnline]);
 
-    // 2. Controlled Broadcast Query (Uses the Wave Dispatch View)
+    // 2. Real-Time Targeted Broadcast Query
+    useEffect(() => {
+        if (!user?.id) return;
+        const channel = supabase.channel(`driver-offers-${user.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'driver_job_offers',
+                    filter: `driver_id=eq.${user.id}`
+                },
+                () => {
+                    queryClient.invalidateQueries({ queryKey: ['driver-jobs'] });
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [user?.id, queryClient]);
+
     const { data: jobs, isLoading, refetch } = useQuery({
         queryKey: ['driver-jobs'],
         queryFn: async () => {
             const { data, error } = await supabase
-                .from('available_driver_jobs')
+                .from('driver_job_offers')
                 .select(`
-                    *,
-                    restaurants:restaurant_id (name, suburb, city, landmark_notes),
-                    profiles:customer_id (full_name, phone)
+                    id,
+                    status,
+                    orders:order_id (
+                        *,
+                        restaurants:restaurant_id (name, suburb, city, landmark_notes, lat, lng),
+                        profiles:customer_id (full_name, phone)
+                    )
                 `)
+                .eq('driver_id', user?.id)
+                .eq('status', 'pending')
                 .order('created_at', { ascending: false });
+
             if (error) throw error;
-            return data;
-        },
-        refetchInterval: 30000 // Poll every 30s to catch new "Waves"
+
+            // Map it back to the flat `job` format
+            const activeOffers = data
+                // PostgREST inner joins require us to filter out explicitly nulled objects if they failed the foreign constraint
+                .filter(offer => offer.orders && !Array.isArray(offer.orders))
+                .map(offer => {
+                    const orderData = offer.orders as any;
+                    return {
+                        ...orderData,
+                        offer_id: offer.id
+                    };
+                })
+                // Only show jobs that are still ready for pickup and haven't been claimed by another driver natively
+                .filter(job => job.status === 'ready_for_pickup' && !job.driver_id);
+
+            return activeOffers;
+        }
     });
 
     const onRefresh = async () => {
