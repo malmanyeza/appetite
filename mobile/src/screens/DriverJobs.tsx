@@ -103,6 +103,7 @@ export const DriverJobs = () => {
             const { data, error } = await supabase
                 .from('targeted_driver_jobs')
                 .select('*')
+                .eq('offer_assigned_driver_id', user?.id)
                 .order('offer_created_at', { ascending: false });
 
             if (error) {
