@@ -76,36 +76,48 @@ export const DriverJobs = () => {
         queryKey: ['driver-jobs'],
         queryFn: async () => {
             const { data, error } = await supabase
-                .from('driver_job_offers')
-                .select(`
-                    id,
-                    status,
-                    orders:order_id (
-                        *,
-                        restaurants:restaurant_id (name, suburb, city, landmark_notes, lat, lng),
-                        profiles:customer_id (full_name, phone)
-                    )
-                `)
-                .eq('driver_id', user?.id)
-                .eq('status', 'pending')
-                .order('created_at', { ascending: false });
+                .from('targeted_driver_jobs')
+                .select('*')
+                .order('offer_created_at', { ascending: false });
 
-            if (error) throw error;
+            if (error) {
+                console.error("Fetch Error:", error);
+                throw error;
+            }
 
-            // Map it back to the flat `job` format
-            const activeOffers = data
-                // PostgREST inner joins require us to filter out explicitly nulled objects if they failed the foreign constraint
-                .filter(offer => offer.orders && !Array.isArray(offer.orders))
-                .map(offer => {
-                    const orderData = offer.orders as any;
-                    return {
-                        ...orderData,
-                        offer_id: offer.id
-                    };
-                })
-                // Only show jobs that are still ready for pickup and haven't been claimed by another driver natively
-                .filter(job => job.status === 'ready_for_pickup' && !job.driver_id);
+            console.log("RAW OFFERS FROM VIEW:", JSON.stringify(data, null, 2));
 
+            // Map the flat SQL View natively back to the expected `job` object hierarchy 
+            const activeOffers = (data || []).map(offer => {
+                return {
+                    id: offer.id,
+                    offer_id: offer.offer_id,
+                    status: offer.status,
+                    delivery_address_snapshot: offer.delivery_address_snapshot,
+                    delivery_pin: offer.delivery_pin,
+                    driver_id: offer.driver_id,
+                    customer_id: offer.customer_id,
+                    restaurant_id: offer.restaurant_id,
+                    pricing: offer.pricing,
+                    payment: offer.payment,
+                    created_at: offer.created_at,
+                    updated_at: offer.updated_at,
+                    restaurants: {
+                        name: offer.restaurant_name,
+                        suburb: offer.restaurant_suburb,
+                        city: offer.restaurant_city,
+                        landmark_notes: offer.restaurant_landmark_notes,
+                        lat: offer.restaurant_lat,
+                        lng: offer.restaurant_lng
+                    },
+                    profiles: {
+                        full_name: offer.customer_name,
+                        phone: offer.customer_phone
+                    }
+                };
+            });
+
+            console.log("FINAL MAPPED OFFERS:", activeOffers);
             return activeOffers;
         }
     });
