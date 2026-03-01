@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  background-color: #0F0F0F;
+  color: #FFFFFF;
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-accent text-white px-6 py-3 rounded-xl font-semibold hover:opacity-90 transition-all active:scale-95;
+  }
+
+  .btn-secondary {
+    @apply bg-light-surface text-background px-6 py-3 rounded-xl font-semibold hover:bg-opacity-80 transition-all active:scale-95;
+  }
+
+  .glass {
+    @apply bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl;
+  }
+
+  .input-field {
+    @apply w-full bg-[#1A1A1A] border border-white/5 rounded-2xl px-5 py-4 focus:outline-none focus:ring-2 focus:ring-[#FF4D00]/40 focus:border-[#FF4D00] transition-all text-white placeholder:text-[#404040] appearance-none;
+  }
+
+  /* Specific overrides for color-scheme and pickers */
+  input[type="time"],
+  input[type="date"],
+  select,
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"] {
+    color-scheme: dark;
+    background-color: #1A1A1A !important;
+  }
+
+  /* Theme browser Auto-fill */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px #1A1A1A inset !important;
+    -webkit-text-fill-color: white !important;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+
+  /* Remove default select arrow and add custom one if needed or just styling it */
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23A3A3A3'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='激19l-7 7-7-7'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1.25rem center;
+    background-size: 1.5rem;
+    padding-right: 3.5rem;
+  }
+}
