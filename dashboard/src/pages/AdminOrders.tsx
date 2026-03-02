@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../lib/supabase';
 import { ordersService, adminService } from '../lib/services';
 import {
     Search,
@@ -27,6 +28,20 @@ export const AdminOrders = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [selectedOrder, setSelectedOrder] = useState<any>(null);
+    const queryClient = useQueryClient();
+
+    const updateStatusMutation = useMutation({
+        mutationFn: async ({ orderId, status }: { orderId: string, status: string }) => {
+            await ordersService.updateOrderStatus(orderId, status);
+            return status;
+        },
+        onSuccess: (newStatus) => {
+            queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
+            if (selectedOrder) {
+                setSelectedOrder((prev: any) => ({ ...prev, status: newStatus }));
+            }
+        }
+    });
 
     const { data: orders, isLoading } = useQuery({
         queryKey: ['admin-orders'],
@@ -166,9 +181,27 @@ export const AdminOrders = () => {
 
                             {/* Status Section */}
                             <div className="space-y-3">
-                                <h3 className="text-xs font-bold uppercase tracking-widest text-muted">Current Status</h3>
-                                <div className="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
+                                <h3 className="text-xs font-bold uppercase tracking-widest text-muted">Current Status (Admin Override)</h3>
+                                <div className="p-4 rounded-xl border border-white/5 bg-white/[0.02] flex items-center justify-between">
                                     <StatusPill status={selectedOrder.status} />
+                                    <div className="relative">
+                                        <select
+                                            value={selectedOrder.status}
+                                            onChange={(e) => updateStatusMutation.mutate({ orderId: selectedOrder.id, status: e.target.value })}
+                                            className="appearance-none pl-4 pr-10 py-2 bg-white/10 border border-white/10 rounded-lg text-sm font-bold focus:outline-none focus:ring-2 focus:ring-accent/50 cursor-pointer text-white"
+                                            disabled={updateStatusMutation.isPending}
+                                        >
+                                            <option value="pending">Pending</option>
+                                            <option value="confirmed">Confirmed</option>
+                                            <option value="preparing">Preparing</option>
+                                            <option value="ready_for_pickup">Ready for Pickup</option>
+                                            <option value="picked_up">Picked Up (Driver route)</option>
+                                            <option value="on_the_way">On The Way</option>
+                                            <option value="delivered">Delivered</option>
+                                            <option value="cancelled">Cancelled</option>
+                                        </select>
+                                        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                                    </div>
                                 </div>
                             </div>
 

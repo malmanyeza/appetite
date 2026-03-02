@@ -126,5 +126,4 @@ SELECT
 FROM public.driver_job_offers djo
 JOIN public.orders o ON djo.order_id = o.id
 JOIN public.restaurants r ON o.restaurant_id = r.id
-JOIN public.profiles p ON o.customer_id = p.id
-WHERE djo.driver_id = auth.uid();
+JOIN public.profiles p ON o.customer_id = p.id;

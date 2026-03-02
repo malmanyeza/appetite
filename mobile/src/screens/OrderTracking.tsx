@@ -113,7 +113,8 @@ export const OrderTracking = ({ route, navigation }: any) => {
         { id: 'delivered', label: 'Delivered', icon: MapPin },
     ];
 
-    const currentIdx = statuses.findIndex(s => s.id === order.status);
+    const displayStatus = order.status === 'picked_up' ? 'ready_for_pickup' : order.status;
+    const currentIdx = statuses.findIndex(s => s.id === displayStatus);
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -129,10 +130,10 @@ export const OrderTracking = ({ route, navigation }: any) => {
                 <View style={[styles.statusCard, { backgroundColor: theme.surface }]}>
                     <Text style={[styles.restaurantName, { color: theme.text }]}>{order.restaurants?.name}</Text>
                     <Text style={[styles.statusText, { color: theme.accent }]}>
-                        {order.status === 'confirmed' ? 'Restaurant is confirming your order' :
-                            order.status === 'preparing' ? 'Your food is being prepared' :
-                                order.status === 'ready_for_pickup' ? 'Biker is picking up your food' :
-                                    order.status === 'on_the_way' ? 'Biker is on the way to you!' :
+                        {displayStatus === 'confirmed' ? 'Restaurant is confirming your order' :
+                            displayStatus === 'preparing' ? 'Your food is being prepared' :
+                                displayStatus === 'ready_for_pickup' ? (order.driver_id ? 'Driver is heading to the restaurant to pick up your food' : 'Waiting for a driver to accept your order') :
+                                    displayStatus === 'on_the_way' ? 'Biker is on the way to you!' :
                                         'Order Delivered'}
                     </Text>
 

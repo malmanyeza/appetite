@@ -13,6 +13,8 @@ import { OrdersScreen } from '../screens/OrdersScreen';
 import { AccountScreen } from '../screens/AccountScreen';
 import { AddressManagementScreen } from '../screens/AddressManagementScreen';
 import { DriverJobs } from '../screens/DriverJobs';
+import { ActiveDelivery } from '../screens/ActiveDelivery';
+import { DeliveryCompleted } from '../screens/DeliveryCompleted';
 import { DriverEarnings } from '../screens/DriverEarnings';
 import { LoginScreen } from '../screens/LoginScreen';
 import { SignUpScreen } from '../screens/SignUpScreen';
@@ -85,6 +87,16 @@ const CustomerTabs = () => {
     );
 };
 
+const DriverJobsStack = () => {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="JobsMain" component={DriverJobs} />
+            <Stack.Screen name="ActiveDelivery" component={ActiveDelivery} />
+            <Stack.Screen name="DeliveryCompleted" component={DeliveryCompleted} />
+        </Stack.Navigator>
+    );
+};
+
 const DriverTabs = () => {
     const { theme } = useTheme();
     return (
@@ -102,7 +114,7 @@ const DriverTabs = () => {
                 headerTintColor: theme.text,
             })}
         >
-            <Tab.Screen name="Jobs" component={DriverJobs} options={{ headerShown: false }} />
+            <Tab.Screen name="Jobs" component={DriverJobsStack} options={{ headerShown: false }} />
             <Tab.Screen name="Earnings" component={DriverEarnings} options={{ headerShown: false }} />
             <Tab.Screen name="Account" component={AccountStack} options={{ headerShown: false }} />
         </Tab.Navigator>

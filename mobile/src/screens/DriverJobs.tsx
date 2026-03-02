@@ -9,8 +9,10 @@ import {
     ActivityIndicator,
     Linking,
     RefreshControl,
-    Alert
+    Alert,
+    Image
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import * as ExpoLocation from 'expo-location';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
@@ -21,6 +23,7 @@ import { MapPin, Package, Phone, CheckCircle2, Navigation, ExternalLink } from '
 export const DriverJobs = () => {
     const { theme } = useTheme();
     const { user } = useAuthStore();
+    const navigation = useNavigation<any>();
     const queryClient = useQueryClient();
     const [isOnline, setIsOnline] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
@@ -97,6 +100,23 @@ export const DriverJobs = () => {
         };
     }, [user?.id, queryClient]);
 
+    const { data: activeOrder, isLoading: isActiveOrderLoading } = useQuery({
+        queryKey: ['active-driver-order', user?.id],
+        queryFn: async () => {
+            if (!user?.id) return null;
+            const { data, error } = await supabase
+                .from('orders')
+                .select('id, status')
+                .eq('driver_id', user.id)
+                .in('status', ['ready_for_pickup', 'picked_up', 'on_the_way'])
+                .maybeSingle();
+
+            // Just return data. If no active order, data is null.
+            return data;
+        },
+        enabled: !!user?.id
+    });
+
     const { data: jobs, isLoading, refetch } = useQuery({
         queryKey: ['driver-jobs'],
         queryFn: async () => {
@@ -158,15 +178,17 @@ export const DriverJobs = () => {
     const acceptJob = useMutation({
         mutationFn: async (orderId: string) => {
             const { data, error } = await supabase.rpc('accept_order_safely', {
-                p_order_id: orderId
+                p_order_id: orderId,
+                p_driver_id: user?.id
             });
             if (error) throw error;
             if (data && !data.success) throw new Error(data.message);
             return data;
         },
-        onSuccess: () => {
-            Alert.alert('Success', 'Job accepted! Drive safely.');
+        onSuccess: (data, orderId) => {
             queryClient.invalidateQueries({ queryKey: ['driver-jobs'] });
+            queryClient.invalidateQueries({ queryKey: ['active-driver-order'] });
+            navigation.navigate('ActiveDelivery', { orderId });
         },
         onError: (err: any) => Alert.alert('Acceptance Failed', err.message)
     });
@@ -198,6 +220,24 @@ export const DriverJobs = () => {
     };
 
     if (isLoading) return <View style={[styles.center, { backgroundColor: theme.background }]}><ActivityIndicator color={theme.accent} /></View>;
+
+    if (activeOrder) {
+        return (
+            <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center', padding: 24 }]}>
+                <Navigation color={theme.accent} size={84} style={{ marginBottom: 24 }} />
+                <Text style={{ color: theme.text, fontSize: 28, fontWeight: '900', textAlign: 'center', marginBottom: 12 }}>Active Delivery</Text>
+                <Text style={{ color: theme.textMuted, fontSize: 16, textAlign: 'center', marginBottom: 40, lineHeight: 24 }}>
+                    You have a live delivery in progress. Please complete your current trip before accepting new jobs.
+                </Text>
+                <TouchableOpacity
+                    style={[styles.primaryButton, { backgroundColor: theme.accent, width: '100%', paddingVertical: 20 }]}
+                    onPress={() => navigation.navigate('ActiveDelivery', { orderId: activeOrder.id })}
+                >
+                    <Text style={[styles.primaryButtonText, { fontSize: 18 }]}>Resume Delivery Hub</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -310,48 +350,13 @@ export const DriverJobs = () => {
                                             {acceptJob.isPending ? <ActivityIndicator color="white" /> : <Text style={styles.btnText}>Accept Job Offer</Text>}
                                         </TouchableOpacity>
                                     )}
-                                    {job.status === 'ready_for_pickup' && job.driver_id === user?.id && (
-                                        <TouchableOpacity
-                                            style={[styles.primaryBtn, { backgroundColor: theme.accent }]}
-                                            onPress={() => updateStatus.mutate({ id: job.id, status: 'picked_up' })}
-                                        >
-                                            <Text style={styles.btnText}>At Restaurant / Picked Up</Text>
-                                        </TouchableOpacity>
-                                    )}
-                                    {job.status === 'picked_up' && (
+                                    {job.driver_id === user?.id && ['ready_for_pickup', 'picked_up', 'on_the_way'].includes(job.status) && (
                                         <TouchableOpacity
                                             style={[styles.primaryBtn, { backgroundColor: '#3B82F6' }]}
-                                            onPress={() => updateStatus.mutate({ id: job.id, status: 'on_the_way' })}
+                                            onPress={() => navigation.navigate('ActiveDelivery', { orderId: job.id })}
                                         >
-                                            <Text style={styles.btnText}>Start Delivery Journey</Text>
-                                        </TouchableOpacity>
-                                    )}
-                                    {job.status === 'on_the_way' && (
-                                        <TouchableOpacity
-                                            style={[styles.primaryBtn, { backgroundColor: '#22C55E' }]}
-                                            onPress={() => {
-                                                Alert.prompt(
-                                                    'Verify Delivery',
-                                                    'Ask the customer for their 4-digit PIN:',
-                                                    [
-                                                        { text: 'Cancel', style: 'cancel' },
-                                                        {
-                                                            text: 'Complete',
-                                                            onPress: (pin?: string) => {
-                                                                if (pin === job.delivery_pin) {
-                                                                    updateStatus.mutate({ id: job.id, status: 'delivered' });
-                                                                } else {
-                                                                    Alert.alert('Invalid PIN', 'The code you entered is incorrect.');
-                                                                }
-                                                            }
-                                                        }
-                                                    ],
-                                                    'plain-text'
-                                                );
-                                            }}
-                                        >
-                                            <CheckCircle2 size={20} color="white" style={{ marginRight: 8 }} />
-                                            <Text style={styles.btnText}>Verify PIN & Complete</Text>
+                                            <Navigation size={20} color="white" style={{ marginRight: 8 }} />
+                                            <Text style={styles.btnText}>Open Delivery Hub</Text>
                                         </TouchableOpacity>
                                     )}
                                 </View>
@@ -394,5 +399,17 @@ const styles = StyleSheet.create({
     primaryBtn: { height: 56, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
     btnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
     emptyJobs: { marginTop: 100, alignItems: 'center', gap: 16 },
-    emptyText: { fontSize: 16 }
+    emptyText: { fontSize: 16 },
+    primaryButton: {
+        backgroundColor: '#E87A5D',
+        borderRadius: 16,
+        paddingVertical: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    primaryButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: 'bold',
+    }
 });

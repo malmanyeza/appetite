@@ -28,10 +28,9 @@ export const ordersService = {
             .from('orders')
             .select(`
         *,
-        profiles:customer_id (full_name),
+        profiles:customer_id (full_name, phone),
         restaurants:restaurant_id (
-            name,
-            profiles:owner_user_id (phone)
+            name
         )
       `)
             .order('created_at', { ascending: false });
