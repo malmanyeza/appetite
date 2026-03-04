@@ -6,42 +6,93 @@ import {
     TouchableOpacity,
     TextInput,
     StyleSheet,
-    FlatList,
     Platform,
     UIManager,
-    LayoutAnimation
+    LayoutAnimation,
+    Modal,
+    KeyboardAvoidingView,
+    KeyboardAvoidingView,
+    TouchableWithoutFeedback,
+    Keyboard,
+    ActivityIndicator,
+    Alert
 } from 'react-native';
+import * as ExpoLocation from 'expo-location';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../theme';
 import { Search, MapPin, ChevronRight, Filter } from 'lucide-react-native';
 import { Image } from 'expo-image';
-
 export const CustomerHome = ({ navigation }: any) => {
     const { theme, isDark } = useTheme();
     const [selectedCategory, setSelectedCategory] = React.useState<string | null>(null);
     const [searchQuery, setSearchQuery] = React.useState('');
+    const [locationModalVisible, setLocationModalVisible] = React.useState(false);
+    const [currentLocation, setCurrentLocation] = React.useState('Harare');
+    const [tempLocation, setTempLocation] = React.useState('');
+
+    // Strict MVP Location Enforcement
+    const [hasLocationPermission, setHasLocationPermission] = React.useState<boolean | null>(null);
+    const [userCoordinates, setUserCoordinates] = React.useState<{ lat: number, lng: number } | null>(null);
+
+    React.useEffect(() => {
+        (async () => {
+            try {
+                const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+                if (status !== 'granted') {
+                    setHasLocationPermission(false);
+                    return;
+                }
+                setHasLocationPermission(true);
+                const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
+                setUserCoordinates({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+                // We could reverse-geocode here, but for now just keep the current location label
+            } catch (err) {
+                console.warn('Customer Location Auth failed:', err);
+                setHasLocationPermission(false);
+            }
+        })();
+    }, []);
 
     if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
         UIManager.setLayoutAnimationEnabledExperimental(true);
     }
 
     const { data: restaurants, isLoading } = useQuery({
-        queryKey: ['restaurants', selectedCategory],
+        queryKey: ['restaurants', selectedCategory, userCoordinates],
         queryFn: async () => {
-            let query = supabase
-                .from('restaurants')
-                .select('*')
-                .eq('is_open', true);
+            if (!userCoordinates) {
+                // Fallback (shouldn't really happen since we block rendering, but just in case)
+                let query = supabase
+                    .from('restaurants')
+                    .select('*')
+                    .eq('is_open', true)
+                    .not('lat', 'is', 'null')
+                    .not('lng', 'is', 'null');
 
-            if (selectedCategory) {
-                query = query.contains('categories', [selectedCategory]);
+                if (selectedCategory) {
+                    query = query.contains('categories', [selectedCategory]);
+                }
+                const { data, error } = await query;
+                if (error) throw error;
+                return data;
             }
 
-            const { data, error } = await query;
+            // Fetch with distance calc
+            const { data, error } = await supabase.rpc('get_restaurants_with_distance', {
+                u_lat: userCoordinates.lat,
+                u_lng: userCoordinates.lng
+            });
+
             if (error) throw error;
-            return data;
-        }
+
+            let result = data;
+            if (selectedCategory) {
+                result = result.filter((r: any) => r.categories.includes(selectedCategory));
+            }
+            return result;
+        },
+        enabled: hasLocationPermission === true
     });
 
     const filteredRestaurants = React.useMemo(() => {
@@ -57,15 +108,56 @@ export const CustomerHome = ({ navigation }: any) => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     }, [filteredRestaurants, selectedCategory]);
 
+    // Mandatory GPS Lock Screen
+    if (hasLocationPermission === null) {
+        return (
+            <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={theme.accent} />
+                <Text style={{ color: theme.textMuted, marginTop: 16 }}>Loading location services...</Text>
+            </View>
+        );
+    }
+
+    if (hasLocationPermission === false) {
+        return (
+            <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center', padding: 24 }]}>
+                <MapPin size={64} color={theme.accent} style={{ marginBottom: 24 }} />
+                <Text style={[{ color: theme.text, fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 12 }]}>Location Required</Text>
+                <Text style={{ color: theme.textMuted, textAlign: 'center', lineHeight: 24, fontSize: 16, marginBottom: 32 }}>
+                    Appetite requires your device's location to accurately show you the closest restaurants, calculate precise delivery ETAs, and dispatch drivers securely.
+                </Text>
+                <TouchableOpacity
+                    style={{ backgroundColor: theme.accent, paddingVertical: 16, paddingHorizontal: 32, rounded: 16, borderRadius: 16, width: '100%', alignItems: 'center' }}
+                    onPress={async () => {
+                        const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+                        if (status === 'granted') {
+                            setHasLocationPermission(true);
+                            const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
+                            setUserCoordinates({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+                        }
+                    }}
+                >
+                    <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>Enable Location Access</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
+
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             {/* Header / Location */}
             <View style={styles.header}>
                 <View>
                     <Text style={[styles.locationLabel, { color: theme.textMuted }]}>Delivering to</Text>
-                    <TouchableOpacity style={styles.locationSelector}>
+                    <TouchableOpacity
+                        style={styles.locationSelector}
+                        onPress={() => {
+                            setTempLocation(currentLocation);
+                            setLocationModalVisible(true);
+                        }}
+                    >
                         <MapPin size={16} color={theme.accent} />
-                        <Text style={[styles.locationText, { color: theme.text }]}>Avondale, Harare</Text>
+                        <Text style={[styles.locationText, { color: theme.text }]}>{currentLocation}</Text>
                         <ChevronRight size={16} color={theme.textMuted} />
                     </TouchableOpacity>
                 </View>
@@ -158,7 +250,10 @@ export const CustomerHome = ({ navigation }: any) => {
                                 <Text style={[styles.categories, { color: theme.textMuted }]}>{item.categories.join(' • ')}</Text>
                                 <View style={styles.deliveryInfo}>
                                     <Text style={[styles.infoText, { color: theme.textMuted }]}>
-                                        {item.avg_prep_time || '20-30 min'} • Free Delivery
+                                        {item.distance_km ? `${item.distance_km.toFixed(1)} km • ` : ''}Delivery
+                                    </Text>
+                                    <Text style={[styles.infoText, { color: theme.textMuted }]}>
+                                        {item.avg_prep_time || '20-30 min'}
                                     </Text>
                                 </View>
                             </View>
@@ -166,6 +261,57 @@ export const CustomerHome = ({ navigation }: any) => {
                     ))
                 )}
             </ScrollView>
+
+            <Modal
+                visible={locationModalVisible}
+                animationType="slide"
+                transparent={true}
+            >
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.modalOverlay}
+                >
+                    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                        <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)', width: '100%' }]}>
+                            <View style={[styles.modalContent, { backgroundColor: theme.background }]}>
+                                <View style={styles.modalHeader}>
+                                    <Text style={[styles.modalTitle, { color: theme.text }]}>Delivery Location</Text>
+                                    <TouchableOpacity onPress={() => setLocationModalVisible(false)}>
+                                        <Text style={{ color: theme.textMuted }}>Close</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <Text style={[styles.modalSubtitle, { color: theme.textMuted }]}>
+                                    Enter your precise address or suburb for delivery
+                                </Text>
+
+                                <TextInput
+                                    style={[styles.locationInput, { backgroundColor: theme.surface, color: theme.text }]}
+                                    placeholder="e.g. 15 Borrowdale Road, Harare"
+                                    placeholderTextColor={theme.textMuted}
+                                    value={tempLocation}
+                                    onChangeText={setTempLocation}
+                                    returnKeyType="done"
+                                    onSubmitEditing={Keyboard.dismiss}
+                                    autoFocus
+                                />
+
+                                <TouchableOpacity
+                                    style={[styles.saveLocationBtn, { backgroundColor: theme.accent }]}
+                                    onPress={() => {
+                                        if (tempLocation.trim()) {
+                                            setCurrentLocation(tempLocation.trim());
+                                        }
+                                        setLocationModalVisible(false);
+                                    }}
+                                >
+                                    <Text style={styles.saveLocationBtnText}>Confirm Location</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </TouchableWithoutFeedback>
+                </KeyboardAvoidingView>
+            </Modal>
         </View>
     );
 };
@@ -203,4 +349,12 @@ const styles = StyleSheet.create({
     categories: { fontSize: 13, marginTop: 4 },
     deliveryInfo: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
     infoText: { fontSize: 12 },
+    modalOverlay: { flex: 1, justifyContent: 'flex-end' },
+    modalContent: { borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, minHeight: 400 },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+    modalTitle: { fontSize: 20, fontWeight: 'bold' },
+    modalSubtitle: { fontSize: 14, marginBottom: 24 },
+    locationInput: { borderRadius: 16, padding: 16, height: 56, fontSize: 16, marginBottom: 24 },
+    saveLocationBtn: { height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+    saveLocationBtnText: { color: 'white', fontSize: 16, fontWeight: 'bold' }
 });

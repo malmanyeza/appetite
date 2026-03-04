@@ -115,6 +115,10 @@ export const AddressManagementScreen = ({ navigation }: any) => {
             Alert.alert('Required Fields', 'Suburb and Landmark Notes are required for successful delivery in Zimbabwe.');
             return;
         }
+        if (!coords?.lat || !coords?.lng) {
+            Alert.alert('Location Required', 'You must tap "Use Current Location (GPS)" to drop a precise pin for this address before saving.');
+            return;
+        }
         addAddressMutation.mutate({
             label,
             city,

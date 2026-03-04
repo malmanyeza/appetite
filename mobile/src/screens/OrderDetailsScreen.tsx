@@ -39,7 +39,10 @@ export const OrderDetailsScreen = ({ route, navigation }: any) => {
                 `)
                 .eq('id', orderId)
                 .single();
-            if (error) throw error;
+            if (error) {
+                console.error('OrderDetails Fetch Error:', JSON.stringify(error, null, 2));
+                throw error;
+            }
             return data;
         }
     });
@@ -89,9 +92,21 @@ export const OrderDetailsScreen = ({ route, navigation }: any) => {
                         <Text style={[styles.statusText, { color: theme.accent }]}>{order.status.replace('_', ' ').toUpperCase()}</Text>
                     </View>
                     <View style={styles.statusInfo}>
-                        <Text style={[styles.statusLabel, { color: theme.textMuted }]}>ORDERED ON</Text>
-                        <Text style={[styles.statusText, { color: theme.text }]}>{new Date(order.created_at).toLocaleDateString()}</Text>
+                        <Text style={[styles.statusLabel, { color: theme.textMuted }]}>ORDERED</Text>
+                        <Text style={[styles.statusText, { color: theme.text, fontSize: 13 }]}>
+                            {new Date(order.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                        </Text>
                     </View>
+                    {(order.status === 'delivered' || order.status === 'cancelled') && (
+                        <View style={styles.statusInfo}>
+                            <Text style={[styles.statusLabel, { color: theme.textMuted }]}>
+                                {order.status === 'delivered' ? 'DELIVERED' : 'CANCELLED'}
+                            </Text>
+                            <Text style={[styles.statusText, { color: theme.text, fontSize: 13 }]}>
+                                {new Date(order.updated_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                            </Text>
+                        </View>
+                    )}
                 </View>
 
                 {/* Restaurant Section */}
@@ -131,7 +146,7 @@ export const OrderDetailsScreen = ({ route, navigation }: any) => {
                                     <Text style={[styles.itemName, { color: theme.text }]}>{item.name_snapshot}</Text>
                                     {item.notes && <Text style={[styles.itemNotes, { color: theme.textMuted }]}>{item.notes}</Text>}
                                 </View>
-                                <Text style={[styles.itemPrice, { color: theme.text }]}>${(item.price_snapshot * item.qty).toFixed(2)}</Text>
+                                <Text style={[styles.itemPrice, { color: theme.text }]}>${((item.price_snapshot || 0) * (item.qty || 1)).toFixed(2)}</Text>
                             </View>
                         ))}
                     </View>
@@ -143,20 +158,20 @@ export const OrderDetailsScreen = ({ route, navigation }: any) => {
                     <View style={[styles.receiptCard, { backgroundColor: theme.surface }]}>
                         <View style={styles.receiptRow}>
                             <Text style={[styles.receiptLabel, { color: theme.textMuted }]}>Subtotal</Text>
-                            <Text style={[styles.receiptValue, { color: theme.text }]}>${pricing.subtotal.toFixed(2)}</Text>
+                            <Text style={[styles.receiptValue, { color: theme.text }]}>${(pricing?.subtotal || 0).toFixed(2)}</Text>
                         </View>
                         <View style={styles.receiptRow}>
                             <Text style={[styles.receiptLabel, { color: theme.textMuted }]}>Delivery Fee</Text>
-                            <Text style={[styles.receiptValue, { color: theme.text }]}>${pricing.deliveryFee.toFixed(2)}</Text>
+                            <Text style={[styles.receiptValue, { color: theme.text }]}>${(pricing?.delivery_fee || pricing?.deliveryFee || 0).toFixed(2)}</Text>
                         </View>
                         <View style={[styles.divider, { backgroundColor: theme.border }]} />
                         <View style={styles.receiptRow}>
                             <Text style={[styles.totalLabel, { color: theme.text }]}>Total</Text>
-                            <Text style={[styles.totalValue, { color: theme.accent }]}>${pricing.total.toFixed(2)}</Text>
+                            <Text style={[styles.totalValue, { color: theme.accent }]}>${(pricing?.total || 0).toFixed(2)}</Text>
                         </View>
                         <View style={styles.paymentInfo}>
                             <Text style={[styles.paymentText, { color: theme.textMuted }]}>
-                                Paid via {order.payment.method.toUpperCase()}
+                                Paid via {order.payment?.method?.toUpperCase() || 'UNKNOWN'}
                             </Text>
                         </View>
                     </View>

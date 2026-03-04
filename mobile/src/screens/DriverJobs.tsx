@@ -27,23 +27,63 @@ export const DriverJobs = () => {
     const queryClient = useQueryClient();
     const [isOnline, setIsOnline] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
-    const [isSyncing, setIsSyncing] = useState(false);
+    const [locationSubscription, setLocationSubscription] = useState<ExpoLocation.LocationSubscription | null>(null);
 
-    // 1. GPS Heartbeat (Zimbabwe Optimized: Updates every 2 mins to save battery while online)
-    const updateLocation = async () => {
-        if (!isOnline) return;
+    // 1. GPS Heartbeat Active Polling
+    const startLocationTracking = async () => {
         try {
             const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
-            if (status !== 'granted') return;
+            if (status !== 'granted') {
+                Alert.alert('Permission Denied', 'You must allow location tracking to go online and receive delivery jobs.');
+                setIsOnline(false); // revert toggle
+                return;
+            }
 
+            // Immediately fetch current pos and upload first
             const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
-            const { error } = await supabase.rpc('update_driver_location', {
-                p_lat: loc.coords.latitude,
-                p_lng: loc.coords.longitude
-            });
-            if (error) console.error('Heartbeat error:', error);
+            if (user?.id) {
+                await supabase.from('driver_locations').upsert({
+                    driver_id: user.id,
+                    lat: loc.coords.latitude,
+                    lng: loc.coords.longitude,
+                    heading: loc.coords.heading,
+                    speed: loc.coords.speed
+                });
+            }
+
+            // Begin continuous watch subscription
+            const subscription = await ExpoLocation.watchPositionAsync(
+                {
+                    accuracy: ExpoLocation.Accuracy.High,
+                    timeInterval: 15000,     // 15 seconds
+                    distanceInterval: 75,    // 75 meters
+                },
+                async (newLocation) => {
+                    if (user?.id) {
+                        await supabase.from('driver_locations').upsert({
+                            driver_id: user.id,
+                            lat: newLocation.coords.latitude,
+                            lng: newLocation.coords.longitude,
+                            heading: newLocation.coords.heading,
+                            speed: newLocation.coords.speed
+                        });
+                    }
+                }
+            );
+
+            setLocationSubscription(subscription);
+
         } catch (e) {
-            console.warn('Location heartbeat failed:', e);
+            console.warn('Location tracking Initialization failed:', e);
+            Alert.alert('GPS Error', 'Failed to connect to GPS hardware.');
+            setIsOnline(false);
+        }
+    };
+
+    const stopLocationTracking = () => {
+        if (locationSubscription) {
+            locationSubscription.remove();
+            setLocationSubscription(null);
         }
     };
 
@@ -51,11 +91,15 @@ export const DriverJobs = () => {
         setIsOnline(value);
         setIsSyncing(true);
         if (user?.id) {
+            // Update legacy state boolean
             await supabase.from('driver_profiles').update({
                 is_online: value
             }).eq('user_id', user.id);
+
             if (value) {
-                updateLocation();
+                await startLocationTracking();
+            } else {
+                stopLocationTracking();
             }
         }
         setIsSyncing(false);
@@ -66,16 +110,16 @@ export const DriverJobs = () => {
         if (user?.id) {
             supabase.from('driver_profiles').select('is_online').eq('user_id', user.id).single()
                 .then(({ data }) => {
-                    if (data) setIsOnline(data.is_online);
+                    if (data?.is_online) {
+                        setIsOnline(true);
+                        startLocationTracking();
+                    }
                 });
         }
+        return () => {
+            stopLocationTracking(); // cleanup on unmount
+        };
     }, [user?.id]);
-
-    useEffect(() => {
-        updateLocation();
-        const interval = setInterval(updateLocation, 120000); // 2 minutes
-        return () => clearInterval(interval);
-    }, [isOnline]);
 
     // 2. Real-Time Targeted Broadcast Query
     useEffect(() => {

@@ -103,7 +103,7 @@ export const RestaurantSettings = () => {
                     'physical_address', 'landmark_notes', 'owner_phone', 'owner_email',
                     'days_open', 'opening_time', 'closing_time', 'avg_prep_time',
                     'payout_method', 'payout_number', 'payout_name', 'fulfillment_type',
-                    'city', 'suburb', 'is_open', 'cover_image_url', 'categories'
+                    'city', 'suburb', 'is_open', 'cover_image_url', 'categories', 'lat', 'lng'
                 ];
 
                 const sanitizedData = Object.keys(updatedData)
@@ -192,6 +192,26 @@ export const RestaurantSettings = () => {
     };
 
     const handleBack = () => setStep(s => s - 1);
+
+    const handleGetLocation = (forNewRest: boolean) => {
+        if (!navigator.geolocation) {
+            alert('Geolocation is not supported by your browser');
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                if (forNewRest) {
+                    setRegistrationData(prev => ({ ...prev, lat: latitude, lng: longitude }));
+                } else {
+                    updateRestaurant.mutate({ lat: latitude, lng: longitude });
+                }
+            },
+            (error) => {
+                alert(`Error getting location: ${error.message}`);
+            }
+        );
+    };
 
     const addMenuItem = () => {
         setOnboardingMenu([...onboardingMenu, { name: '', price: 0, category: 'Main', is_available: true }]);
@@ -301,6 +321,12 @@ export const RestaurantSettings = () => {
                                             className="sr-only peer"
                                             defaultChecked={restaurant?.is_open}
                                             onChange={(e) => {
+                                                if (e.target.checked && (!restaurant?.lat || !restaurant?.lng)) {
+                                                    e.preventDefault();
+                                                    e.target.checked = false;
+                                                    alert('Cannot open restaurant. You must Set GPS Coordinates first in the Address section.');
+                                                    return;
+                                                }
                                                 // Instant optimistic update just for visuals
                                                 updateRestaurant.mutate({ is_open: e.target.checked });
                                             }}
@@ -338,6 +364,24 @@ export const RestaurantSettings = () => {
                                     <h3 className="font-bold flex items-center gap-2 border-b border-white/5 pb-4"><MapPin size={18} className="text-accent" /> Address & Delivery</h3>
                                     <InputField label="City" name="city" defaultValue={restaurant?.city} />
                                     <InputField label="Physical Address" name="physical_address" defaultValue={restaurant?.physical_address} />
+
+                                    <div className="pt-4 border-t border-white/5 space-y-4">
+                                        <div className="flex justify-between items-center">
+                                            <label className="text-xs font-bold uppercase tracking-widest text-[#A3A3A3] ml-1">GPS Coordinates *</label>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleGetLocation(false)}
+                                                className="text-xs font-bold text-accent bg-accent/10 px-3 py-1.5 rounded hover:bg-accent/20 transition-colors flex items-center gap-1"
+                                            >
+                                                <MapPin size={12} /> Use Current Location
+                                            </button>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <InputField label="Latitude" name="lat" type="number" step="any" required defaultValue={restaurant?.lat} placeholder="-17.82..." />
+                                            <InputField label="Longitude" name="lng" type="number" step="any" required defaultValue={restaurant?.lng} placeholder="31.05..." />
+                                        </div>
+                                    </div>
+
                                     <SelectField label="Delivery Radius (km)" name="delivery_radius_km" defaultValue={restaurant?.delivery_radius_km || 5}>
                                         <option value="3">3 km Radius</option>
                                         <option value="5">5 km Radius</option>
@@ -610,6 +654,23 @@ export const RestaurantSettings = () => {
                             placeholder="Near which major building or intersection?"
                             defaultValue={registrationData.landmark_notes}
                         />
+
+                        <div className="pt-4 border-t border-white/5 space-y-4">
+                            <div className="flex justify-between items-center">
+                                <label className="text-xs font-bold uppercase tracking-widest text-[#A3A3A3] ml-1">GPS Coordinates *</label>
+                                <button
+                                    type="button"
+                                    onClick={() => handleGetLocation(true)}
+                                    className="text-xs font-bold text-accent bg-accent/10 px-4 py-2 rounded-lg hover:bg-accent/20 transition-colors flex items-center gap-2"
+                                >
+                                    <MapPin size={16} /> Auto-Detect via GPS
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <InputField label="Latitude" name="lat" type="number" step="any" required value={registrationData.lat || ''} onChange={(e) => setRegistrationData({ ...registrationData, lat: e.target.value })} placeholder="-17.82..." />
+                                <InputField label="Longitude" name="lng" type="number" step="any" required value={registrationData.lng || ''} onChange={(e) => setRegistrationData({ ...registrationData, lng: e.target.value })} placeholder="31.05..." />
+                            </div>
+                        </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-white/5">
                             <SelectField

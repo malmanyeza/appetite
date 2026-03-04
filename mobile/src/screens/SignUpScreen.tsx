@@ -14,11 +14,12 @@ import {
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../theme';
 import { useAuthStore } from '../store/authStore';
-import { Mail, Lock, User, UserPlus, ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Mail, Lock, User, UserCircle, Car, Phone } from 'lucide-react-native';
 
 export const SignUpScreen = ({ navigation }: any) => {
     const { theme } = useTheme();
     const [name, setName] = useState('');
+    const [phone, setPhone] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [role] = useState<'customer'>('customer');
@@ -32,7 +33,7 @@ export const SignUpScreen = ({ navigation }: any) => {
     };
 
     const handleSignUp = async () => {
-        if (!name.trim() || !email.trim() || !password) {
+        if (!name.trim() || !email.trim() || !password || !phone.trim()) {
             Alert.alert('Missing Fields', 'Please fill in all fields to create your account.');
             return;
         }
@@ -77,7 +78,8 @@ export const SignUpScreen = ({ navigation }: any) => {
                 .from('profiles')
                 .upsert({
                     id: user.id,
-                    full_name: name.trim()
+                    full_name: name.trim(),
+                    phone: phone.trim()
                 });
 
             if (profileError) {
@@ -150,6 +152,18 @@ export const SignUpScreen = ({ navigation }: any) => {
                             placeholderTextColor={theme.textMuted}
                             value={name}
                             onChangeText={setName}
+                            style={[styles.input, { color: theme.text }]}
+                        />
+                    </View>
+
+                    <View style={[styles.inputContainer, { backgroundColor: theme.surface }]}>
+                        <Phone size={20} color={theme.textMuted} />
+                        <TextInput
+                            placeholder="Phone Number (e.g. +123456789)"
+                            placeholderTextColor={theme.textMuted}
+                            value={phone}
+                            onChangeText={setPhone}
+                            keyboardType="phone-pad"
                             style={[styles.input, { color: theme.text }]}
                         />
                     </View>

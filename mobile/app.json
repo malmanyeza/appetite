@@ -29,7 +29,13 @@
       "output": "single"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Appetite to use your location to find nearby restaurants and dispatch deliveries accurately."
+        }
+      ]
     ],
     "extra": {
       "eas": {

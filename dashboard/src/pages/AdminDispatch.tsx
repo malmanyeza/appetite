@@ -16,11 +16,28 @@ export const AdminDispatch = () => {
     });
 
     // Only show orders that need dispatching: confirmed or ready, but strictly no driver assigned
-    const readyOrders = orders?.filter(order => !order.driver_id && (order.status === 'confirmed' || order.status === 'ready')) || [];
-    const onlineDrivers = drivers?.filter(driver => driver.driver_profiles?.[0]?.is_online) || [];
-
-    const [selectedOrder, setSelectedOrder] = useState<any>(null);
     const queryClient = useQueryClient();
+
+    // 1. Dynamic GPS Dispatch Query based on active selection constraints
+    const { data: closestDrivers, isLoading: isDriversLoading } = useQuery({
+        queryKey: ['closest-drivers', selectedOrder?.restaurants?.lat, selectedOrder?.restaurants?.lng],
+        queryFn: async () => {
+            if (!selectedOrder?.restaurants?.lat || !selectedOrder?.restaurants?.lng) return [];
+
+            const { data, error } = await supabase.rpc('get_closest_drivers', {
+                r_lat: selectedOrder.restaurants.lat,
+                r_lng: selectedOrder.restaurants.lng,
+                max_distance_km: 15
+            });
+
+            if (error) {
+                console.error("Failed to map Haversine distance calculations:", error);
+                throw error;
+            }
+            return data;
+        },
+        enabled: !!selectedOrder?.restaurants?.lat
+    });
 
     const assignMutation = useMutation({
         mutationFn: async ({ orderId, driverId }: { orderId: string, driverId: string }) => {
@@ -108,31 +125,34 @@ export const AdminDispatch = () => {
                                 <h3 className="font-bold">Dispatching Order #{selectedOrder.id.slice(0, 8).toUpperCase()}</h3>
                                 <div className="flex items-center gap-1 text-sm font-bold"><MapPin size={16} /> {selectedOrder.delivery_address?.suburb}</div>
                             </div>
-                            <div className="p-4 max-h-64 overflow-y-auto space-y-2">
-                                {onlineDrivers.map(driver => (
-                                    <div key={driver.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors border border-transparent hover:border-white/10 group cursor-pointer">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center relative">
-                                                <Bike size={18} className="text-muted" />
-                                                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[#1a1a1a]" />
+                            <div className="p-4 max-h-[400px] overflow-y-auto space-y-2">
+                                {isDriversLoading ? (
+                                    <div className="p-8 text-center text-muted animate-pulse">Scanning mapped coordinates...</div>
+                                ) : closestDrivers && closestDrivers.length > 0 ? (
+                                    closestDrivers.map((driver: any) => (
+                                        <div key={driver.driver_id} className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors border border-transparent hover:border-white/10 group cursor-pointer">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center relative">
+                                                    <Bike size={18} className="text-muted" />
+                                                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[#1a1a1a]" />
+                                                </div>
+                                                <div>
+                                                    <p className="font-bold text-white text-sm">{driver.full_name}</p>
+                                                    <p className="text-xs text-[#10B981] mt-0.5 font-mono">{driver.distance_km ? `${Number(driver.distance_km).toFixed(2)} km radius` : 'Live Tracking'}</p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="font-bold text-white text-sm">{driver.full_name}</p>
-                                                <p className="text-xs text-muted mt-0.5">3 mins away • Yamaha TriCity</p>
-                                            </div>
+                                            <button
+                                                onClick={() => assignMutation.mutate({ orderId: selectedOrder.id, driverId: driver.driver_id })}
+                                                disabled={assignMutation.isPending}
+                                                className="px-4 py-2 bg-[#FF4D00] text-white text-xs font-bold rounded-lg hover:bg-[#FF4D00]/80 transition-colors opacity-0 group-hover:opacity-100 flex items-center gap-1 shadow-lg shadow-[#FF4D00]/20 disabled:opacity-50"
+                                            >
+                                                {assignMutation.isPending ? 'Assigning...' : 'Assign'}
+                                                {!assignMutation.isPending && <ChevronRight size={14} />}
+                                            </button>
                                         </div>
-                                        <button
-                                            onClick={() => assignMutation.mutate({ orderId: selectedOrder.id, driverId: driver.id })}
-                                            disabled={assignMutation.isPending}
-                                            className="px-4 py-2 bg-[#FF4D00] text-white text-xs font-bold rounded-lg hover:bg-[#FF4D00]/80 transition-colors opacity-0 group-hover:opacity-100 flex items-center gap-1 shadow-lg shadow-[#FF4D00]/20 disabled:opacity-50"
-                                        >
-                                            {assignMutation.isPending ? 'Assigning...' : 'Assign'}
-                                            {!assignMutation.isPending && <ChevronRight size={14} />}
-                                        </button>
-                                    </div>
-                                ))}
-                                {onlineDrivers.length === 0 && (
-                                    <div className="p-8 text-center text-muted">No drivers currently online.</div>
+                                    ))
+                                ) : (
+                                    <div className="p-8 text-center text-muted">No drivers within 15km radar ping.</div>
                                 )}
                             </div>
                         </div>
