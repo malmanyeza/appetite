@@ -9,6 +9,7 @@ import {
     Share
 } from 'react-native';
 import { useTheme } from '../theme';
+import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import {
     User,
@@ -20,7 +21,8 @@ import {
     Bell,
     Share2,
     HelpCircle,
-    Smartphone
+    Smartphone,
+    Briefcase
 } from 'lucide-react-native';
 
 export const AccountScreen = ({ navigation }: any) => {
@@ -38,16 +40,63 @@ export const AccountScreen = ({ navigation }: any) => {
         );
     };
 
-    const handleRoleSwitch = () => {
-        const otherRole = activeRole === 'customer' ? 'driver' : 'customer';
-        if (roles.includes(otherRole)) {
-            setActiveRole(otherRole);
-        } else {
-            Alert.alert(
-                'Switch Role',
-                `You don't have a ${otherRole} profile yet. Would you like to create one?`,
-                [{ text: 'Maybe Later', style: 'cancel' }]
-            );
+    const handleRoleSwitch = async () => {
+        if (activeRole === 'driver') {
+            setActiveRole('customer');
+            return;
+        }
+
+        try {
+            const { data: driverProfile, error } = await supabase
+                .from('driver_profiles')
+                .select('*')
+                .eq('user_id', user?.id)
+                .single();
+
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    if (roles.includes('driver')) {
+                        Alert.alert(
+                            'Driver Setup Required',
+                            'Your driver account needs additional details.',
+                            [{ text: 'Setup Now', onPress: () => navigation.navigate('DriverOnboarding') }]
+                        );
+                        return;
+                    }
+                    navigation.navigate('DriverOnboarding');
+                    return;
+                }
+                throw error;
+            }
+
+            if (driverProfile.status === 'pending') {
+                Alert.alert(
+                    'Application Pending',
+                    'Your driver application is currently pending review. We will notify you once approved!',
+                    [{ text: 'OK' }]
+                );
+                return;
+            }
+
+            if (driverProfile.status === 'rejected') {
+                Alert.alert(
+                    'Application Rejected',
+                    'Unfortunately, your driver application was not approved. Please contact support.',
+                    [{ text: 'OK' }]
+                );
+                return;
+            }
+
+            // If approved, enforce active tab switch
+            if (!roles.includes('driver')) {
+                Alert.alert('Notice', 'You have been approved! Please restart your app to sync permissions.');
+                return;
+            }
+
+            setActiveRole('driver');
+
+        } catch (err: any) {
+            Alert.alert('Error checking status', err.message);
         }
     };
 
@@ -86,15 +135,23 @@ export const AccountScreen = ({ navigation }: any) => {
                 <Text style={[styles.name, { color: theme.text }]}>{profile?.full_name || 'Appetite User'}</Text>
                 <Text style={[styles.email, { color: theme.textMuted }]}>{user?.email}</Text>
 
-                {roles.length > 1 && (
+                {activeRole === 'customer' ? (
                     <TouchableOpacity
                         style={[styles.roleBadge, { backgroundColor: theme.accent }]}
                         onPress={handleRoleSwitch}
                     >
-                        <Smartphone size={16} color="white" />
+                        <Briefcase size={16} color="white" />
                         <Text style={styles.roleBadgeText}>
-                            Switch to {activeRole === 'customer' ? 'Driver' : 'Customer'}
+                            {roles.includes('driver') ? 'Switch to Driver' : 'Become a Driver'}
                         </Text>
+                    </TouchableOpacity>
+                ) : (
+                    <TouchableOpacity
+                        style={[styles.roleBadge, { backgroundColor: theme.accent }]}
+                        onPress={handleRoleSwitch}
+                    >
+                        <User size={16} color="white" />
+                        <Text style={styles.roleBadgeText}>Switch to Customer</Text>
                     </TouchableOpacity>
                 )}
             </View>

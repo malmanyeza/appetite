@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, TextInput, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
@@ -238,36 +238,47 @@ export const ActiveDelivery = () => {
 
             {/* PIN Modal */}
             <Modal visible={isPinModalVisible} transparent animationType="slide">
-                <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
-                        <Text style={[styles.modalTitle, { color: theme.text }]}>Enter Delivery PIN</Text>
-                        <Text style={[styles.modalText, { color: theme.textMuted }]}>Ask the customer for the 4-digit PIN shown in their app.</Text>
+                <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                    <View style={styles.modalOverlay}>
+                        <KeyboardAvoidingView
+                            behavior={Platform.OS === "ios" ? "padding" : "height"}
+                            style={{ flex: 1, justifyContent: 'center', width: '100%' }}
+                        >
+                            <TouchableWithoutFeedback>
+                                <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
+                                    <Text style={[styles.modalTitle, { color: theme.text }]}>Enter Delivery PIN</Text>
+                                    <Text style={[styles.modalText, { color: theme.textMuted }]}>Ask the customer for the 4-digit PIN shown in their app.</Text>
 
-                        <TextInput
-                            style={[styles.pinInput, { color: theme.text, borderColor: pinError ? '#ef4444' : theme.border, backgroundColor: theme.background }]}
-                            keyboardType="number-pad"
-                            maxLength={4}
-                            value={pinEntry}
-                            onChangeText={setPinEntry}
-                            placeholder="0000"
-                            placeholderTextColor={theme.textMuted}
-                            textAlign="center"
-                        />
+                                    <TextInput
+                                        style={[styles.pinInput, { color: theme.text, borderColor: pinError ? '#ef4444' : theme.border, backgroundColor: theme.background }]}
+                                        keyboardType="number-pad"
+                                        maxLength={4}
+                                        value={pinEntry}
+                                        onChangeText={setPinEntry}
+                                        placeholder="0000"
+                                        placeholderTextColor={theme.textMuted}
+                                        textAlign="center"
+                                        returnKeyType="done"
+                                        onSubmitEditing={Keyboard.dismiss}
+                                    />
 
-                        {!!pinError && (
-                            <Text style={{ color: '#ef4444', textAlign: 'center', marginBottom: 12, fontWeight: '600' }}>
-                                {pinError}
-                            </Text>
-                        )}
+                                    {!!pinError && (
+                                        <Text style={{ color: '#ef4444', textAlign: 'center', marginBottom: 12, fontWeight: '600' }}>
+                                            {pinError}
+                                        </Text>
+                                    )}
 
-                        <TouchableOpacity style={[styles.primaryButton, { backgroundColor: '#22c55e' }]} onPress={handleConfirmDelivery}>
-                            <Text style={styles.primaryButtonText}>Confirm Delivery</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.secondaryButton, { borderColor: theme.border }]} onPress={() => setIsPinModalVisible(false)}>
-                            <Text style={[styles.secondaryButtonText, { color: theme.text }]}>Cancel</Text>
-                        </TouchableOpacity>
+                                    <TouchableOpacity style={[styles.primaryButton, { backgroundColor: '#22c55e' }]} onPress={handleConfirmDelivery}>
+                                        <Text style={styles.primaryButtonText}>Confirm Delivery</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={[styles.secondaryButton, { borderColor: theme.border }]} onPress={() => setIsPinModalVisible(false)}>
+                                        <Text style={[styles.secondaryButtonText, { color: theme.text }]}>Cancel</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </TouchableWithoutFeedback>
+                        </KeyboardAvoidingView>
                     </View>
-                </View>
+                </TouchableWithoutFeedback>
             </Modal>
         </View>
     );

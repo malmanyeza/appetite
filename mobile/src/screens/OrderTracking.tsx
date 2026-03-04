@@ -89,17 +89,21 @@ export const OrderTracking = ({ route, navigation }: any) => {
             <View style={styles.header}>
                 <Text style={[styles.headerTitle, { color: theme.text, marginLeft: 20 }]}>Order Tracking</Text>
             </View>
-            <View style={styles.center}>
-                <MapPin size={64} color={theme.surface} style={{ marginBottom: 16 }} />
+            <View style={[styles.center, { paddingHorizontal: 32 }]}>
+                <View style={[styles.emptyIconContainer, { backgroundColor: `${theme.accent}15` }]}>
+                    <Package size={64} color={theme.accent} />
+                </View>
                 <Text style={[styles.emptyTitle, { color: theme.text }]}>No Active Orders</Text>
                 <Text style={[styles.emptySubtitle, { color: theme.textMuted }]}>
-                    You do not have any orders actively being prepared or delivered right now.
+                    Looks like your stomach is empty! Discover amazing local restaurants and get delicious food delivered fast.
                 </Text>
                 <TouchableOpacity
-                    style={[styles.browseButton, { backgroundColor: theme.accent, marginTop: 24 }]}
-                    onPress={() => navigation.navigate('Home')}
+                    style={[styles.browseButton, { backgroundColor: theme.accent }]}
+                    onPress={() => navigation.navigate('Home', { screen: 'HomeMain' })}
+                    activeOpacity={0.8}
                 >
-                    <Text style={{ color: 'white', fontWeight: 'bold' }}>Browse Restaurants</Text>
+                    <Search size={20} color="white" style={{ marginRight: 8 }} />
+                    <Text style={styles.browseButtonText}>Browse Restaurants</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -119,7 +123,7 @@ export const OrderTracking = ({ route, navigation }: any) => {
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.navigate('Home')}>
+                <TouchableOpacity onPress={() => navigation.navigate('Home', { screen: 'HomeMain' })}>
                     <ChevronLeft color={theme.text} size={24} />
                 </TouchableOpacity>
                 <Text style={[styles.headerTitle, { color: theme.text }]}>Order Tracking</Text>
@@ -228,7 +232,32 @@ const styles = StyleSheet.create({
     },
     timelineLabel: { marginLeft: 20, fontSize: 16 },
     backButton: { padding: 20, alignItems: 'center', borderTopWidth: 1 },
-    emptyTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 8 },
-    emptySubtitle: { fontSize: 16, textAlign: 'center', paddingHorizontal: 40 },
-    browseButton: { paddingHorizontal: 32, paddingVertical: 14, borderRadius: 12 }
+    emptyIconContainer: {
+        width: 140,
+        height: 140,
+        borderRadius: 70,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    emptyTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 12, textAlign: 'center' },
+    emptySubtitle: { fontSize: 16, textAlign: 'center', lineHeight: 24, marginBottom: 32 },
+    browseButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 32,
+        paddingVertical: 16,
+        borderRadius: 30,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    browseButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: 'bold',
+        letterSpacing: 0.5,
+    }
 });

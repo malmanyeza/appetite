@@ -7,10 +7,14 @@ import { ThemeContext, Colors } from './src/theme';
 import { RootNavigator } from './src/navigation';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from './src/lib/supabase';
+import { usePushNotifications } from './src/hooks/usePushNotifications';
 
 const queryClient = new QueryClient();
 
 export default function App() {
+    // Initialize Push Notifications
+    usePushNotifications();
+
     const colorScheme = useColorScheme();
     const { loading, user, refreshSession } = useAuthStore();
 

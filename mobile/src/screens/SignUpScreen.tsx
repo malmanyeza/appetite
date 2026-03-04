@@ -14,14 +14,14 @@ import {
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../theme';
 import { useAuthStore } from '../store/authStore';
-import { Mail, Lock, User, UserPlus, ArrowLeft, Briefcase, ShoppingBag } from 'lucide-react-native';
+import { Mail, Lock, User, UserPlus, ArrowLeft } from 'lucide-react-native';
 
 export const SignUpScreen = ({ navigation }: any) => {
     const { theme } = useTheme();
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [role, setRole] = useState<'customer' | 'driver'>('customer');
+    const [role] = useState<'customer'>('customer');
     const [loading, setLoading] = useState(false);
 
     const setSigningUp = useAuthStore(state => state.setSigningUp);
@@ -100,17 +100,6 @@ export const SignUpScreen = ({ navigation }: any) => {
                 // We continue because they have a profile, but the role might need fixing via support or re-login
             }
 
-            // 4. Create driver record if needed
-            if (role === 'driver') {
-                const { error: driverError } = await supabase
-                    .from('driver_profiles')
-                    .insert({
-                        user_id: user.id,
-                        is_online: false
-                    });
-                if (driverError) console.error('Driver profile error:', driverError);
-            }
-
             // 5. Force session refresh to accurately load the new role
             await refreshSession();
 
@@ -151,32 +140,6 @@ export const SignUpScreen = ({ navigation }: any) => {
                     <Text style={[styles.subtitle, { color: theme.textMuted }]}>
                         Join Appetite and start your journey
                     </Text>
-                </View>
-
-                <View style={styles.roleContainer}>
-                    <TouchableOpacity
-                        style={[
-                            styles.roleCard,
-                            { backgroundColor: theme.surface },
-                            role === 'customer' && { borderColor: theme.accent, borderWidth: 2 }
-                        ]}
-                        onPress={() => setRole('customer')}
-                    >
-                        <ShoppingBag color={role === 'customer' ? theme.accent : theme.textMuted} size={24} />
-                        <Text style={[styles.roleText, { color: role === 'customer' ? theme.accent : theme.text }]}>Customer</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[
-                            styles.roleCard,
-                            { backgroundColor: theme.surface },
-                            role === 'driver' && { borderColor: theme.accent, borderWidth: 2 }
-                        ]}
-                        onPress={() => setRole('driver')}
-                    >
-                        <Briefcase color={role === 'driver' ? theme.accent : theme.textMuted} size={24} />
-                        <Text style={[styles.roleText, { color: role === 'driver' ? theme.accent : theme.text }]}>Driver</Text>
-                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.form}>

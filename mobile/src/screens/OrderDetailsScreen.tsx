@@ -65,6 +65,7 @@ export const OrderDetailsScreen = ({ route, navigation }: any) => {
     });
 
     if (isLoading) return <View style={[styles.center, { backgroundColor: theme.background }]}><ActivityIndicator color={theme.accent} /></View>;
+    if (!order) return <View style={[styles.center, { backgroundColor: theme.background }]}><Text style={{ color: theme.textMuted }}>Order information unavailable.</Text></View>;
 
     const addr = order.delivery_address_snapshot;
     const pricing = order.pricing;
@@ -170,10 +171,10 @@ export const OrderDetailsScreen = ({ route, navigation }: any) => {
                                     <Text style={[styles.reviewRateLabel, { color: theme.text }]}>Your Review</Text>
                                     <View style={styles.starsRow}>
                                         {[1, 2, 3, 4, 5].map((s) => (
-                                            <Star 
-                                                key={s} 
-                                                size={16} 
-                                                color={s <= existingReview.rating ? theme.accent : theme.border} 
+                                            <Star
+                                                key={s}
+                                                size={16}
+                                                color={s <= existingReview.rating ? theme.accent : theme.border}
                                                 fill={s <= existingReview.rating ? theme.accent : 'transparent'}
                                             />
                                         ))}
@@ -216,9 +217,9 @@ export const OrderDetailsScreen = ({ route, navigation }: any) => {
                         <View style={styles.modalStarsRow}>
                             {[1, 2, 3, 4, 5].map((s) => (
                                 <TouchableOpacity key={s} onPress={() => setRating(s)}>
-                                    <Star 
-                                        size={40} 
-                                        color={s <= rating ? theme.accent : theme.border} 
+                                    <Star
+                                        size={40}
+                                        color={s <= rating ? theme.accent : theme.border}
                                         fill={s <= rating ? theme.accent : 'transparent'}
                                     />
                                 </TouchableOpacity>

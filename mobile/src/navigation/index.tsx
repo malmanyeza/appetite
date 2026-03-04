@@ -20,6 +20,7 @@ import { LoginScreen } from '../screens/LoginScreen';
 import { SignUpScreen } from '../screens/SignUpScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { OrderDetailsScreen } from '../screens/OrderDetailsScreen';
+import { DriverOnboarding } from '../screens/DriverOnboarding';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -40,6 +41,7 @@ const AccountStack = () => {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="AccountMain" component={AccountScreen} />
             <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="DriverOnboarding" component={DriverOnboarding} />
         </Stack.Navigator>
     );
 };
