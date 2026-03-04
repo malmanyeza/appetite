@@ -108,7 +108,7 @@ export const AdminOrders = () => {
                                     <th className="px-6 py-5">Order ID</th>
                                     <th className="px-6 py-5">Time</th>
                                     <th className="px-6 py-5">Customer</th>
-                                    <th className="px-6 py-5">Restaurant</th>
+                                    <th className="px-6 py-5">Restaurant Contact</th>
                                     <th className="px-6 py-5">Status</th>
                                     <th className="px-6 py-5">Amount</th>
                                     <th className="px-6 py-5 text-right">Action</th>
@@ -134,7 +134,7 @@ export const AdminOrders = () => {
                                         <td className="px-6 py-4 font-medium">{order.profiles?.full_name || 'Guest User'}</td>
                                         <td className="px-6 py-4">
                                             <p className="text-white font-medium">{order.restaurants?.name || 'Unknown Store'}</p>
-                                            <p className="text-xs text-muted mt-0.5">{order.restaurants?.profiles?.phone || 'No phone listed'}</p>
+                                            <p className="text-xs text-muted mt-0.5">{order.restaurants?.owner_phone || 'No phone listed'}</p>
                                         </td>
                                         <td className="px-6 py-4">
                                             <StatusPill status={order.status} />

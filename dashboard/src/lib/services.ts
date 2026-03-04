@@ -30,7 +30,8 @@ export const ordersService = {
         *,
         profiles:customer_id (full_name, phone),
         restaurants:restaurant_id (
-            name
+            name,
+            owner_phone
         )
       `)
             .order('created_at', { ascending: false });
@@ -249,14 +250,103 @@ export const adminService = {
 
     async getAllDrivers() {
         const { data, error } = await supabase
-            .from('profiles')
+            .from('driver_profiles')
             .select(`
-        *,
-        driver_profiles (*)
-      `)
-            .eq('role', 'driver');
+                *,
+                profiles:user_id (*)
+            `)
+            .order('created_at', { ascending: false });
+
         if (error) throw error;
-        return data;
+
+        // Transform the payload to match the expected format: 
+        // Profiles array where each profile contains its driver_profile as an array [0]
+        return data.map((dp: any) => ({
+            ...dp.profiles,
+            driver_profiles: [dp]
+        }));
+    },
+
+    async sendPushNotification(pushToken: string, title: string, body: string, data?: any) {
+        if (!pushToken) return;
+        const message = {
+            to: pushToken,
+            sound: 'default',
+            title,
+            body,
+            data,
+        };
+
+        try {
+            await fetch('https://exp.host/--/api/v2/push/send', {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Accept-encoding': 'gzip, deflate',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(message),
+            });
+        } catch (error) {
+            console.error('Error sending push notification', error);
+        }
+    },
+
+    async updateDriverStatus(userId: string, status: string) {
+        // Look up the driver's notification token before processing the event
+        const { data: profile } = await supabase.from('profiles').select('expo_push_token').eq('id', userId).single();
+        const pushToken = profile?.expo_push_token;
+
+        if (status === 'rejected') {
+            const { error: deleteError } = await supabase
+                .from('driver_profiles')
+                .delete()
+                .eq('user_id', userId);
+
+            if (deleteError) throw deleteError;
+
+            // Ensure any accidentally granted driver role is removed
+            await supabase.from('user_roles').delete().match({ user_id: userId, role: 'driver' });
+
+            if (pushToken) {
+                await this.sendPushNotification(pushToken, 'Application Update', 'Your driver application was reviewed but could not be approved at this time.');
+            }
+            return;
+        }
+
+        const { error } = await supabase
+            .from('driver_profiles')
+            .update({ status })
+            .eq('user_id', userId);
+
+        if (error) throw error;
+
+        // Also ensure user_roles has 'driver' if approved
+        if (status === 'approved') {
+            await supabase.from('user_roles').upsert({ user_id: userId, role: 'driver' }, { onConflict: 'user_id, role' });
+            if (pushToken) {
+                await this.sendPushNotification(pushToken, 'Application Approved!', 'Welcome to the fleet! You are now officially approved to start accepting delivery orders.');
+            }
+        }
+    },
+
+    async assignDriver(orderId: string, driverId: string) {
+        const { error } = await supabase
+            .from('orders')
+            .update({ driver_id: driverId, status: 'dispatched' })
+            .eq('id', orderId);
+
+        if (error) throw error;
+
+        // Automatically dispatch a Push Notification to the target driver
+        const { data: profile } = await supabase.from('profiles').select('expo_push_token').eq('id', driverId).single();
+        if (profile?.expo_push_token) {
+            await this.sendPushNotification(
+                profile.expo_push_token,
+                'New Delivery Assigned!',
+                'You have a new active order securely routed to your device for pickup.'
+            );
+        }
     },
 
     async getGlobalAnalytics() {

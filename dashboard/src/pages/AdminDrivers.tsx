@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminService } from '../lib/services';
+import { supabase } from '../lib/supabase';
 import {
     Bike,
     Search,
@@ -12,7 +13,10 @@ import {
     X,
     TrendingUp,
     Clock,
-    Navigation
+    Navigation,
+    CheckCircle2,
+    XCircle,
+    AlertTriangle
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -24,6 +28,35 @@ function cn(...inputs: ClassValue[]) {
 export const AdminDrivers = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedDriver, setSelectedDriver] = useState<any>(null);
+    const queryClient = useQueryClient();
+
+    useEffect(() => {
+        const channel = supabase
+            .channel('admin-drivers-status')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'driver_profiles',
+            }, (payload) => {
+                queryClient.invalidateQueries({ queryKey: ['admin-drivers-list'] });
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [queryClient]);
+
+    const updateStatusMutation = useMutation({
+        mutationFn: async ({ userId, status }: { userId: string, status: string }) => {
+            await adminService.updateDriverStatus(userId, status);
+            return status;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['admin-drivers-list'] });
+            setSelectedDriver(null);
+        }
+    });
 
     const { data: drivers, isLoading } = useQuery({
         queryKey: ['admin-drivers-list'],
@@ -108,12 +141,20 @@ export const AdminDrivers = () => {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <span className={cn(
-                                                    "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                                                    isOnline ? "bg-green-500/10 text-green-500" : "bg-white/10 text-muted"
-                                                )}>
-                                                    {isOnline ? 'Active' : 'Offline'}
-                                                </span>
+                                                <div className="flex flex-col gap-2 items-start">
+                                                    {driver.driver_profiles?.[0]?.status === 'pending' ? (
+                                                        <span className="px-3 py-1 bg-orange-500/10 text-orange-400 rounded-full text-[10px] font-bold uppercase tracking-wider border border-orange-500/20">Pending Approval</span>
+                                                    ) : driver.driver_profiles?.[0]?.status === 'rejected' ? (
+                                                        <span className="px-3 py-1 bg-red-500/10 text-red-500 rounded-full text-[10px] font-bold uppercase tracking-wider border border-red-500/20">Rejected</span>
+                                                    ) : (
+                                                        <span className={cn(
+                                                            "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border",
+                                                            isOnline ? "bg-green-500/10 text-green-500 border-green-500/20" : "bg-white/5 text-muted border-white/10"
+                                                        )}>
+                                                            {isOnline ? 'Active' : 'Offline'}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 text-muted">
                                                 <div className="flex items-center gap-2">
@@ -208,6 +249,69 @@ export const AdminDrivers = () => {
                                 </div>
                             </div>
 
+                            {/* Onboarding Documents & Info */}
+                            <div className="space-y-3">
+                                <h3 className="text-xs font-bold uppercase tracking-widest text-muted flex items-center gap-2">
+                                    <ShieldCheck size={14} /> Onboarding Details
+                                </h3>
+
+                                <div className="space-y-4">
+                                    {/* Personal Info Grid */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
+                                            <p className="text-[10px] text-muted uppercase font-bold tracking-wider mb-1">City / Area</p>
+                                            <p className="text-sm font-bold text-white">
+                                                {selectedDriver.driver_profiles?.[0]?.city || 'N/A'} • {selectedDriver.driver_profiles?.[0]?.operating_area || 'N/A'}
+                                            </p>
+                                        </div>
+                                        <div className="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
+                                            <p className="text-[10px] text-muted uppercase font-bold tracking-wider mb-1">Emergency Contact</p>
+                                            <p className="text-sm font-bold text-white">{selectedDriver.driver_profiles?.[0]?.emergency_contact || 'None Provided'}</p>
+                                        </div>
+                                        <div className="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
+                                            <p className="text-[10px] text-muted uppercase font-bold tracking-wider mb-1">Vehicle Plate</p>
+                                            <p className="text-sm font-bold text-white max-w-[120px] truncate">{selectedDriver.driver_profiles?.[0]?.plate_number || 'N/A'}</p>
+                                        </div>
+                                        <div className="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
+                                            <p className="text-[10px] text-muted uppercase font-bold tracking-wider mb-1">EcoCash Payout</p>
+                                            <p className="text-sm font-bold text-white max-w-[120px] truncate" title={`${selectedDriver.driver_profiles?.[0]?.ecocash_number || 'None'} - ${selectedDriver.driver_profiles?.[0]?.account_name || ''}`}>
+                                                {selectedDriver.driver_profiles?.[0]?.ecocash_number || 'None'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Documents */}
+                                    <div className="flex gap-4">
+                                        <div className="flex-1 space-y-2">
+                                            <p className="text-[10px] text-muted uppercase font-bold tracking-wider">Driver Selfie</p>
+                                            <div className="h-40 rounded-xl border border-white/5 bg-white/[0.02] flex items-center justify-center overflow-hidden relative group">
+                                                {selectedDriver.driver_profiles?.[0]?.selfie_url ? (
+                                                    <img src={selectedDriver.driver_profiles[0].selfie_url} alt="Selfie" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <p className="text-xs text-muted">No Photo</p>
+                                                )}
+                                                {selectedDriver.driver_profiles?.[0]?.selfie_url && (
+                                                    <a href={selectedDriver.driver_profiles[0].selfie_url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-xs uppercase tracking-wider backdrop-blur-sm">View Full</a>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 space-y-2">
+                                            <p className="text-[10px] text-muted uppercase font-bold tracking-wider">National ID</p>
+                                            <div className="h-40 rounded-xl border border-white/5 bg-white/[0.02] flex items-center justify-center overflow-hidden relative group">
+                                                {selectedDriver.driver_profiles?.[0]?.id_photo_url ? (
+                                                    <img src={selectedDriver.driver_profiles[0].id_photo_url} alt="National ID" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <p className="text-xs text-muted">No Document</p>
+                                                )}
+                                                {selectedDriver.driver_profiles?.[0]?.id_photo_url && (
+                                                    <a href={selectedDriver.driver_profiles[0].id_photo_url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-xs uppercase tracking-wider backdrop-blur-sm">View Full</a>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* Performance Metrics */}
                             <div className="space-y-3">
                                 <h3 className="text-xs font-bold uppercase tracking-widest text-muted flex items-center gap-2">
@@ -216,17 +320,35 @@ export const AdminDrivers = () => {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
                                         <p className="text-[10px] text-muted uppercase font-bold tracking-wider mb-1">Deliveries</p>
-                                        <p className="text-2xl font-black text-white">14</p>
+                                        <p className="text-2xl font-black text-white">0</p>
                                     </div>
                                     <div className="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
                                         <p className="text-[10px] text-muted uppercase font-bold tracking-wider mb-1">Est. Earnings</p>
-                                        <p className="text-2xl font-black text-green-400">$42.50</p>
+                                        <p className="text-2xl font-black text-green-400">$0.00</p>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Actions */}
                             <div className="pt-6 border-t border-white/5 space-y-3">
+                                {selectedDriver.driver_profiles?.[0]?.status === 'pending' && (
+                                    <div className="grid grid-cols-2 gap-3 pb-3">
+                                        <button
+                                            onClick={() => updateStatusMutation.mutate({ userId: selectedDriver.id, status: 'approved' })}
+                                            disabled={updateStatusMutation.isPending}
+                                            className="w-full py-3 bg-green-500/10 hover:bg-green-500/20 text-green-500 border border-green-500/20 font-bold rounded-xl transition-colors flex justify-center items-center gap-2"
+                                        >
+                                            <CheckCircle2 size={18} /> Approve
+                                        </button>
+                                        <button
+                                            onClick={() => updateStatusMutation.mutate({ userId: selectedDriver.id, status: 'rejected' })}
+                                            disabled={updateStatusMutation.isPending}
+                                            className="w-full py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 font-bold rounded-xl transition-colors flex justify-center items-center gap-2"
+                                        >
+                                            <XCircle size={18} /> Reject
+                                        </button>
+                                    </div>
+                                )}
                                 <button className="w-full py-4 glass text-[#FF4D00] hover:text-white font-bold rounded-xl hover:bg-[#FF4D00] transition-colors shadow-lg border border-[#FF4D00]/20 flex justify-center items-center gap-2">
                                     <MapPin size={18} /> Focus on Dispatch Map
                                 </button>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ordersService, adminService } from '../lib/services';
 import { Map, MapPin, Bike, Navigation, Clock, User, ChevronRight } from 'lucide-react';
 import { StatusPill } from '../components/StatusPill';
@@ -20,6 +20,17 @@ export const AdminDispatch = () => {
     const onlineDrivers = drivers?.filter(driver => driver.driver_profiles?.[0]?.is_online) || [];
 
     const [selectedOrder, setSelectedOrder] = useState<any>(null);
+    const queryClient = useQueryClient();
+
+    const assignMutation = useMutation({
+        mutationFn: async ({ orderId, driverId }: { orderId: string, driverId: string }) => {
+            await adminService.assignDriver(orderId, driverId);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
+            setSelectedOrder(null);
+        }
+    });
 
     return (
         <div className="flex flex-col h-[85vh] -m-8">
@@ -54,8 +65,8 @@ export const AdminDispatch = () => {
                                 key={order.id}
                                 onClick={() => setSelectedOrder(order)}
                                 className={`p-4 rounded-xl border transition-all cursor-pointer ${selectedOrder?.id === order.id
-                                        ? 'bg-accent/10 border-accent/30 shadow-[0_0_15px_rgba(255,77,0,0.1)]'
-                                        : 'bg-white/5 border-white/10 hover:border-white/20'
+                                    ? 'bg-accent/10 border-accent/30 shadow-[0_0_15px_rgba(255,77,0,0.1)]'
+                                    : 'bg-white/5 border-white/10 hover:border-white/20'
                                     }`}
                             >
                                 <div className="flex justify-between items-start mb-3">
@@ -110,9 +121,13 @@ export const AdminDispatch = () => {
                                                 <p className="text-xs text-muted mt-0.5">3 mins away • Yamaha TriCity</p>
                                             </div>
                                         </div>
-                                        <button className="px-4 py-2 bg-[#FF4D00] text-white text-xs font-bold rounded-lg hover:bg-[#FF4D00]/80 transition-colors opacity-0 group-hover:opacity-100 flex items-center gap-1 shadow-lg shadow-[#FF4D00]/20">
-                                            Assign
-                                            <ChevronRight size={14} />
+                                        <button
+                                            onClick={() => assignMutation.mutate({ orderId: selectedOrder.id, driverId: driver.id })}
+                                            disabled={assignMutation.isPending}
+                                            className="px-4 py-2 bg-[#FF4D00] text-white text-xs font-bold rounded-lg hover:bg-[#FF4D00]/80 transition-colors opacity-0 group-hover:opacity-100 flex items-center gap-1 shadow-lg shadow-[#FF4D00]/20 disabled:opacity-50"
+                                        >
+                                            {assignMutation.isPending ? 'Assigning...' : 'Assign'}
+                                            {!assignMutation.isPending && <ChevronRight size={14} />}
                                         </button>
                                     </div>
                                 ))}
