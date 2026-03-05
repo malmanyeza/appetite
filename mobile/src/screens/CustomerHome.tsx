@@ -11,7 +11,6 @@ import {
     LayoutAnimation,
     Modal,
     KeyboardAvoidingView,
-    KeyboardAvoidingView,
     TouchableWithoutFeedback,
     Keyboard,
     ActivityIndicator,
@@ -67,8 +66,8 @@ export const CustomerHome = ({ navigation }: any) => {
                     .from('restaurants')
                     .select('*')
                     .eq('is_open', true)
-                    .not('lat', 'is', 'null')
-                    .not('lng', 'is', 'null');
+                    .not('lat', 'is', null)
+                    .not('lng', 'is', null);
 
                 if (selectedCategory) {
                     query = query.contains('categories', [selectedCategory]);
@@ -84,11 +83,14 @@ export const CustomerHome = ({ navigation }: any) => {
                 u_lng: userCoordinates.lng
             });
 
-            if (error) throw error;
+            if (error) {
+                console.error("RPC Error:", error);
+                throw error;
+            }
 
-            let result = data;
-            if (selectedCategory) {
-                result = result.filter((r: any) => r.categories.includes(selectedCategory));
+            let result = data || [];
+            if (selectedCategory && result.length > 0) {
+                result = result.filter((r: any) => r.categories && r.categories.includes(selectedCategory));
             }
             return result;
         },
@@ -245,12 +247,12 @@ export const CustomerHome = ({ navigation }: any) => {
                             <View style={styles.restaurantDetails}>
                                 <View style={styles.row}>
                                     <Text style={[styles.restaurantName, { color: theme.text }]}>{item.name}</Text>
-                                    <Text style={[styles.rating, { color: theme.text }]}>⭐ {item.rating_avg.toFixed(1)}</Text>
+                                    <Text style={[styles.rating, { color: theme.text }]}>⭐ {item.rating_avg != null ? Number(item.rating_avg).toFixed(1) : 'New'}</Text>
                                 </View>
-                                <Text style={[styles.categories, { color: theme.textMuted }]}>{item.categories.join(' • ')}</Text>
+                                <Text style={[styles.categories, { color: theme.textMuted }]}>{item.categories ? item.categories.join(' • ') : 'Food & Drink'}</Text>
                                 <View style={styles.deliveryInfo}>
                                     <Text style={[styles.infoText, { color: theme.textMuted }]}>
-                                        {item.distance_km ? `${item.distance_km.toFixed(1)} km • ` : ''}Delivery
+                                        {item.distance_km != null ? `${Number(item.distance_km).toFixed(1)} km • ` : ''}Delivery
                                     </Text>
                                     <Text style={[styles.infoText, { color: theme.textMuted }]}>
                                         {item.avg_prep_time || '20-30 min'}

@@ -27,6 +27,7 @@ export const DriverJobs = () => {
     const queryClient = useQueryClient();
     const [isOnline, setIsOnline] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
     const [locationSubscription, setLocationSubscription] = useState<ExpoLocation.LocationSubscription | null>(null);
 
     // 1. GPS Heartbeat Active Polling

@@ -28,7 +28,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     signIn: async (email, password) => {
         set({ loading: true });
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        if (error) {
+            set({ loading: false });
+            throw error;
+        }
+
+        // Verify Dashboard Clearance
+        const { data: roles } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', data.user.id);
+
+        const availableRoles = roles?.map(r => r.role as Role) || [];
+        if (!availableRoles.includes('admin') && !availableRoles.includes('restaurant')) {
+            await supabase.auth.signOut();
+            set({ loading: false, user: null, profile: null, roles: [], currentRole: null });
+            throw new Error('Unauthorized access. This dashboard is strictly for Restaurant Partners and Admins.');
+        }
+
         await get().refreshSession();
     },
 
@@ -73,32 +90,49 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     refreshSession: async () => {
         set({ loading: true });
-        const { data: { session } } = await supabase.auth.getSession();
-
-        if (session) {
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
-
-            const { data: roles } = await supabase
-                .from('user_roles')
-                .select('role')
-                .eq('user_id', session.user.id);
-
-            const availableRoles = roles?.map(r => r.role as Role) || [];
-
-            set({
-                user: session.user,
-                profile,
-                roles: availableRoles,
-                currentRole: availableRoles[0] || null,
-                loading: false,
-                initialized: true
-            });
-        } else {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session) {
             set({ user: null, profile: null, roles: [], currentRole: null, loading: false, initialized: true });
+            return;
         }
+
+        // Use getUser() to ensure token is valid server-side, preventing DB-wiped zombie sessions
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+            // Zombie session or expired
+            await supabase.auth.signOut().catch(() => { });
+            set({ user: null, profile: null, roles: [], currentRole: null, loading: false, initialized: true });
+            return;
+        }
+
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+
+        const { data: roles } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id);
+
+        const availableRoles = roles?.map(r => r.role as Role) || [];
+
+        // If a malicious user bypasses signIn and hits refreshSession with a customer token:
+        if (!availableRoles.includes('admin') && !availableRoles.includes('restaurant')) {
+            await supabase.auth.signOut();
+            set({ user: null, profile: null, roles: [], currentRole: null, loading: false, initialized: true });
+            return;
+        }
+
+        set({
+            user,
+            profile,
+            roles: availableRoles,
+            currentRole: availableRoles.includes('admin') ? 'admin' : (availableRoles[0] || null),
+            loading: false,
+            initialized: true
+        });
     }
 }));

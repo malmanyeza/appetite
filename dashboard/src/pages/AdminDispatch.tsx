@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ordersService, adminService } from '../lib/services';
+import { supabase } from '../lib/supabase';
 import { Map, MapPin, Bike, Navigation, Clock, User, ChevronRight } from 'lucide-react';
 import { StatusPill } from '../components/StatusPill';
 
@@ -16,6 +17,10 @@ export const AdminDispatch = () => {
     });
 
     // Only show orders that need dispatching: confirmed or ready, but strictly no driver assigned
+    const readyOrders = orders?.filter(order => !order.driver_id && (order.status === 'confirmed' || order.status === 'ready')) || [];
+    const onlineDrivers = drivers?.filter(driver => driver.driver_profiles?.[0]?.is_online) || [];
+
+    const [selectedOrder, setSelectedOrder] = useState<any>(null);
     const queryClient = useQueryClient();
 
     // 1. Dynamic GPS Dispatch Query based on active selection constraints
@@ -27,7 +32,8 @@ export const AdminDispatch = () => {
             const { data, error } = await supabase.rpc('get_closest_drivers', {
                 r_lat: selectedOrder.restaurants.lat,
                 r_lng: selectedOrder.restaurants.lng,
-                max_distance_km: 15
+                max_distance_km: 15,
+                exclude_driver_id: selectedOrder.customer_id
             });
 
             if (error) {

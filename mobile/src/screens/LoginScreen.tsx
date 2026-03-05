@@ -37,7 +37,7 @@ export const LoginScreen = ({ navigation }: any) => {
 
         setLoading(true);
         try {
-            const { error } = await supabase.auth.signInWithPassword({
+            const { data, error } = await supabase.auth.signInWithPassword({
                 email,
                 password,
             });
@@ -47,6 +47,25 @@ export const LoginScreen = ({ navigation }: any) => {
                     throw new Error('Incorrect email or password. Please try again.');
                 }
                 throw error;
+            }
+
+            // Explicitly ping the authoritative backend to prevent zombie passwords bypassing cache
+            const { data: { user }, error: authError } = await supabase.auth.getUser();
+            if (authError || !user) {
+                await supabase.auth.signOut().catch(() => { });
+                throw new Error('This account has been administratively disabled or deleted.');
+            }
+
+            // Strictly check if the user exists in our public database (profiles)
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('id', user.id)
+                .single();
+
+            if (!profile) {
+                await supabase.auth.signOut().catch(() => { });
+                throw new Error('This user does not exist in the database. Please sign up or contact support.');
             }
         } catch (error: any) {
             Alert.alert('Login Failed', error.message);

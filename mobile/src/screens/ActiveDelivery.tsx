@@ -144,15 +144,9 @@ export const ActiveDelivery = () => {
                         <Text style={[styles.cardText, { color: theme.textMuted }]}>{order.restaurants?.suburb}, {order.restaurants?.city}</Text>
 
                         <View style={styles.buttonRow}>
-                            {order.restaurants?.lat && (
-                                <TouchableOpacity style={[styles.iconButton, { backgroundColor: theme.background }]} onPress={() => openMaps(order.restaurants.lat, order.restaurants.lng)}>
-                                    <MapPin color={theme.text} size={20} />
-                                    <Text style={[styles.iconButtonText, { color: theme.text }]}>Directions</Text>
-                                </TouchableOpacity>
-                            )}
                             <TouchableOpacity style={[styles.iconButton, { backgroundColor: theme.background }]} onPress={() => callNumber('0000000000')}>
                                 <Phone color={theme.text} size={20} />
-                                <Text style={[styles.iconButtonText, { color: theme.text }]}>Call</Text>
+                                <Text style={[styles.iconButtonText, { color: theme.text }]}>Call Restaurant</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -165,6 +159,16 @@ export const ActiveDelivery = () => {
                                 </Text>
                             </View>
                         </View>
+
+                        {order.restaurants?.lat && (
+                            <TouchableOpacity
+                                style={[styles.navButton, { backgroundColor: theme.surface, borderColor: theme.accent, borderWidth: 1 }]}
+                                onPress={() => openMaps(order.restaurants.lat, order.restaurants.lng)}
+                            >
+                                <Navigation color={theme.accent} size={20} style={{ marginRight: 8 }} />
+                                <Text style={[styles.primaryButtonText, { color: theme.accent }]}>Navigate to Restaurant</Text>
+                            </TouchableOpacity>
+                        )}
 
                         <TouchableOpacity
                             style={[styles.primaryButton, { backgroundColor: theme.accent }]}
@@ -187,15 +191,9 @@ export const ActiveDelivery = () => {
                         </Text>
 
                         <View style={styles.buttonRow}>
-                            {order.delivery_address_snapshot?.lat && (
-                                <TouchableOpacity style={[styles.iconButton, { backgroundColor: theme.background }]} onPress={() => openMaps(order.delivery_address_snapshot.lat, order.delivery_address_snapshot.lng)}>
-                                    <MapPin color={theme.text} size={20} />
-                                    <Text style={[styles.iconButtonText, { color: theme.text }]}>Directions</Text>
-                                </TouchableOpacity>
-                            )}
                             <TouchableOpacity style={[styles.iconButton, { backgroundColor: theme.background }]} onPress={() => callNumber(order.profiles?.phone || '')}>
                                 <Phone color={theme.text} size={20} />
-                                <Text style={[styles.iconButtonText, { color: theme.text }]}>Call</Text>
+                                <Text style={[styles.iconButtonText, { color: theme.text }]}>Call Customer</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -209,12 +207,24 @@ export const ActiveDelivery = () => {
                         )}
 
                         {order.status === 'on_the_way' && (
-                            <TouchableOpacity
-                                style={[styles.primaryButton, { backgroundColor: '#22c55e' }]}
-                                onPress={() => setIsPinModalVisible(true)}
-                            >
-                                <Text style={styles.primaryButtonText}>Complete Delivery</Text>
-                            </TouchableOpacity>
+                            <>
+                                {order.delivery_address_snapshot?.lat && (
+                                    <TouchableOpacity
+                                        style={[styles.navButton, { backgroundColor: theme.surface, borderColor: theme.accent, borderWidth: 1 }]}
+                                        onPress={() => openMaps(order.delivery_address_snapshot.lat, order.delivery_address_snapshot.lng)}
+                                    >
+                                        <Navigation color={theme.accent} size={20} style={{ marginRight: 8 }} />
+                                        <Text style={[styles.primaryButtonText, { color: theme.accent }]}>Navigate to Customer</Text>
+                                    </TouchableOpacity>
+                                )}
+
+                                <TouchableOpacity
+                                    style={[styles.primaryButton, { backgroundColor: '#22c55e' }]}
+                                    onPress={() => setIsPinModalVisible(true)}
+                                >
+                                    <Text style={styles.primaryButtonText}>Complete Delivery</Text>
+                                </TouchableOpacity>
+                            </>
                         )}
                     </View>
                 )}
@@ -305,6 +315,7 @@ const styles = StyleSheet.create({
     summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     summaryTitle: { fontSize: 14, fontWeight: 'bold' },
     primaryButton: { padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 8 },
+    navButton: { padding: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', marginBottom: 12, marginTop: 8 },
     primaryButtonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
     secondaryButton: { padding: 16, borderRadius: 12, alignItems: 'center', borderWidth: 1, marginTop: 8 },
     secondaryButtonText: { fontSize: 16, fontWeight: 'bold' },

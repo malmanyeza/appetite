@@ -18,7 +18,12 @@ export const LoginPage = () => {
             await signIn(email, password);
             navigate('/');
         } catch (err: any) {
-            setError(err.message || 'An error occurred');
+            // Provide exact user feedback for incorrect credentials
+            if (err.message === 'Invalid login credentials') {
+                setError('Incorrect email or password. Please try again.');
+            } else {
+                setError(err.message || 'An error occurred during sign in.');
+            }
         } finally {
             setLoading(false);
         }

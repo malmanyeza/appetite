@@ -32,8 +32,13 @@ const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode,
 
     if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
 
-    if (allowedRoles && currentRole && !allowedRoles.includes(currentRole)) {
-        return <Navigate to={currentRole === 'restaurant' ? '/restaurant/overview' : '/admin/overview'} replace />;
+    if (allowedRoles) {
+        if (!currentRole || !allowedRoles.includes(currentRole)) {
+            if (!currentRole) {
+                return <Navigate to="/login" replace />;
+            }
+            return <Navigate to={currentRole === 'restaurant' ? '/restaurant/overview' : '/admin/overview'} replace />;
+        }
     }
 
     return <>{children}</>;
@@ -42,7 +47,8 @@ const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode,
 const queryClient = new QueryClient();
 
 const RoleRedirect = () => {
-    const { currentRole } = useAuthStore();
+    const { user, currentRole } = useAuthStore();
+    if (!user) return <Navigate to="/login" replace />;
     const target = currentRole === 'admin' ? '/admin/overview' : '/restaurant/overview';
     return <Navigate to={target} replace />;
 };
