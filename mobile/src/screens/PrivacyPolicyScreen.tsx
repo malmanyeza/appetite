@@ -52,7 +52,7 @@ export const PrivacyPolicyScreen = ({ navigation }: any) => {
 
                 <Text style={[styles.heading, { color: theme.text }]}>5. Contact Us</Text>
                 <Text style={[styles.paragraph, { color: theme.text }]}>
-                    If you have any questions about this Privacy Policy, please contact us at support@appetize.example.com.
+                    If you have any questions about this Privacy Policy, please contact us at malmanyeza@gmail.com.
                 </Text>
             </ScrollView>
         </View>
