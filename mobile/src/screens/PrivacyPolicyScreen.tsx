@@ -17,11 +17,11 @@ export const PrivacyPolicyScreen = ({ navigation }: any) => {
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
-                <Text style={[styles.title, { color: theme.text }]}>Privacy Policy for Appetize</Text>
+                <Text style={[styles.title, { color: theme.text }]}>Privacy Policy for Appetite</Text>
                 <Text style={[styles.date, { color: theme.textMuted }]}>Last Updated: March 2026</Text>
 
                 <Text style={[styles.paragraph, { color: theme.text }]}>
-                    Welcome to Appetize! Your privacy is critically important to us. This Privacy Policy outlines how we collect, use, and protect your personal data.
+                    Welcome to Appetite! Your privacy is critically important to us. This Privacy Policy outlines how we collect, use, and protect your personal data.
                 </Text>
 
                 <Text style={[styles.heading, { color: theme.text }]}>1. Information We Collect</Text>
@@ -47,7 +47,7 @@ export const PrivacyPolicyScreen = ({ navigation }: any) => {
 
                 <Text style={[styles.heading, { color: theme.text }]}>4. Your Rights and Account Deletion</Text>
                 <Text style={[styles.paragraph, { color: theme.text }]}>
-                    You have the right to access, modify, or delete your personal data. You can permanently delete your account and all associated data directly within the Appetize app by navigating to Account settings and tapping 'Delete Account'.
+                    You have the right to access, modify, or delete your personal data. You can permanently delete your account and all associated data directly within the Appetite app by navigating to Account settings and tapping 'Delete Account'.
                 </Text>
 
                 <Text style={[styles.heading, { color: theme.text }]}>5. Contact Us</Text>

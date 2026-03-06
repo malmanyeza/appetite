@@ -3,11 +3,11 @@ layout: default
 title: Privacy Policy
 ---
 
-# Privacy Policy for Appetize
+# Privacy Policy for Appetite
 
 **Last Updated: March 2026**
 
-Welcome to Appetize! Your privacy is critically important to us. This Privacy Policy outlines how we collect, use, and protect your personal data when you use our mobile application and services.
+Welcome to Appetite! Your privacy is critically important to us. This Privacy Policy outlines how we collect, use, and protect your personal data when you use our mobile application and services.
 
 ## 1. Information We Collect
 - **Account Information:** Name, email address, phone number, and password.
@@ -29,7 +29,7 @@ We do not sell your personal data. We only share information with:
 
 ## 4. Your Rights and Account Deletion
 You have the right to access, modify, or delete your personal data. 
-You can permanently delete your account and all associated data directly within the Appetize app by navigating to **Account > Delete Account**.
+You can permanently delete your account and all associated data directly within the Appetite app by navigating to **Account > Delete Account**.
 
 ## 5. Contact Us
 If you have any questions about this Privacy Policy, please contact us at malmanyeza@gmail.com.

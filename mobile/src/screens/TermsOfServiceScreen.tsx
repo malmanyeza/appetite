@@ -17,28 +17,28 @@ export const TermsOfServiceScreen = ({ navigation }: any) => {
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
-                <Text style={[styles.title, { color: theme.text }]}>Terms of Service for Appetize</Text>
+                <Text style={[styles.title, { color: theme.text }]}>Terms of Service for Appetite</Text>
                 <Text style={[styles.date, { color: theme.textMuted }]}>Last Updated: March 2026</Text>
 
                 <Text style={[styles.paragraph, { color: theme.text }]}>
-                    Please read these Terms of Service carefully before using the Appetize mobile application.
+                    Please read these Terms of Service carefully before using the Appetite mobile application.
                 </Text>
 
                 <Text style={[styles.heading, { color: theme.text }]}>1. Acceptance of Terms</Text>
                 <Text style={[styles.paragraph, { color: theme.text }]}>
-                    By creating an account and using Appetize, you agree to be bound by these Terms of Service and our Privacy Policy. If you do not agree, do not use the application.
+                    By creating an account and using Appetite, you agree to be bound by these Terms of Service and our Privacy Policy. If you do not agree, do not use the application.
                 </Text>
 
                 <Text style={[styles.heading, { color: theme.text }]}>2. User Accounts</Text>
                 <Text style={[styles.paragraph, { color: theme.text }]}>
                     • You must provide accurate and complete information when creating an account.{'\n'}
                     • You are responsible for maintaining the security of your account credentials.{'\n'}
-                    • Appetize reserves the right to suspend or terminate accounts that violate these terms or engage in fraudulent activity.
+                    • Appetite reserves the right to suspend or terminate accounts that violate these terms or engage in fraudulent activity.
                 </Text>
 
                 <Text style={[styles.heading, { color: theme.text }]}>3. Ordering and Delivery</Text>
                 <Text style={[styles.paragraph, { color: theme.text }]}>
-                    • Appetize acts as an intermediary between you, independent restaurants, and independent delivery drivers.{'\n'}
+                    • Appetite acts as an intermediary between you, independent restaurants, and independent delivery drivers.{'\n'}
                     • Delivery times are estimates and may vary.{'\n'}
                     • All sales are final once an order is confirmed by the restaurant.
                 </Text>
@@ -52,7 +52,7 @@ export const TermsOfServiceScreen = ({ navigation }: any) => {
 
                 <Text style={[styles.heading, { color: theme.text }]}>5. Limitation of Liability</Text>
                 <Text style={[styles.paragraph, { color: theme.text }]}>
-                    Appetize is not liable for indirect, incidental, or consequential damages arising from your use of the service. We do not guarantee that the app will be error-free or uninterrupted.
+                    Appetite is not liable for indirect, incidental, or consequential damages arising from your use of the service. We do not guarantee that the app will be error-free or uninterrupted.
                 </Text>
             </ScrollView>
         </View>
