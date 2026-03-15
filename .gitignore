@@ -6,3 +6,13 @@ dist/
 build/
 .DS_Store
 *.log
+google-services.json
+GoogleService-Info.plist
+*.p12
+*.json
+!package.json
+!app.json
+!package-lock.json
+!tsconfig.json
+!deno.json
+!deno.jsonc
