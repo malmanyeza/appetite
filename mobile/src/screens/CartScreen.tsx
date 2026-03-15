@@ -7,12 +7,17 @@ import {
     StyleSheet,
     Alert,
     TextInput,
-    Animated
+    Animated,
+    KeyboardAvoidingView,
+    Platform,
+    ActivityIndicator,
+    Modal
 } from 'react-native';
 import { useCartStore } from '../store/cartStore';
 import { useAuthStore } from '../store/authStore';
 import { useTheme } from '../theme';
-import { ChevronLeft, Trash2, MapPin, Smartphone, CheckCircle2, DollarSign } from 'lucide-react-native';
+import { ChevronLeft, Trash2, MapPin, Smartphone, CheckCircle2, DollarSign, CreditCard } from 'lucide-react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { Image } from 'expo-image';
 import { supabase, supabaseUrl, supabaseAnonKey } from '../lib/supabase';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -40,23 +45,54 @@ export const CartScreen = ({ navigation }: any) => {
     });
 
     const [selectedAddress, setSelectedAddress] = React.useState<any>(null);
-    const [paymentMethod, setPaymentMethod] = React.useState<'cod' | 'ecocash'>('ecocash');
+    const [paymentMethod, setPaymentMethod] = React.useState<'cod' | 'ecocash' | 'card'>('ecocash');
     const [ecocashPhone, setEcocashPhone] = React.useState('');
     const [deliveryFee, setDeliveryFee] = React.useState(0);
     const [serviceFee, setServiceFee] = React.useState(0.5);
 
-    const shakeAnimation = React.useRef(new Animated.Value(0)).current;
-    const [phoneError, setPhoneError] = React.useState(false);
+    const [showEcocashModal, setShowEcocashModal] = React.useState(false);
 
-    const triggerShake = () => {
-        setPhoneError(true);
-        Animated.sequence([
-            Animated.timing(shakeAnimation, { toValue: 10, duration: 100, useNativeDriver: true }),
-            Animated.timing(shakeAnimation, { toValue: -10, duration: 100, useNativeDriver: true }),
-            Animated.timing(shakeAnimation, { toValue: 10, duration: 100, useNativeDriver: true }),
-            Animated.timing(shakeAnimation, { toValue: 0, duration: 100, useNativeDriver: true })
-        ]).start();
-    };
+    const [ecocashPending, setEcocashPending] = React.useState(false);
+    const [pendingOrderId, setPendingOrderId] = React.useState<string | null>(null);
+
+    // EcoCash Polling
+    React.useEffect(() => {
+        let interval: NodeJS.Timeout;
+
+        if (ecocashPending && pendingOrderId) {
+            interval = setInterval(async () => {
+                try {
+                    const { data, error } = await supabase
+                        .from('orders')
+                        .select('payment')
+                        .eq('id', pendingOrderId)
+                        .single();
+                        
+                    if (data?.payment?.status === 'paid') {
+                        clearInterval(interval);
+                        setEcocashPending(false);
+                        setPendingOrderId(null);
+                        WebBrowser.dismissBrowser();
+                        clearCart();
+                        navigation.navigate('Home', { screen: 'HomeMain' });
+                        navigation.navigate('Tracking', { screen: 'TrackingMain', params: { orderId: pendingOrderId } });
+                    } else if (data?.payment?.status === 'failed' || data?.payment?.status === 'cancelled') {
+                        clearInterval(interval);
+                        setEcocashPending(false);
+                        setPendingOrderId(null);
+                        WebBrowser.dismissBrowser();
+                        Alert.alert('Payment Failed', 'Your payment failed or was cancelled. Please try again.');
+                    }
+                } catch (err) {
+                    console.error('Polling error:', err);
+                }
+            }, 3000);
+        }
+
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [ecocashPending, pendingOrderId]);
 
     // Fetch Delivery Settings & Restaurant Location
     const restaurantId = items[0]?.restaurant_id; // Assumes all items are from same restaurant
@@ -141,7 +177,7 @@ export const CartScreen = ({ navigation }: any) => {
         }
     }, [addresses]);
 
-    const handleCheckout = async () => {
+    const handleCheckout = () => {
         if (items.length === 0) return;
         if (!selectedAddress) {
             Alert.alert('Address Required', 'Please add a delivery address before placing an order.', [
@@ -149,12 +185,20 @@ export const CartScreen = ({ navigation }: any) => {
             ]);
             return;
         }
-        if (paymentMethod === 'ecocash' && !ecocashPhone.trim()) {
-            triggerShake();
+        
+        if (paymentMethod === 'ecocash') {
+            setShowEcocashModal(true);
             return;
         }
 
+        processPayment();
+    };
+
+    const processPayment = async (phoneToUse?: string) => {
         setLoading(true);
+        if (showEcocashModal) {
+            setShowEcocashModal(false);
+        }
         try {
             const session = (await supabase.auth.getSession()).data.session;
             if (!session) throw new Error('You must be logged in to place an order.');
@@ -179,7 +223,7 @@ export const CartScreen = ({ navigation }: any) => {
                     },
                     paymentMethod,
                     restaurantId: items[0].restaurant_id,
-                    phone: paymentMethod === 'ecocash' ? ecocashPhone.trim() : undefined
+                    phone: paymentMethod === 'ecocash' ? phoneToUse?.trim() : undefined
                 })
             });
 
@@ -255,18 +299,50 @@ export const CartScreen = ({ navigation }: any) => {
                 });
                 const expressText = await expressResp.text();
                 const expressParams = new URLSearchParams(expressText);
-
+                
                 console.log('EcoCash Express response:', expressText);
 
                 if (expressParams.get('status') !== 'Ok') {
                     throw new Error(expressParams.get('error') || 'EcoCash payment initiation failed.');
                 }
 
-                Alert.alert(
-                    'EcoCash Payment Sent',
-                    `A payment prompt has been sent to ${phone}. Please check your phone and enter your EcoCash PIN to complete payment.`,
-                    [{ text: 'OK' }]
-                );
+                setPendingOrderId(data.orderId);
+                setEcocashPending(true);
+                return;
+            }
+
+            // PAYNOW STANDARD CHECKOUT (Visa / Mastercard)
+            if (data?.standardCheckout) {
+                const { initUrl, initFields, initFieldOrder } = data.standardCheckout;
+
+                const initBody = initFieldOrder.map((k: string) => `${encodeURIComponent(k)}=${encodeURIComponent(initFields[k])}`).join('&');
+                const initResp = await fetch(initUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: initBody
+                });
+                const initText = await initResp.text();
+                const initParams = new URLSearchParams(initText);
+
+                if (initParams.get('status') !== 'Ok') {
+                    throw new Error(initParams.get('error') || 'Failed to initiate Paynow checkout.');
+                }
+
+                const browserUrl = initParams.get('browserurl');
+                if (!browserUrl) throw new Error('No browser URL returned from Paynow.');
+
+                setPendingOrderId(data.orderId);
+                setEcocashPending(true);
+                
+                // Open In-App Browser
+                const result = await WebBrowser.openBrowserAsync(decodeURIComponent(browserUrl));
+                
+                // If user closes browser manually
+                if (result.type === 'cancel' || result.type === 'dismiss') {
+                    setEcocashPending(false);
+                    setPendingOrderId(null);
+                }
+                return;
             }
 
             clearCart();
@@ -281,7 +357,10 @@ export const CartScreen = ({ navigation }: any) => {
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <KeyboardAvoidingView 
+            style={[styles.container, { backgroundColor: theme.background }]}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                     <ChevronLeft color={theme.text} size={24} />
@@ -347,6 +426,7 @@ export const CartScreen = ({ navigation }: any) => {
                             <Text style={[styles.sectionTitle, { color: theme.text }]}>Payment Method</Text>
                             <View style={styles.paymentMethods}>
                                 {[
+                                    { id: 'card', label: 'Visa / Mastercard', icon: CreditCard },
                                     { id: 'ecocash', label: 'EcoCash', icon: Smartphone },
                                     { id: 'cod', label: 'Cash on Delivery', icon: DollarSign }
                                 ].map((method) => (
@@ -365,40 +445,6 @@ export const CartScreen = ({ navigation }: any) => {
                                     </TouchableOpacity>
                                 ))}
                             </View>
-                            {paymentMethod === 'ecocash' && (
-                                <Animated.View style={[
-                                    styles.ecocashContainer,
-                                    { backgroundColor: phoneError ? 'rgba(239, 68, 68, 0.05)' : 'rgba(255, 77, 0, 0.05)' },
-                                    { borderColor: phoneError ? '#EF4444' : theme.accent },
-                                    { transform: [{ translateX: shakeAnimation }] }
-                                ]}>
-                                    <View style={styles.ecocashHeader}>
-                                        <Smartphone size={20} color={phoneError ? '#EF4444' : theme.accent} />
-                                        <Text style={[styles.ecocashTitle, { color: phoneError ? '#EF4444' : theme.accent }]}>
-                                            EcoCash Phone Number Required
-                                        </Text>
-                                    </View>
-                                    <TextInput
-                                        style={[
-                                            styles.ecocashInput,
-                                            { backgroundColor: theme.surface, color: theme.text },
-                                            phoneError && { borderColor: '#EF4444', borderWidth: 1 }
-                                        ]}
-                                        placeholder="Enter number (e.g. 0771234567)"
-                                        placeholderTextColor={theme.textMuted}
-                                        value={ecocashPhone}
-                                        onChangeText={(text) => {
-                                            setEcocashPhone(text);
-                                            if (phoneError) setPhoneError(false);
-                                        }}
-                                        keyboardType="phone-pad"
-                                        maxLength={12}
-                                    />
-                                    {phoneError && (
-                                        <Text style={styles.errorText}>Please enter a valid phone number to proceed.</Text>
-                                    )}
-                                </Animated.View>
-                            )}
                         </View>
 
                         <View style={styles.summaryBox}>
@@ -430,12 +476,87 @@ export const CartScreen = ({ navigation }: any) => {
                         onPress={handleCheckout}
                     >
                         <Text style={styles.buttonText}>
-                            {paymentMethod === 'ecocash' ? 'Pay with EcoCash' : 'Place Order'}
+                            {paymentMethod === 'ecocash' ? 'Pay with EcoCash' : paymentMethod === 'card' ? 'Pay with Card' : 'Place Order'}
                         </Text>
                     </TouchableOpacity>
                 </View>
             )}
-        </View>
+
+            {ecocashPending && (
+                <View style={styles.overlay}>
+                    <ActivityIndicator size="large" color={theme.accent} />
+                    <Text style={{ color: 'white', marginTop: 16, fontSize: 18, fontWeight: 'bold' }}>
+                        {paymentMethod === 'card' ? 'Awaiting Payment...' : 'Awaiting EcoCash...'}
+                    </Text>
+                    <Text style={{ color: theme.textMuted, marginTop: 8, textAlign: 'center', paddingHorizontal: 40 }}>
+                        {paymentMethod === 'card' 
+                            ? 'Please complete the secure Visa/Mastercard checkout in the browser window.'
+                            : 'Please check your phone for the EcoCash prompt and enter your PIN to complete the transaction.'}
+                    </Text>
+                    <TouchableOpacity 
+                        style={{ marginTop: 32, padding: 12, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: 8 }} 
+                        onPress={() => {
+                            setEcocashPending(false);
+                            setPendingOrderId(null);
+                            if (paymentMethod === 'card') {
+                                WebBrowser.dismissBrowser();
+                            }
+                        }}
+                    >
+                        <Text style={{ color: '#EF4444', fontWeight: 'bold' }}>Cancel Waiting</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
+            <Modal visible={showEcocashModal} animationType="slide" transparent>
+                <KeyboardAvoidingView 
+                    style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }} 
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                >
+                    <View style={{ backgroundColor: theme.background, padding: 24, borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                            <Text style={{ color: theme.text, fontSize: 20, fontWeight: 'bold' }}>Enter EcoCash Number</Text>
+                            <TouchableOpacity onPress={() => setShowEcocashModal(false)}>
+                                <Text style={{ color: theme.textMuted, fontSize: 16 }}>Cancel</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={{ color: theme.textMuted, marginBottom: 12 }}>Please enter the phone number registered with EcoCash to receive the push prompt.</Text>
+                        
+                        <TextInput
+                            style={[
+                                styles.ecocashInput,
+                                { backgroundColor: theme.surface, color: theme.text, borderColor: theme.border, borderWidth: 1, marginBottom: 24 }
+                            ]}
+                            placeholder="e.g. 0771234567"
+                            placeholderTextColor={theme.textMuted}
+                            value={ecocashPhone}
+                            onChangeText={setEcocashPhone}
+                            keyboardType="phone-pad"
+                            maxLength={12}
+                            autoFocus
+                        />
+
+                        <TouchableOpacity
+                            style={[styles.primaryButton, { backgroundColor: theme.accent, opacity: loading ? 0.7 : 1 }]}
+                            onPress={() => {
+                                if (!ecocashPhone.trim() || ecocashPhone.trim().length < 9) {
+                                    Alert.alert('Invalid Number', 'Please enter a valid phone number.');
+                                    return;
+                                }
+                                processPayment(ecocashPhone);
+                            }}
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                <ActivityIndicator color="#FFF" />
+                            ) : (
+                                <Text style={styles.buttonText}>Confirm Payment</Text>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
+        </KeyboardAvoidingView>
     );
 };
 
@@ -504,5 +625,12 @@ const styles = StyleSheet.create({
     },
     primaryButton: { paddingVertical: 18, borderRadius: 16, alignItems: 'center' },
     buttonText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
-    footer: { padding: 20, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.05)', backgroundColor: '#000' }
+    footer: { padding: 20, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.05)', backgroundColor: '#000' },
+    overlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.85)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000,
+    }
 });

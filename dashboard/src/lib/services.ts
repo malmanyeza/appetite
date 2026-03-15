@@ -21,6 +21,21 @@ export const ordersService = {
             .update({ status })
             .eq('id', orderId);
         if (error) throw error;
+
+        // Trigger driver notifications if the order is now ready for pickup
+        if (status === 'ready_for_pickup') {
+            console.log('Triggering driver notifications for ready order:', orderId);
+            
+            // Wait for 1.5 seconds to ensure the DB trigger has finished creating job offers
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            const { data: order } = await supabase.from('orders').select('*').eq('id', orderId).single();
+            if (order) {
+                supabase.functions.invoke('notify_drivers', {
+                    body: order
+                }).catch(err => console.error('Failed to trigger driver notifications:', err));
+            }
+        }
     },
 
     async getAdminOrders() {
@@ -394,8 +409,13 @@ export const adminService = {
 
         // Calculations
         const todayOrders = orders.filter(o => new Date(o.created_at) >= startOfToday);
-        const todayRevenue = todayOrders.reduce((acc, o) => acc + (o.pricing?.platform_commission || 0), 0);
-        const totalRevenue = orders.reduce((acc, o) => acc + (o.pricing?.platform_commission || 0), 0);
+        
+        // Exclude pending orders from actual revenue
+        const finalizedOrders = orders.filter(o => o.status !== 'pending');
+        const finalizedTodayOrders = todayOrders.filter(o => o.status !== 'pending');
+
+        const todayRevenue = finalizedTodayOrders.reduce((acc, o) => acc + (o.pricing?.appetite_margin || 0), 0);
+        const totalRevenue = finalizedOrders.reduce((acc, o) => acc + (o.pricing?.appetite_margin || 0), 0);
 
         return {
             todayOrders: todayOrders.length,

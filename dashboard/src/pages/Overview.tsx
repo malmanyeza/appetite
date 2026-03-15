@@ -46,8 +46,9 @@ export const Overview = () => {
         const rawData: Record<string, number> = {};
 
         orders.forEach(order => {
+            if (order.status === 'pending') return;
             const date = new Date(order.created_at);
-            const revenue = order.pricing?.platform_commission || 0;
+            const revenue = order.pricing?.appetite_margin || 0;
             let key = '';
 
             if (timeFrame === 'minute') {
@@ -113,18 +114,33 @@ export const Overview = () => {
         if (!stats?.allOrders) return 0;
         const now = new Date();
         return (stats.allOrders as any[]).reduce((sum, order) => {
+            if (order.status === 'pending') return sum;
+            
             const date = new Date(order.created_at);
-            const revenue = order.pricing?.platform_commission || 0;
+            const revenue = order.pricing?.appetite_margin || 0;
             let include = false;
 
-            if (timeFrame === 'minute') include = (now.getTime() - date.getTime() <= 60000);
-            else if (timeFrame === 'hour') include = (now.getTime() - date.getTime() <= 3600000);
-            else if (timeFrame === 'day') include = date.toDateString() === now.toDateString();
-            else if (timeFrame === 'week') {
-                const weekAgo = new Date(); weekAgo.setDate(now.getDate() - 7);
-                include = date >= weekAgo;
+            if (timeFrame === 'minute') {
+                include = date.getFullYear() === now.getFullYear() &&
+                          date.getMonth() === now.getMonth() &&
+                          date.getDate() === now.getDate() &&
+                          date.getHours() === now.getHours() &&
+                          date.getMinutes() === now.getMinutes();
+            } else if (timeFrame === 'hour') {
+                include = date.getFullYear() === now.getFullYear() &&
+                          date.getMonth() === now.getMonth() &&
+                          date.getDate() === now.getDate() &&
+                          date.getHours() === now.getHours();
+            } else if (timeFrame === 'day') {
+                include = date.toDateString() === now.toDateString();
+            } else if (timeFrame === 'week') {
+                const startOfWeek = new Date(now);
+                startOfWeek.setHours(0, 0, 0, 0);
+                startOfWeek.setDate(now.getDate() - now.getDay()); // Start on Sunday
+                include = date >= startOfWeek;
+            } else if (timeFrame === 'month') {
+                include = date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
             }
-            else if (timeFrame === 'month') include = date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
 
             return include ? sum + revenue : sum;
         }, 0);
@@ -324,7 +340,7 @@ export const Overview = () => {
                                             <StatusPill status={order.status} />
                                         </td>
                                         <td className="py-4 text-sm font-bold text-green-400 text-right">
-                                            ${order.pricing?.platform_commission?.toFixed(2) || '0.00'}
+                                            ${order.pricing?.appetite_margin?.toFixed(2) || '0.00'}
                                         </td>
                                     </tr>
                                 ))}

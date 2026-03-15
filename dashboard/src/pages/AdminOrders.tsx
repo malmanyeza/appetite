@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { ordersService, adminService } from '../lib/services';
@@ -53,14 +53,40 @@ export const AdminOrders = () => {
         queryFn: adminService.getAllDrivers
     });
 
-    const filteredOrders = orders?.filter(order => {
-        const matchesSearch =
-            order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            order.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            order.restaurants?.name?.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
-        return matchesSearch && matchesStatus;
-    });
+    const filteredOrders = useMemo(() => {
+        if (!orders) return [];
+        let filtered = orders.filter(order => {
+            const matchesSearch =
+                order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                order.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                order.restaurants?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+            return matchesSearch && matchesStatus;
+        });
+
+        // Status-Weighted Sort (Highest Priority First)
+        const statusPriority: Record<string, number> = {
+            'confirmed': 1,
+            'preparing': 2,
+            'ready': 3,
+            'on_the_way': 4,
+            'pending': 5,
+            'delivered': 6,
+            'cancelled': 7
+        };
+
+        return filtered.sort((a, b) => {
+            const priorityA = statusPriority[a.status] || 99;
+            const priorityB = statusPriority[b.status] || 99;
+            
+            if (priorityA !== priorityB) {
+                return priorityA - priorityB;
+            }
+            
+            // If same status, newest first
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+    }, [orders, searchTerm, statusFilter]);
 
     return (
         <div className="relative min-h-[80vh] pb-20">
@@ -123,7 +149,7 @@ export const AdminOrders = () => {
                                     <tr>
                                         <td colSpan={7} className="px-6 py-12 text-center text-muted">No orders found matching criteria.</td>
                                     </tr>
-                                ) : filteredOrders?.map((order) => (
+                                ) : filteredOrders?.map((order: any) => (
                                     <tr
                                         key={order.id}
                                         onClick={() => setSelectedOrder(order)}

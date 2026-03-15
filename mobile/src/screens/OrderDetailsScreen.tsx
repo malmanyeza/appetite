@@ -87,26 +87,45 @@ export const OrderDetailsScreen = ({ route, navigation }: any) => {
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 {/* Status Card */}
                 <View style={[styles.statusCard, { backgroundColor: theme.surface }]}>
-                    <View style={styles.statusInfo}>
-                        <Text style={[styles.statusLabel, { color: theme.textMuted }]}>STATUS</Text>
-                        <Text style={[styles.statusText, { color: theme.accent }]}>{order.status.replace('_', ' ').toUpperCase()}</Text>
-                    </View>
-                    <View style={styles.statusInfo}>
-                        <Text style={[styles.statusLabel, { color: theme.textMuted }]}>ORDERED</Text>
-                        <Text style={[styles.statusText, { color: theme.text, fontSize: 13 }]}>
-                            {new Date(order.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                        </Text>
-                    </View>
-                    {(order.status === 'delivered' || order.status === 'cancelled') && (
-                        <View style={styles.statusInfo}>
-                            <Text style={[styles.statusLabel, { color: theme.textMuted }]}>
-                                {order.status === 'delivered' ? 'DELIVERED' : 'CANCELLED'}
-                            </Text>
-                            <Text style={[styles.statusText, { color: theme.text, fontSize: 13 }]}>
-                                {new Date(order.updated_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                            </Text>
+                    <View style={styles.statusHeaderRow}>
+                        <Text style={[styles.statusLabel, { color: theme.textMuted }]}>CURRENT STATUS</Text>
+                        <View style={[styles.statusBadge, { backgroundColor: `${theme.accent}15` }]}>
+                            <Text style={[styles.statusText, { color: theme.accent }]}>{order.status.replace('_', ' ').toUpperCase()}</Text>
                         </View>
-                    )}
+                    </View>
+
+                    <View style={[styles.divider, { backgroundColor: theme.border, marginVertical: 16 }]} />
+
+                    <View style={styles.timelineContainer}>
+                        <View style={styles.timelineRow}>
+                            <View style={[styles.timelineDot, { backgroundColor: theme.accent }]} />
+                            <Text style={[styles.timelineLabel, { color: theme.textMuted }]}>Ordered</Text>
+                            <Text style={[styles.timelineTime, { color: theme.text }]}>
+                                {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </Text>
+                            <View style={[styles.dateBadge, { backgroundColor: `${theme.accent}15` }]}>
+                                <Text style={[styles.dateBadgeText, { color: theme.accent }]}>
+                                    {new Date(order.created_at).toDateString() === new Date().toDateString() ? 'TODAY' : new Date(order.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                                </Text>
+                            </View>
+                        </View>
+                        {(order.status === 'delivered' || order.status === 'cancelled') && (
+                            <View style={styles.timelineRow}>
+                                <View style={[styles.timelineDot, { backgroundColor: order.status === 'delivered' ? '#10B981' : '#EF4444' }]} />
+                                <Text style={[styles.timelineLabel, { color: theme.textMuted }]}>
+                                    {order.status === 'delivered' ? 'Delivered' : 'Cancelled'}
+                                </Text>
+                                <Text style={[styles.timelineTime, { color: theme.text }]}>
+                                    {new Date(order.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </Text>
+                                <View style={[styles.dateBadge, { backgroundColor: order.status === 'delivered' ? '#10B98115' : '#EF444415' }]}>
+                                    <Text style={[styles.dateBadgeText, { color: order.status === 'delivered' ? '#10B981' : '#EF4444' }]}>
+                                        {new Date(order.updated_at).toDateString() === new Date().toDateString() ? 'TODAY' : new Date(order.updated_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                                    </Text>
+                                </View>
+                            </View>
+                        )}
+                    </View>
                 </View>
 
                 {/* Restaurant Section */}
@@ -142,7 +161,7 @@ export const OrderDetailsScreen = ({ route, navigation }: any) => {
                                 <View style={[styles.qtyBox, { backgroundColor: theme.background }]}>
                                     <Text style={[styles.qtyText, { color: theme.accent }]}>{item.qty}x</Text>
                                 </View>
-                                <View style={{ flex: 1 }}>
+                                <View style={{ flex: 1, paddingRight: 12 }}>
                                     <Text style={[styles.itemName, { color: theme.text }]}>{item.name_snapshot}</Text>
                                     {item.notes && <Text style={[styles.itemNotes, { color: theme.textMuted }]}>{item.notes}</Text>}
                                 </View>
@@ -280,40 +299,49 @@ const styles = StyleSheet.create({
         paddingTop: 60,
         paddingBottom: 20,
     },
-    headerTitle: { fontSize: 18, fontWeight: 'bold' },
+    headerTitle: { fontSize: 18, fontWeight: '800', letterSpacing: -0.5 },
     scrollContent: { padding: 20 },
     statusCard: {
-        flexDirection: 'row',
-        padding: 20,
+        padding: 24,
         borderRadius: 20,
         marginBottom: 24,
     },
-    statusInfo: { flex: 1 },
-    statusLabel: { fontSize: 10, fontWeight: 'bold', letterSpacing: 1, marginBottom: 4 },
-    statusText: { fontSize: 16, fontWeight: 'bold' },
+    statusHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+    statusLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
+    statusText: { fontSize: 14, fontWeight: '900', letterSpacing: 0.5 },
+    
+    timelineContainer: { gap: 12 },
+    timelineRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    timelineDot: { width: 6, height: 6, borderRadius: 3 },
+    timelineLabel: { fontSize: 13, fontWeight: '500', width: 75, letterSpacing: -0.2 },
+    timelineTime: { fontSize: 13, fontWeight: '700', letterSpacing: -0.2 },
+    dateBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 'auto' },
+    dateBadgeText: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+
     section: { marginBottom: 24 },
-    sectionTitle: { fontSize: 12, fontWeight: 'bold', letterSpacing: 1, marginBottom: 12 },
+    sectionTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 1.2, marginBottom: 12 },
     restaurantCard: { padding: 20, borderRadius: 20 },
-    restaurantName: { fontSize: 18, fontWeight: 'bold' },
-    restaurantSub: { fontSize: 14, marginTop: 4 },
+    restaurantName: { fontSize: 18, fontWeight: '800', letterSpacing: -0.5 },
+    restaurantSub: { fontSize: 14, marginTop: 4, fontWeight: '500' },
     addressCard: { padding: 20, borderRadius: 20, flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
-    addressMain: { fontSize: 18, fontWeight: 'bold' },
-    addressDetail: { fontSize: 16, fontWeight: 'bold', fontStyle: 'italic', marginVertical: 4 },
-    addressSub: { fontSize: 13 },
+    addressMain: { fontSize: 18, fontWeight: '800', letterSpacing: -0.5 },
+    addressDetail: { fontSize: 16, fontWeight: '600', fontStyle: 'italic', marginVertical: 4 },
+    addressSub: { fontSize: 13, fontWeight: '500' },
     itemsContainer: { padding: 16, borderRadius: 20 },
-    itemRow: { flexDirection: 'row', gap: 12, paddingVertical: 12, alignItems: 'flex-start' },
+    itemRow: { flexDirection: 'row', gap: 12, paddingVertical: 12, alignItems: 'center' },
     qtyBox: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-    qtyText: { fontWeight: 'bold', fontSize: 14 },
-    itemName: { fontSize: 16, fontWeight: '600' },
-    itemNotes: { fontSize: 12, marginTop: 2 },
-    itemPrice: { fontSize: 16, fontWeight: 'bold' },
+    qtyText: { fontWeight: '900', fontSize: 14 },
+    itemName: { fontSize: 16, fontWeight: '700', letterSpacing: -0.3 },
+    itemNotes: { fontSize: 13, marginTop: 4, fontWeight: '500' },
+    itemPrice: { fontSize: 16, fontWeight: '800', letterSpacing: -0.5 },
     receiptCard: { padding: 20, borderRadius: 20 },
-    receiptRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-    receiptLabel: { fontSize: 14 },
-    receiptValue: { fontSize: 14, fontWeight: '600' },
-    divider: { height: 1, marginVertical: 12 },
-    totalLabel: { fontSize: 18, fontWeight: 'bold' },
-    totalValue: { fontSize: 20, fontWeight: '900' },
+    receiptRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, alignItems: 'center' },
+    receiptLabel: { fontSize: 14, fontWeight: '500' },
+    receiptValue: { fontSize: 15, fontWeight: '800', letterSpacing: -0.5 },
+    divider: { height: 1, marginVertical: 8 },
+    totalLabel: { fontSize: 18, fontWeight: '800', letterSpacing: -0.5 },
+    totalValue: { fontSize: 24, fontWeight: '900', letterSpacing: -1 },
     paymentInfo: { marginTop: 16, alignItems: 'center' },
     paymentText: { fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
     rateButton: {

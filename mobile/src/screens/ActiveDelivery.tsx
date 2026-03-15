@@ -258,17 +258,22 @@ export const ActiveDelivery = () => {
             </Modal>
 
             {/* PIN Modal */}
-            <Modal visible={isPinModalVisible} transparent animationType="slide">
+            <Modal visible={isPinModalVisible} transparent animationType="fade">
                 <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                    <View style={styles.modalOverlay}>
+                    <View style={styles.modalOverlayCentered}>
                         <KeyboardAvoidingView
-                            behavior={Platform.OS === "ios" ? "padding" : "height"}
-                            style={{ flex: 1, justifyContent: 'center', width: '100%' }}
+                            behavior={Platform.OS === "ios" ? "padding" : "padding"}
+                            style={{ width: '100%', alignItems: 'center' }}
+                            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
                         >
                             <TouchableWithoutFeedback>
-                                <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
-                                    <Text style={[styles.modalTitle, { color: theme.text }]}>Enter Delivery PIN</Text>
-                                    <Text style={[styles.modalText, { color: theme.textMuted }]}>Ask the customer for the 4-digit PIN shown in their app.</Text>
+                                <View style={[styles.modalContentCentered, { backgroundColor: theme.surface }]}>
+                                    <View style={{ alignItems: 'center', marginBottom: 8 }}>
+                                        <View style={[styles.modalHandle, { backgroundColor: theme.border }]} />
+                                    </View>
+                                    
+                                    <Text style={[styles.modalTitle, { color: theme.text, textAlign: 'center' }]}>Enter Delivery PIN</Text>
+                                    <Text style={[styles.modalText, { color: theme.textMuted, textAlign: 'center' }]}>Ask the customer for the 4-digit PIN shown in their app.</Text>
 
                                     <TextInput
                                         style={[styles.pinInput, { color: theme.text, borderColor: pinError ? '#ef4444' : theme.border, backgroundColor: theme.background }]}
@@ -279,6 +284,7 @@ export const ActiveDelivery = () => {
                                         placeholder="0000"
                                         placeholderTextColor={theme.textMuted}
                                         textAlign="center"
+                                        autoFocus={true}
                                         returnKeyType="done"
                                         onSubmitEditing={Keyboard.dismiss}
                                     />
@@ -330,8 +336,31 @@ const styles = StyleSheet.create({
     primaryButtonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
     secondaryButton: { padding: 16, borderRadius: 12, alignItems: 'center', borderWidth: 1, marginTop: 8 },
     secondaryButtonText: { fontSize: 16, fontWeight: 'bold' },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-    modalContent: { padding: 24, borderTopLeftRadius: 24, borderTopRightRadius: 24, gap: 16 },
+    modalOverlayCentered: { 
+        flex: 1, 
+        backgroundColor: 'rgba(0,0,0,0.7)', 
+        justifyContent: 'center', 
+        alignItems: 'center',
+        padding: 20
+    },
+    modalContentCentered: { 
+        width: '100%',
+        maxWidth: 400,
+        padding: 24, 
+        borderRadius: 32, 
+        gap: 16,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20
+    },
+    modalHandle: {
+        width: 40,
+        height: 6,
+        borderRadius: 3,
+        marginBottom: 8
+    },
     modalTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 8 },
     modalText: { fontSize: 16, marginBottom: 16 },
     pinInput: { fontSize: 32, letterSpacing: 16, padding: 20, borderRadius: 12, borderWidth: 1, marginBottom: 20 }

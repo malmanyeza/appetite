@@ -56,6 +56,20 @@ export const SignUpScreen = ({ navigation }: any) => {
         setLoading(true);
         setSigningUp(true);
         try {
+            // 0. Safely check if phone number already exists using RPC
+            // Direct table query (Profiles) fails for unauthenticated users due to RLS
+            const { data: phoneIsTaken, error: rpcError } = await supabase
+                .rpc('check_phone_exists', { phone_number: phone.trim() });
+
+            if (rpcError) {
+                console.error('RPC Phone check error:', rpcError);
+                // We proceed if RPC fails but log it for debugging
+            }
+
+            if (phoneIsTaken) {
+                throw new Error('This phone number is already registered. Please use a different number or sign in.');
+            }
+
             // 1. Sign up user
             const { data: { user }, error: signUpError } = await supabase.auth.signUp({
                 email,
@@ -74,6 +88,7 @@ export const SignUpScreen = ({ navigation }: any) => {
             if (!user) throw new Error('Sign up failed. Please try again.');
 
             // 2. Create profile entries
+            // Using upsert to handle rare race conditions gracefully
             const { error: profileError } = await supabase
                 .from('profiles')
                 .upsert({
@@ -84,7 +99,13 @@ export const SignUpScreen = ({ navigation }: any) => {
 
             if (profileError) {
                 console.error('Profile creation error:', profileError);
-                Alert.alert('Note', 'Your account was created, but there was an error setting up your profile. Please try signing in to complete your setup.');
+                
+                let errorMessage = 'There was an error setting up your profile.';
+                if (profileError.code === '23505') {
+                    errorMessage = 'This phone number is already associated with another account.';
+                }
+
+                Alert.alert('Sign Up Issue', errorMessage + ' Please try signing in if you already have an account.');
                 navigation.navigate('Login');
                 return;
             }

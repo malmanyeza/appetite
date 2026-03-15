@@ -48,6 +48,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         try {
             set({ loading: true });
 
+            if (!supabase) {
+                set({ user: null, profile: null, roles: [], activeRole: null, loading: false });
+                return;
+            }
+
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
             if (sessionError || !session) {
                 set({ user: null, profile: null, roles: [], activeRole: null, loading: false });
@@ -90,7 +95,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 console.error('Error fetching roles:', rolesError);
             }
 
-            const availableRoles = roles?.map(r => r.role as Role) || [];
+            const availableRoles = roles?.map((r: { role: string }) => r.role as Role) || [];
 
             // Default to customer if no roles found (fallback)
             let defaultRole = availableRoles.includes('customer') ? 'customer' : (availableRoles.includes('driver') ? 'driver' : null);
@@ -123,6 +128,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const userId = get().user?.id;
         if (!userId) return;
 
+        if (!userId || !supabase) return;
+        
         const { data, error } = await supabase
             .from('profiles')
             .select('*')
@@ -147,7 +154,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     },
 
     signOut: async () => {
-        await supabase.auth.signOut();
+        if (supabase) {
+            await supabase.auth.signOut().catch(() => {});
+        }
         set({ user: null, profile: null, roles: [], activeRole: null });
     },
 }));

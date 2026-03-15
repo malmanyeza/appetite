@@ -58,14 +58,22 @@ Deno.serve(async (req: Request) => {
     if (!order) throw new Error('Order not found in database');
 
     let paymentStatus = order.payment.status;
+    let orderStatus = order.status;
 
     if (status === 'Paid' || status === 'Awaiting Delivery' || status === 'Delivered') {
         paymentStatus = 'paid';
+        if (orderStatus === 'pending') {
+            orderStatus = 'confirmed';
+        }
     } else if (status === 'Cancelled' || status === 'Failed') {
         paymentStatus = 'failed';
+        if (orderStatus === 'pending') {
+            orderStatus = 'cancelled';
+        }
     }
 
     await supabaseAdmin.from('orders').update({
+        status: orderStatus,
         payment: {
             ...order.payment,
             status: paymentStatus,
@@ -73,6 +81,22 @@ Deno.serve(async (req: Request) => {
             paid_at: paymentStatus === 'paid' ? new Date().toISOString() : null
         }
     }).eq('id', orderId);
+
+    // If the order just became confirmed, notify restaurant
+    if (orderStatus === 'confirmed' && order.status === 'pending') {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+        
+        console.log('Triggering restaurant notification for confirmed order:', orderId);
+        await fetch(`${supabaseUrl}/functions/v1/notify_restaurant`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${supabaseServiceKey}`
+            },
+            body: JSON.stringify({ ...order, status: orderStatus })
+        }).catch(err => console.error('Notification trigger failed:', err));
+    }
 
     return new Response('', { status: 200 }); 
 

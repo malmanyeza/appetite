@@ -93,11 +93,25 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
 
                     if (payload.eventType === 'INSERT') {
                         const newOrder = payload.new as any;
-                        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-                        audio.play().catch(e => console.warn('Audio play failed:', e));
+                        if (newOrder.status !== 'pending') {
+                            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                            audio.play().catch(e => console.warn('Audio play failed:', e));
 
-                        const shortId = newOrder?.id ? newOrder.id.slice(0, 5).toUpperCase() : 'NEW';
-                        addNotification(`New order #${shortId} has arrived!`);
+                            const shortId = newOrder?.id ? newOrder.id.slice(0, 5).toUpperCase() : 'NEW';
+                            addNotification(`New order #${shortId} has arrived!`);
+                        }
+                    } else if (payload.eventType === 'UPDATE') {
+                        const oldOrder = payload.old as any;
+                        const newOrder = payload.new as any;
+                        
+                        // Listen for payment confirmation: pending -> confirmed
+                        if (oldOrder.status === 'pending' && newOrder.status === 'confirmed') {
+                            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                            audio.play().catch(e => console.warn('Audio play failed:', e));
+
+                            const shortId = newOrder?.id ? newOrder.id.slice(0, 5).toUpperCase() : 'NEW';
+                            addNotification(`Payment confirmed for Order #${shortId}!`);
+                        }
                     }
                 }
             )

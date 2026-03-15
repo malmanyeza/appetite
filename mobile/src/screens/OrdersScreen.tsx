@@ -103,29 +103,37 @@ export const OrdersScreen = ({ navigation }: any) => {
                     <ShoppingBag size={24} color={theme.accent} />
                 </View>
                 <View style={styles.orderTitle}>
-                    <Text style={[styles.restaurantName, { color: theme.text }]}>
+                    <Text style={[styles.restaurantName, { color: theme.text }]} numberOfLines={1}>
                         {item.restaurants?.name}
                     </Text>
-                    <View>
-                        <Text style={[styles.orderDate, { color: theme.text, fontWeight: 'bold' }]}>
-                            Ordered: {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </Text>
-                        <View style={{ backgroundColor: theme.surface, alignSelf: 'flex-start', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 2 }}>
-                            <Text style={{ color: theme.accent, fontSize: 10, fontWeight: 'bold' }}>
-                                {new Date(item.created_at).toDateString() === new Date().toDateString() ? 'TODAY' : new Date(item.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                    <View style={styles.timelineContainer}>
+                        <View style={styles.timelineRow}>
+                            <View style={[styles.timelineDot, { backgroundColor: theme.accent }]} />
+                            <Text style={[styles.timelineLabel, { color: theme.textMuted }]}>Ordered</Text>
+                            <Text style={[styles.timelineTime, { color: theme.text }]}>
+                                {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </Text>
+                            <View style={[styles.dateBadge, { backgroundColor: `${theme.accent}15` }]}>
+                                <Text style={[styles.dateBadgeText, { color: theme.accent }]}>
+                                    {new Date(item.created_at).toDateString() === new Date().toDateString() ? 'TODAY' : new Date(item.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                                </Text>
+                            </View>
                         </View>
+                        {item.delivered_at && (
+                            <View style={styles.timelineRow}>
+                                <View style={[styles.timelineDot, { backgroundColor: '#10B981' }]} />
+                                <Text style={[styles.timelineLabel, { color: theme.textMuted }]}>Delivered</Text>
+                                <Text style={[styles.timelineTime, { color: theme.text }]}>
+                                    {new Date(item.delivered_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </Text>
+                                <View style={[styles.dateBadge, { backgroundColor: '#10B98115' }]}>
+                                    <Text style={[styles.dateBadgeText, { color: '#10B981' }]}>
+                                        {new Date(item.delivered_at).toDateString() === new Date().toDateString() ? 'TODAY' : new Date(item.delivered_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                                    </Text>
+                                </View>
+                            </View>
+                        )}
                     </View>
-                    {item.delivered_at && (
-                        <View>
-                            <Text style={[styles.orderDate, { color: '#10B981', fontWeight: 'bold' }]}>
-                                Delivered: {new Date(item.delivered_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </Text>
-                            <Text style={[styles.orderDate, { color: '#059669', fontSize: 10, marginTop: -2 }]}>
-                                {new Date(item.delivered_at).toDateString() === new Date().toDateString() ? 'Today' : new Date(item.delivered_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                            </Text>
-                        </View>
-                    )}
                 </View>
                 <ChevronRight size={20} color={theme.textMuted} />
             </View>
@@ -221,9 +229,15 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    orderTitle: { flex: 1, gap: 2 },
-    restaurantName: { fontSize: 18, fontWeight: 'bold' },
-    orderDate: { fontSize: 13 },
+    orderTitle: { flex: 1 },
+    restaurantName: { fontSize: 18, fontWeight: '800', letterSpacing: -0.5 },
+    timelineContainer: { marginTop: 8, gap: 8 },
+    timelineRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    timelineDot: { width: 6, height: 6, borderRadius: 3 },
+    timelineLabel: { fontSize: 13, fontWeight: '500', width: 65, letterSpacing: -0.2 },
+    timelineTime: { fontSize: 13, fontWeight: '700', letterSpacing: -0.2 },
+    dateBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 'auto' },
+    dateBadgeText: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
     divider: { height: 1, marginHorizontal: -16 },
     orderFooter: {
         flexDirection: 'row',
@@ -231,14 +245,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     orderInfo: { gap: 2 },
-    orderAmount: { fontSize: 16, fontWeight: 'bold' },
-    orderItems: { fontSize: 13 },
+    orderAmount: { fontSize: 18, fontWeight: '800', letterSpacing: -0.5 },
+    orderItems: { fontSize: 14, fontWeight: '500', letterSpacing: -0.2 },
     statusBadge: {
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 8,
     },
-    statusText: { fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase' },
+    statusText: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
     centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
     emptyTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 8 },
     emptySubtitle: { fontSize: 16, textAlign: 'center', marginBottom: 24 },

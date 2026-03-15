@@ -2,7 +2,7 @@
   "expo": {
     "name": "Appetite",
     "slug": "appetite-mobile",
-    "version": "1.0.1",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -31,7 +31,9 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
-      ]
+      ],
+      "package": "com.appetite.mobile",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -45,13 +47,26 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Allow Appetite to use your location to find nearby restaurants and dispatch deliveries accurately."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#FF4D00"
+        }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "appetite-oe",
+          "project": "react-native"
+        }
       ]
     ],
     "extra": {
       "eas": {
-        "projectId": "7ebdc389-a028-408c-a07d-25c357aaf65b"
+        "projectId": "f9d5d1d3-6f24-44cc-92c1-9269f6e7c69e"
       }
-    },
-    "owner": "malverneas"
+    }
   }
 }

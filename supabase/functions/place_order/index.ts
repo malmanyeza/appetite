@@ -127,7 +127,7 @@ Deno.serve(async (req: Request) => {
     const orderPayload = {
         customer_id: user.id,
         restaurant_id: restaurantId,
-        status: 'confirmed',
+        status: (paymentMethod === 'ecocash' || paymentMethod === 'card') ? 'pending' : 'confirmed',
         delivery_pin: deliveryPin,
         delivery_address_snapshot: address,
         pricing: {
@@ -172,6 +172,17 @@ Deno.serve(async (req: Request) => {
 
     // COD: return immediately
     if (paymentMethod === 'cod') {
+        // Trigger restaurant notification - Await to ensure it completes
+        console.log('Triggering restaurant notification for COD order:', newOrder.id);
+        await fetch(`${supabaseUrl}/functions/v1/notify_restaurant`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${supabaseServiceKey}`
+            },
+            body: JSON.stringify(newOrder)
+        }).catch(err => console.error('Notification trigger failed:', err));
+
         return new Response(JSON.stringify({ 
             success: true, 
             orderId: newOrder.id,
@@ -231,6 +242,56 @@ Deno.serve(async (req: Request) => {
                 expressUrl: 'https://www.paynow.co.zw/interface/remotetransaction',
                 phone: phone,
                 method: 'ecocash'
+            }
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // PAYNOW STANDARD: Visa / Mastercard via web checkout
+    if (paymentMethod === 'card') {
+        const integrationId = Deno.env.get('PAYNOW_INTEGRATION_ID') || '';
+        const integrationKey = Deno.env.get('PAYNOW_INTEGRATION_KEY') || '';
+
+        if (!integrationId || !integrationKey) {
+            return new Response(JSON.stringify({ 
+                success: true, 
+                orderId: newOrder.id,
+                message: "Order placed. Paynow keys not configured yet."
+            }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        
+        const resultUrl = `${supabaseUrl}/functions/v1/paynow_webhook`; 
+        const returnUrl = `https://appetite.delivery/payment-complete?order=${newOrder.id}`; // Custom return URL
+
+        // Step 1: Build initiatetransaction form data
+        const initFields: Record<string, string> = {
+            resulturl: resultUrl,
+            returnurl: returnUrl,
+            reference: newOrder.id,
+            amount: total.toFixed(2),
+            id: integrationId,
+            additionalinfo: 'Appetite Order',
+            authemail: 'malmanyeza@gmail.com', // Must be the merchant email in Paynow Test Mode
+            status: 'Message'
+        };
+
+        const initFieldOrder = ['resulturl', 'returnurl', 'reference', 'amount', 'id', 'additionalinfo', 'authemail', 'status'];
+        let hashString = "";
+        for (const k of initFieldOrder) {
+            hashString += initFields[k];
+        }
+        hashString += integrationKey;
+
+        const encoder = new TextEncoder();
+        const hashBuffer = await crypto.subtle.digest('SHA-512', encoder.encode(hashString));
+        initFields.hash = toHex(hashBuffer);
+
+        return new Response(JSON.stringify({ 
+            success: true, 
+            orderId: newOrder.id,
+            standardCheckout: {
+                initUrl: 'https://www.paynow.co.zw/interface/initiatetransaction',
+                initFields: initFields,
+                initFieldOrder: [...initFieldOrder, 'hash']
             }
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }

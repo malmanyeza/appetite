@@ -3,8 +3,12 @@ import { createClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
-export const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-export const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+export const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+export const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+
+if (!supabaseUrl || !supabaseAnonKey) {
+    console.error('CRITICAL: Supabase environment variables are missing! The app will likely fail to load data.');
+}
 
 const WebStorageAdapter = {
     getItem: (key: string) => {
@@ -33,12 +37,15 @@ const ExpoSecureStoreAdapter = {
 
 const storageAdapter = Platform.OS === 'web' ? WebStorageAdapter : ExpoSecureStoreAdapter;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-        storage: storageAdapter,
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: false,
-    },
-});
+// Create client lazily or handle missing config gracefully
+export const supabase = (supabaseUrl && supabaseAnonKey) 
+    ? createClient(supabaseUrl, supabaseAnonKey, {
+        auth: {
+            storage: storageAdapter,
+            autoRefreshToken: true,
+            persistSession: true,
+            detectSessionInUrl: false,
+        },
+    })
+    : null as any; // Cast to 'any' to avoid breaking types, but we check for null in App.tsx
 

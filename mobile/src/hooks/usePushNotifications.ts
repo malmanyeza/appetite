@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
@@ -26,18 +26,18 @@ export const usePushNotifications = () => {
     useEffect(() => {
         registerForPushNotificationsAsync().then((token) => {
             setExpoPushToken(token);
-            if (token && typeof token === 'string' && !token.includes('Error:') && user) {
+            if (token && typeof token === 'string' && !token.includes('Error:') && user && supabase) {
                 // Sync to Supabase
                 supabase
                     .from('profiles')
                     .update({ expo_push_token: token })
                     .eq('id', user.id)
-                    .then(({ error }) => {
+                    .then(({ error }: { error: any }) => {
                         if (error) console.error('Failed to sync push token', error);
                         else console.log('Successfully synced push token to Supabase');
                     });
             } else if (token) {
-                console.warn('Invalid token captured, skipping sync:', token);
+                console.warn('Invalid token or missing Supabase/User, skipping sync:', token);
             }
         });
 
@@ -71,6 +71,18 @@ async function registerForPushNotificationsAsync() {
     }
 
     if (Device.isDevice) {
+        // Since Expo SDK 53, remote notifications are NOT supported in Expo Go.
+        // We check if we're running in Expo Go to avoid confusing warnings/errors.
+        const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+        
+        if (isExpoGo) {
+            console.log('--- PUSH NOTIFICATIONS ---');
+            console.log('Running in Expo Go. Remote push notifications are not supported here in SDK 54.');
+            console.log('To test push notifications, please use your Development Build (Native App).');
+            console.log('--------------------------');
+            return undefined;
+        }
+
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
         let finalStatus = existingStatus;
         if (existingStatus !== 'granted') {
@@ -84,12 +96,14 @@ async function registerForPushNotificationsAsync() {
 
         try {
             const projectId =
-                Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+                Constants?.expoConfig?.extra?.eas?.projectId ?? 
+                Constants?.easConfig?.projectId ??
+                '15c0aa0d-83d5-40df-ac4d-7ab315d086da'; // Hard fallback based on app.json check
 
             if (projectId) {
                 token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
             } else {
-                console.log('Project ID not found, attempting generic Expo push token fetch...');
+                console.warn('Project ID not found in Constants. Attempting fetch without ID...');
                 token = (await Notifications.getExpoPushTokenAsync()).data;
             }
         } catch (e: any) {

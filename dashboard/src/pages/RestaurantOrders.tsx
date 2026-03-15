@@ -106,10 +106,13 @@ export const RestaurantOrders = () => {
         );
     }
 
-    const incomingOrders = allOrders?.filter(o => o.status === 'confirmed') || [];
-    const preparingOrders = allOrders?.filter(o => o.status === 'preparing') || [];
-    const readyOrders = allOrders?.filter(o => o.status === 'ready_for_pickup') || [];
-    const historyOrders = allOrders?.filter(o => ['delivered', 'cancelled'].includes(o.status)) || [];
+    // Helper to extract and sort arrays newest first
+    const sortNewestFirst = (arr: any[]) => arr.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    const incomingOrders = sortNewestFirst(allOrders?.filter(o => o.status === 'confirmed') || []);
+    const preparingOrders = sortNewestFirst(allOrders?.filter(o => o.status === 'preparing') || []);
+    const readyOrders = sortNewestFirst(allOrders?.filter(o => o.status === 'ready_for_pickup') || []);
+    const historyOrders = sortNewestFirst(allOrders?.filter(o => ['delivered', 'cancelled'].includes(o.status)) || []);
 
     const [viewMode, setViewMode] = useState<'board' | 'table'>('board');
 
