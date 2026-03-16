@@ -10,18 +10,21 @@ import {
     Linking,
     RefreshControl,
     Alert,
-    Image
+    Image,
+    Dimensions
 } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { mapDarkStyle, mapLightStyle } from '../theme/MapStyle';
 import { useNavigation } from '@react-navigation/native';
 import * as ExpoLocation from 'expo-location';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { useTheme } from '../theme';
-import { MapPin, Package, Phone, CheckCircle2, Navigation, ExternalLink } from 'lucide-react-native';
+import { MapPin, Package, Phone, CheckCircle2, Navigation, ExternalLink, Store } from 'lucide-react-native';
 
 export const DriverJobs = () => {
-    const { theme } = useTheme();
+    const { theme, isDark } = useTheme();
     const { user } = useAuthStore();
     const navigation = useNavigation<any>();
     const queryClient = useQueryClient();
@@ -297,7 +300,7 @@ export const DriverJobs = () => {
         Linking.openURL(url);
     };
 
-    if (isLoading) return <View style={[styles.center, { backgroundColor: theme.background }]}><ActivityIndicator color={theme.accent} /></View>;
+    if (isActiveOrderLoading || isLoading) return <View style={[styles.center, { backgroundColor: theme.background }]}><ActivityIndicator color={theme.accent} /></View>;
 
     if (activeOrder) {
         return (
@@ -349,111 +352,107 @@ export const DriverJobs = () => {
                 ) : (
                     jobs?.map((job) => {
                         const addr = job.delivery_address_snapshot;
+                        const pickup = job.restaurants;
+                        
                         return (
                             <View key={job.id} style={[styles.jobCard, { backgroundColor: theme.surface }]}>
-                                <View style={styles.jobHeader}>
-                                    <View>
-                                        <Text style={[styles.orderId, { color: theme.textMuted }]}>Order #{job.id.slice(0, 8)}</Text>
-                                        <Text style={[styles.jobStatus, { color: theme.accent, fontWeight: 'bold' }]}>{job.status.replace('_', ' ').toUpperCase()}</Text>
-                                        <Text style={{ fontSize: 10, color: theme.textMuted, marginTop: 4 }}>
-                                            Ordered: {new Date(job.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                            <Text style={{ fontSize: 9, opacity: 0.7 }}>
-                                                {" "}({new Date(job.created_at).toDateString() === new Date().toDateString() ? 'Today' : new Date(job.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })})
-                                            </Text>
-                                        </Text>
+                                {/* Map Preview Container */}
+                                {(pickup?.lat && addr?.lat) ? (
+                                    <View style={styles.mapPreviewWrapper}>
+                                        <MapView
+                                            provider={PROVIDER_GOOGLE}
+                                            style={StyleSheet.absoluteFillObject}
+                                            customMapStyle={isDark ? mapDarkStyle : mapLightStyle}
+                                            liteMode={true}
+                                            initialRegion={{
+                                                latitude: (pickup.lat + addr.lat) / 2,
+                                                longitude: (pickup.lng + addr.lng) / 2,
+                                                latitudeDelta: Math.abs(pickup.lat - addr.lat) * 2 + 0.05,
+                                                longitudeDelta: Math.abs(pickup.lng - addr.lng) * 2 + 0.05,
+                                            }}
+                                        >
+                                            <Marker coordinate={{ latitude: pickup.lat, longitude: pickup.lng }}>
+                                                <View style={[styles.miniMarker, { backgroundColor: '#3B82F6' }]}>
+                                                    <Store color="#FFF" size={10} />
+                                                </View>
+                                            </Marker>
+                                            <Marker coordinate={{ latitude: addr.lat, longitude: addr.lng }}>
+                                                <View style={[styles.miniMarker, { backgroundColor: theme.accent }]}>
+                                                    <MapPin color="#FFF" size={10} />
+                                                </View>
+                                            </Marker>
+                                        </MapView>
                                     </View>
-                                    <View style={{ alignItems: 'flex-end' }}>
-                                        <Text style={[styles.payout, { color: '#22C55E' }]}>
-                                            Est. ${(job.pricing?.driver_earnings ||
-                                                ((Number(deliveryConfig?.driver_base) || 1.20) +
-                                                    ((Number(deliveryConfig?.driver_per_km) || 0.30) * (job.pricing?.distance_km || 0)) +
-                                                    (Number(deliveryConfig?.driver_bonus) || 0))
-                                            ).toFixed(2)}
-                                        </Text>
-                                        {job.pricing?.driver_bonus_applied > 0 && (
-                                            <Text style={{ fontSize: 9, color: '#22C55E', fontWeight: 'bold' }}>+${job.pricing.driver_bonus_applied.toFixed(2)} BONUS</Text>
+                                ) : (
+                                    <View style={[styles.mapPlaceholder, { backgroundColor: theme.background }]}>
+                                        <Navigation size={24} color={theme.border} />
+                                    </View>
+                                )}
+
+                                <View style={styles.cardInfo}>
+                                    <View style={styles.jobHeader}>
+                                        <View>
+                                            <Text style={[styles.orderId, { color: theme.textMuted }]}>Order #{job.id.slice(0, 8)}</Text>
+                                            <Text style={[styles.jobStatus, { color: theme.accent, fontWeight: 'bold' }]}>{job.status.replace('_', ' ').toUpperCase()}</Text>
+                                        </View>
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            <Text style={[styles.payout, { color: '#22C55E' }]}>
+                                                ${(job.pricing?.driver_earnings ||
+                                                    ((Number(deliveryConfig?.driver_base) || 1.20) +
+                                                        ((Number(deliveryConfig?.driver_per_km) || 0.30) * (job.pricing?.distance_km || 0)) +
+                                                        (Number(deliveryConfig?.driver_bonus) || 0))
+                                                ).toFixed(2)}
+                                            </Text>
+                                            <Text style={{ fontSize: 10, color: theme.textMuted }}>Est. Earnings</Text>
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.addressSection}>
+                                        <View style={styles.addressRow}>
+                                            <View style={[styles.dot, { backgroundColor: '#3B82F6' }]} />
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={[styles.addressText, { color: theme.text }]}>{pickup?.name}</Text>
+                                                <Text style={[styles.smallText, { color: theme.textMuted }]}>{pickup?.suburb}</Text>
+                                            </View>
+                                            <TouchableOpacity onPress={() => handleNavigate(pickup?.lat, pickup?.lng, `${pickup?.name}`)}>
+                                                <Navigation size={18} color={theme.textMuted} />
+                                            </TouchableOpacity>
+                                        </View>
+
+                                        <View style={[styles.line, { backgroundColor: theme.border }]} />
+
+                                        <View style={styles.addressRow}>
+                                            <View style={[styles.dot, { backgroundColor: theme.accent }]} />
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={[styles.addressText, { color: theme.text }]}>{addr?.suburb}</Text>
+                                                <Text style={[styles.smallText, { color: theme.textMuted }]} numberOfLines={1}>{addr?.landmark_notes}</Text>
+                                            </View>
+                                            <TouchableOpacity onPress={() => handleNavigate(addr?.lat, addr?.lng, `${addr?.suburb}`)}>
+                                                <Navigation size={18} color={theme.textMuted} />
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.actionSection}>
+                                        {job.status === 'ready_for_pickup' && !job.driver_id && (
+                                            <TouchableOpacity
+                                                style={[styles.primaryBtn, { backgroundColor: theme.accent }]}
+                                                onPress={() => acceptJob.mutate(job.id)}
+                                                disabled={acceptJob.isPending}
+                                            >
+                                                {acceptJob.isPending ? <ActivityIndicator color="white" /> : <Text style={styles.btnText}>Accept Job Offer</Text>}
+                                            </TouchableOpacity>
+                                        )}
+                                        {job.driver_id === user?.id && ['ready_for_pickup', 'picked_up', 'on_the_way'].includes(job.status) && (
+                                            <TouchableOpacity
+                                                style={[styles.primaryBtn, { backgroundColor: '#3B82F6' }]}
+                                                onPress={() => navigation.navigate('ActiveDelivery', { orderId: job.id })}
+                                            >
+                                                <Navigation size={20} color="white" style={{ marginRight: 8 }} />
+                                                <Text style={styles.btnText}>Resume Delivery</Text>
+                                            </TouchableOpacity>
                                         )}
                                     </View>
-                                </View>
-
-                                <View style={styles.addressSection}>
-                                    {/* Pickup (Restaurant) */}
-                                    <View style={styles.addressRow}>
-                                        <View style={[styles.dot, { backgroundColor: '#3B82F6' }]} />
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={[styles.addressLabel, { color: theme.textMuted }]}>Pickup</Text>
-                                            <Text style={[styles.addressText, { color: theme.text }]}>{job.restaurants?.name}</Text>
-                                            <Text style={[styles.landmarkText, { color: theme.textMuted }]}>
-                                                {job.restaurants?.suburb}, {job.restaurants?.landmark_notes}
-                                            </Text>
-                                        </View>
-                                        <TouchableOpacity onPress={() => handleNavigate(job.restaurants?.lat, job.restaurants?.lng, `${job.restaurants?.name} ${job.restaurants?.suburb}`)}>
-                                            <Navigation size={22} color={theme.accent} />
-                                        </TouchableOpacity>
-                                    </View>
-
-                                    <View style={[styles.line, { backgroundColor: theme.border }]} />
-
-                                    {/* Delivery (Customer) */}
-                                    <View style={styles.addressRow}>
-                                        <View style={[styles.dot, { backgroundColor: theme.accent }]} />
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={[styles.addressLabel, { color: theme.textMuted }]}>Delivery (Landmark Priority)</Text>
-
-                                            {/* Landmark-Driven BIG TEXT */}
-                                            <Text style={[styles.bigAddressText, { color: theme.text }]}>
-                                                {addr.suburb}
-                                            </Text>
-                                            <Text style={[styles.bigLandmarkText, { color: theme.accent }]}>
-                                                "{addr.landmark_notes}"
-                                            </Text>
-
-                                            <Text style={[styles.smallAddressText, { color: theme.textMuted }]}>
-                                                {addr.street ? `${addr.street}, ` : ''}{addr.city}
-                                            </Text>
-
-                                            <View style={styles.customerRow}>
-                                                <Text style={[styles.customerName, { color: theme.text }]}>
-                                                    Recipient: {job.profiles?.full_name}
-                                                </Text>
-                                            </View>
-                                        </View>
-                                        <View style={styles.sideActions}>
-                                            <TouchableOpacity
-                                                style={styles.actionIcon}
-                                                onPress={() => handleCall(job.profiles?.phone)}
-                                            >
-                                                <Phone size={22} color="#22C55E" />
-                                            </TouchableOpacity>
-                                            <TouchableOpacity
-                                                style={styles.actionIcon}
-                                                onPress={() => handleNavigate(addr.lat, addr.lng, `${addr.suburb} ${addr.landmark_notes}`)}
-                                            >
-                                                <Navigation size={22} color={theme.accent} />
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
-                                </View>
-
-                                <View style={styles.actionSection}>
-                                    {job.status === 'ready_for_pickup' && !job.driver_id && (
-                                        <TouchableOpacity
-                                            style={[styles.primaryBtn, { backgroundColor: theme.accent }]}
-                                            onPress={() => acceptJob.mutate(job.id)}
-                                            disabled={acceptJob.isPending}
-                                        >
-                                            {acceptJob.isPending ? <ActivityIndicator color="white" /> : <Text style={styles.btnText}>Accept Job Offer</Text>}
-                                        </TouchableOpacity>
-                                    )}
-                                    {job.driver_id === user?.id && ['ready_for_pickup', 'picked_up', 'on_the_way'].includes(job.status) && (
-                                        <TouchableOpacity
-                                            style={[styles.primaryBtn, { backgroundColor: '#3B82F6' }]}
-                                            onPress={() => navigation.navigate('ActiveDelivery', { orderId: job.id })}
-                                        >
-                                            <Navigation size={20} color="white" style={{ marginRight: 8 }} />
-                                            <Text style={styles.btnText}>Open Delivery Hub</Text>
-                                        </TouchableOpacity>
-                                    )}
                                 </View>
                             </View>
                         );
@@ -471,27 +470,23 @@ const styles = StyleSheet.create({
     onlineStatus: { fontSize: 18, fontWeight: 'bold' },
     onlineSub: { fontSize: 12, marginTop: 2 },
     scrollContent: { padding: 20, paddingBottom: 100 },
-    jobCard: { borderRadius: 24, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
-    jobHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
+    jobCard: { borderRadius: 24, marginBottom: 20, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 15, elevation: 5 },
+    mapPreviewWrapper: { height: 140, width: '100%', backgroundColor: '#eee' },
+    mapPlaceholder: { height: 140, width: '100%', justifyContent: 'center', alignItems: 'center' },
+    cardInfo: { padding: 20 },
+    miniMarker: { padding: 4, borderRadius: 10, borderWidth: 1, borderColor: '#FFF' },
+    jobHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
     orderId: { fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 },
-    jobStatus: { fontSize: 14, marginTop: 4 },
-    payout: { fontSize: 16, fontWeight: 'bold' },
-    addressSection: { marginBottom: 24 },
-    addressRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
-    dot: { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
-    addressLabel: { fontSize: 9, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-    addressText: { fontSize: 16, fontWeight: 'bold' },
-    landmarkText: { fontSize: 13, marginTop: 2 },
-    bigAddressText: { fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
-    bigLandmarkText: { fontSize: 18, fontWeight: 'bold', fontStyle: 'italic', marginTop: 2, marginBottom: 8 },
-    smallAddressText: { fontSize: 12, opacity: 0.7 },
-    customerRow: { marginTop: 12, flexDirection: 'row', alignItems: 'center' },
-    customerName: { fontSize: 14, fontWeight: '600' },
-    sideActions: { gap: 16, alignItems: 'center' },
-    actionIcon: { padding: 8, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)' },
-    line: { width: 2, height: 40, marginLeft: 4, marginVertical: 4 },
-    actionSection: { paddingTop: 20, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
-    primaryBtn: { height: 56, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+    jobStatus: { fontSize: 12, marginTop: 2 },
+    payout: { fontSize: 20, fontWeight: '900' },
+    addressSection: { marginBottom: 20 },
+    addressRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    dot: { width: 8, height: 8, borderRadius: 4 },
+    addressText: { fontSize: 15, fontWeight: 'bold' },
+    smallText: { fontSize: 12, marginTop: 1 },
+    line: { width: 1, height: 12, marginLeft: 3, marginVertical: 2 },
+    actionSection: { paddingTop: 16, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)' },
+    primaryBtn: { height: 50, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
     btnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
     emptyJobs: { marginTop: 100, alignItems: 'center', gap: 16 },
     emptyText: { fontSize: 16 },

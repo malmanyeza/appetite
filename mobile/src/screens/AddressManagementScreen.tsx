@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
     View,
     Text,
@@ -10,17 +10,26 @@ import {
     Modal,
     ActivityIndicator,
     KeyboardAvoidingView,
-    Platform
+    Platform,
+    Dimensions,
+    TouchableWithoutFeedback,
+    Keyboard,
+    ScrollView,
+    Animated
 } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+import { mapDarkStyle, mapLightStyle } from '../theme/MapStyle';
 import { useTheme } from '../theme';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { MapPin, Plus, Trash2, Home, Briefcase, MapIcon, ChevronLeft, CheckCircle2 } from 'lucide-react-native';
+import { MapPin, Plus, Trash2, Home, Briefcase, MapIcon, ChevronLeft, CheckCircle2, X } from 'lucide-react-native';
 
 export const AddressManagementScreen = ({ navigation }: any) => {
-    const { theme } = useTheme();
+    const { theme, isDark } = useTheme();
     const { user } = useAuthStore();
+    const { profile } = useAuthStore();
     const queryClient = useQueryClient();
     const [modalVisible, setModalVisible] = useState(false);
 
@@ -32,10 +41,26 @@ export const AddressManagementScreen = ({ navigation }: any) => {
     const [landmark, setLandmark] = useState('');
     const [coords, setCoords] = useState<{ lat: number, lng: number } | null>(null);
     const [isDefault, setIsDefault] = useState(false);
-    const [showCityPicker, setShowCityPicker] = useState(false);
     const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+    
+    const mapRef = useRef<MapView | null>(null);
+    const googlePlacesRef = useRef<any>(null);
+    const modalY = useRef(new Animated.Value(0)).current;
+    
+    const [mapRegion, setMapRegion] = useState<any>({
+        latitude: -17.8248, // Harare
+        longitude: 31.0530,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+    });
 
-    const cities = ['Harare', 'Bulawayo', 'Mutare', 'Gweru', 'Kwekwe', 'Chitungwiza'];
+    const animateModal = (toValue: number) => {
+        Animated.timing(modalY, {
+            toValue,
+            duration: 600,
+            useNativeDriver: true,
+        }).start();
+    };
 
     const { data: addresses, isLoading } = useQuery({
         queryKey: ['addresses', user?.id],
@@ -91,10 +116,32 @@ export const AddressManagementScreen = ({ navigation }: any) => {
             }
 
             const location = await Location.getCurrentPositionAsync({});
-            setCoords({
+            const newCoords = {
                 lat: location.coords.latitude,
                 lng: location.coords.longitude
+            };
+            setCoords(newCoords);
+            
+            const region = {
+                latitude: newCoords.lat,
+                longitude: newCoords.lng,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+            };
+            setMapRegion(region);
+            mapRef.current?.animateToRegion(region, 500);
+
+            // Reverse geocode to fill fields
+            const [rev] = await Location.reverseGeocodeAsync({
+                latitude: newCoords.lat,
+                longitude: newCoords.lng
             });
+            if (rev) {
+                setCity(rev.city || 'Harare');
+                setSuburb(rev.district || rev.subregion || '');
+                setStreet(rev.street || '');
+            }
+
             setIsFetchingLocation(false);
         } catch (error) {
             console.warn('GPS logic failed:', error);
@@ -115,7 +162,7 @@ export const AddressManagementScreen = ({ navigation }: any) => {
 
     const handleAddAddress = () => {
         if (!coords?.lat || !coords?.lng) {
-            Alert.alert('Location Required', 'You must tap "Use Current Location (GPS)" to save the exact address coordinates.');
+            Alert.alert('Location Required', 'Please search for an address or use GPS to pick a location on the map.');
             return;
         }
         addAddressMutation.mutate({
@@ -159,11 +206,6 @@ export const AddressManagementScreen = ({ navigation }: any) => {
                     <Text style={[styles.landmark, { color: theme.textMuted }]}>
                         {item.street ? `${item.street}, ` : ''}{item.city}
                     </Text>
-                    {item.lat && (
-                        <Text style={[styles.landmark, { color: '#10B981', fontSize: 10 }]}>
-                            📍 GPS Pin Saved
-                        </Text>
-                    )}
                 </View>
                 <TouchableOpacity onPress={() => confirmDelete(item.id)}>
                     <Trash2 size={20} color="#EF4444" />
@@ -207,129 +249,217 @@ export const AddressManagementScreen = ({ navigation }: any) => {
                 <Text style={styles.addButtonText}>Add New Address</Text>
             </TouchableOpacity>
 
-            <Modal visible={modalVisible} animationType="slide" transparent>
-                <View style={styles.modalOverlay}>
-                    <KeyboardAvoidingView
-                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                        style={[styles.modalContent, { backgroundColor: theme.background }]}
-                    >
-                        <View style={styles.modalHeader}>
-                            <Text style={[styles.modalTitle, { color: theme.text }]}>New Address</Text>
-                            <TouchableOpacity onPress={() => setModalVisible(false)}>
-                                <Text style={{ color: theme.accent, fontWeight: 'bold' }}>Cancel</Text>
-                            </TouchableOpacity>
-                        </View>
+            <Modal visible={modalVisible} animationType="slide" transparent={false}>
+                <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                    <View style={{ flex: 1, backgroundColor: theme.background }}>
+                        {/* Full Screen Map */}
+                        <MapView
+                            ref={mapRef}
+                            provider={PROVIDER_GOOGLE}
+                            style={StyleSheet.absoluteFillObject}
+                            initialRegion={mapRegion}
+                            mapPadding={{ top: 0, right: 0, left: 0, bottom: Dimensions.get('window').height * 0.4 }}
+                            customMapStyle={isDark ? mapDarkStyle : mapLightStyle}
+                            onPress={() => {
+                                Keyboard.dismiss();
+                            }}
+                            onRegionChangeStart={() => {
+                                Keyboard.dismiss();
+                                animateModal(Dimensions.get('window').height * 0.7);
+                            }}
+                            onRegionChangeComplete={(region) => {
+                                setMapRegion(region);
+                                animateModal(0);
+                            }}
+                        >
+                            {coords && (
+                                <Marker
+                                    coordinate={{
+                                        latitude: coords.lat,
+                                        longitude: coords.lng
+                                    }}
+                                    pinColor={theme.accent}
+                                />
+                            )}
+                        </MapView>
 
-                        <View style={styles.form}>
-                            <Text style={[styles.inputLabel, { color: theme.text }]}>Label</Text>
-                            <View style={styles.labelPicker}>
-                                {['Home', 'Work', 'Other'].map(l => (
-                                    <TouchableOpacity
-                                        key={l}
-                                        style={[
-                                            styles.labelChip,
-                                            { backgroundColor: theme.surface },
-                                            label === l && { borderColor: theme.accent, borderWidth: 1 }
-                                        ]}
-                                        onPress={() => setLabel(l)}
-                                    >
-                                        <Text style={{ color: label === l ? theme.accent : theme.text }}>{l}</Text>
-                                    </TouchableOpacity>
-                                ))}
+                        <View style={styles.modalHeaderButtons}>
+                            <TouchableOpacity 
+                                onPress={() => setModalVisible(false)}
+                                style={[styles.backCircle, { backgroundColor: theme.surface }]}
+                            >
+                                <X color={theme.text} size={24} />
+                            </TouchableOpacity>
+                            <View style={{ flex: 1 }}>
+                                <GooglePlacesAutocomplete
+                                    ref={googlePlacesRef}
+                                    placeholder="Search address..."
+                                    fetchDetails={true}
+                                    enablePoweredByContainer={false}
+                                    onPress={(data, details = null) => {
+                                        if (details) {
+                                            const newCoords = {
+                                                lat: details.geometry.location.lat,
+                                                lng: details.geometry.location.lng,
+                                            };
+                                            setCoords(newCoords);
+                                            setCity(details.address_components.find(c => c.types.includes('locality'))?.long_name || 'Harare');
+                                            setSuburb(details.address_components.find(c => c.types.includes('sublocality') || c.types.includes('neighborhood'))?.long_name || data.structured_formatting.main_text);
+                                            setStreet(details.address_components.find(c => c.types.includes('route'))?.long_name || '');
+                                            
+                                            const region = {
+                                                latitude: newCoords.lat,
+                                                longitude: newCoords.lng,
+                                                latitudeDelta: 0.01,
+                                                longitudeDelta: 0.01,
+                                            };
+                                            setMapRegion(region);
+                                            mapRef.current?.animateToRegion(region, 500);
+                                            Keyboard.dismiss();
+                                        }
+                                    }}
+                                    query={{
+                                        key: 'AIzaSyAfW8js09sB0cfQzz19aRBkSE7sDMy5cu0',
+                                        language: 'en',
+                                        components: 'country:zw',
+                                        types: 'establishment|geocode',
+                                        location: `${mapRegion.latitude},${mapRegion.longitude}`,
+                                        radius: 5000
+                                    }}
+                                    styles={{
+                                        container: { flex: 0 },
+                                        textInput: {
+                                            height: 48,
+                                            backgroundColor: theme.surface,
+                                            color: theme.text,
+                                            borderRadius: 24,
+                                            paddingLeft: 20,
+                                            fontSize: 14,
+                                            elevation: 5,
+                                            shadowColor: '#000',
+                                            shadowOffset: { width: 0, height: 2 },
+                                            shadowOpacity: 0.1,
+                                            shadowRadius: 4
+                                        },
+                                        listView: {
+                                            backgroundColor: theme.background,
+                                            borderRadius: 12,
+                                            marginTop: 8,
+                                            elevation: 10,
+                                            zIndex: 3000
+                                        },
+                                        row: { backgroundColor: theme.background, padding: 13, height: 48, flexDirection: 'row' },
+                                        description: { color: theme.text }
+                                    }}
+                                />
                             </View>
-
-                            <TouchableOpacity
-                                style={[styles.input, { backgroundColor: theme.surface, justifyContent: 'center' }]}
-                                onPress={() => setShowCityPicker(true)}
-                            >
-                                <Text style={{ color: theme.text }}>City: {city}</Text>
-                            </TouchableOpacity>
-
-                            <TextInput
-                                placeholder="Suburb (e.g. Avondale, CBD)"
-                                placeholderTextColor={theme.textMuted}
-                                style={[styles.input, { backgroundColor: theme.surface, color: theme.text }]}
-                                value={suburb}
-                                onChangeText={setSuburb}
-                            />
-                            <TextInput
-                                placeholder="Street Name (Optional)"
-                                placeholderTextColor={theme.textMuted}
-                                style={[styles.input, { backgroundColor: theme.surface, color: theme.text }]}
-                                value={street}
-                                onChangeText={setStreet}
-                            />
-                            <TextInput
-                                placeholder="Landmark Notes (Optional: Blue gate...)"
-                                placeholderTextColor={theme.textMuted}
-                                style={[styles.input, { backgroundColor: theme.surface, color: theme.text }]}
-                                value={landmark}
-                                onChangeText={setLandmark}
-                                multiline
-                            />
-
-                            <TouchableOpacity
-                                style={[styles.gpsButton, { borderColor: coords ? '#10B981' : theme.accent }]}
-                                onPress={handleUseCurrentLocation}
-                                disabled={isFetchingLocation || !!coords}
-                            >
-                                {isFetchingLocation ? (
-                                    <ActivityIndicator size="small" color={theme.accent} />
-                                ) : coords ? (
-                                    <CheckCircle2 size={20} color="#10B981" />
-                                ) : (
-                                    <MapPin size={20} color={theme.accent} />
-                                )}
-                                <Text style={{ color: coords ? '#10B981' : theme.accent, fontWeight: 'bold' }}>
-                                    {isFetchingLocation ? 'Acquiring GPS...' : coords ? 'GPS Location Captured' : 'Use Current Location (GPS)'}
-                                </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={styles.checkboxRow}
-                                onPress={() => setIsDefault(!isDefault)}
-                            >
-                                <View style={[styles.checkbox, isDefault && { backgroundColor: theme.accent, borderColor: theme.accent }]}>
-                                    {isDefault && <CheckCircle2 size={16} color="white" />}
-                                </View>
-                                <Text style={[styles.checkboxLabel, { color: theme.text }]}>Set as Default address</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.saveButton, { backgroundColor: theme.accent }]}
-                                onPress={handleAddAddress}
-                                disabled={addAddressMutation.isPending}
-                            >
-                                {addAddressMutation.isPending ? (
-                                    <ActivityIndicator color="white" />
-                                ) : (
-                                    <Text style={styles.saveButtonText}>Save Address</Text>
-                                )}
-                            </TouchableOpacity>
                         </View>
 
-                        {/* City Picker Modal */}
-                        <Modal visible={showCityPicker} transparent animationType="fade">
-                            <View style={styles.modalOverlay}>
-                                <View style={[styles.cityPickerContent, { backgroundColor: theme.background }]}>
-                                    <Text style={[styles.modalTitle, { color: theme.text, marginBottom: 16 }]}>Select City</Text>
-                                    {cities.map(c => (
+                        <Animated.View
+                            style={[
+                                styles.modalContent, 
+                                { 
+                                    backgroundColor: theme.background,
+                                    transform: [{ translateY: modalY }],
+                                    position: 'absolute',
+                                    bottom: 0,
+                                    left: 0,
+                                    right: 0,
+                                    height: Dimensions.get('window').height * 0.65
+                                }
+                            ]}
+                        >
+                            <KeyboardAvoidingView
+                                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                                style={{ flex: 1 }}
+                            >
+                                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                                    <View style={styles.form}>
+                                        <View style={styles.formHeader}>
+                                            <Text style={[styles.modalTitle, { color: theme.text }]}>New Address</Text>
+                                            <Text style={{ color: theme.textMuted }}>Pick a spot and add details</Text>
+                                        </View>
+
+                                        <View>
+                                            <Text style={[styles.inputLabel, { color: theme.text }]}>Label</Text>
+                                            <View style={styles.labelPicker}>
+                                                {['Home', 'Work', 'Other'].map(l => (
+                                                    <TouchableOpacity
+                                                        key={l}
+                                                        style={[
+                                                            styles.labelChip,
+                                                            { backgroundColor: theme.surface },
+                                                            label === l && { borderColor: theme.accent, borderWidth: 2 }
+                                                        ]}
+                                                        onPress={() => setLabel(l)}
+                                                    >
+                                                        <Text style={{ color: label === l ? theme.accent : theme.text, fontWeight: label === l ? 'bold' : 'normal' }}>{l}</Text>
+                                                    </TouchableOpacity>
+                                                ))}
+                                            </View>
+                                        </View>
+
+                                        <View style={{ gap: 4 }}>
+                                            <Text style={[styles.inputLabel, { color: theme.text }]}>Selected Location</Text>
+                                            <View style={[styles.input, { backgroundColor: theme.surface, justifyContent: 'center' }]}>
+                                                <Text style={{ color: theme.text }} numberOfLines={1}>
+                                                    {suburb ? `${city}, ${suburb}` : city}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        <TextInput
+                                            placeholder="House Number / Notes (Optional)"
+                                            placeholderTextColor={theme.textMuted}
+                                            style={[styles.input, { backgroundColor: theme.surface, color: theme.text }]}
+                                            value={street}
+                                            onChangeText={setStreet}
+                                        />
+
                                         <TouchableOpacity
-                                            key={c}
-                                            style={styles.cityOption}
-                                            onPress={() => { setCity(c); setShowCityPicker(false); }}
+                                            style={[styles.gpsButton, { borderColor: coords ? '#10B981' : theme.accent, backgroundColor: coords ? '#10B98110' : 'transparent' }]}
+                                            onPress={handleUseCurrentLocation}
+                                            disabled={isFetchingLocation}
                                         >
-                                            <Text style={{ color: theme.text, fontSize: 16 }}>{c}</Text>
+                                            {isFetchingLocation ? (
+                                                <ActivityIndicator size="small" color={theme.accent} />
+                                            ) : coords ? (
+                                                <CheckCircle2 size={20} color="#10B981" />
+                                            ) : (
+                                                <MapPin size={20} color={theme.accent} />
+                                            )}
+                                            <Text style={{ color: coords ? '#10B981' : theme.accent, fontWeight: 'bold' }}>
+                                                {isFetchingLocation ? 'Acquiring GPS...' : coords ? 'GPS Captured' : 'Use Current GPS'}
+                                            </Text>
                                         </TouchableOpacity>
-                                    ))}
-                                    <TouchableOpacity onPress={() => setShowCityPicker(false)} style={{ marginTop: 16 }}>
-                                        <Text style={{ color: theme.accent, textAlign: 'center' }}>Close</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        </Modal>
-                    </KeyboardAvoidingView>
-                </View>
+
+                                        <TouchableOpacity
+                                            style={styles.checkboxRow}
+                                            onPress={() => setIsDefault(!isDefault)}
+                                        >
+                                            <View style={[styles.checkbox, isDefault && { backgroundColor: theme.accent, borderColor: theme.accent }]}>
+                                                {isDefault && <CheckCircle2 size={16} color="white" />}
+                                            </View>
+                                            <Text style={[styles.checkboxLabel, { color: theme.text }]}>Set as Default address</Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            style={[styles.saveButton, { backgroundColor: theme.accent }]}
+                                            onPress={handleAddAddress}
+                                            disabled={addAddressMutation.isPending}
+                                        >
+                                            {addAddressMutation.isPending ? (
+                                                <ActivityIndicator color="white" />
+                                            ) : (
+                                                <Text style={styles.saveButtonText}>Save Address</Text>
+                                            )}
+                                        </TouchableOpacity>
+                                    </View>
+                                </ScrollView>
+                            </KeyboardAvoidingView>
+                        </Animated.View>
+                    </View>
+                </TouchableWithoutFeedback>
             </Modal>
         </View>
     );
@@ -386,30 +516,54 @@ const styles = StyleSheet.create({
         marginBottom: 40
     },
     addButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-    modalContent: { borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: 60 },
-    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-    modalTitle: { fontSize: 20, fontWeight: 'bold' },
-    form: { gap: 16 },
-    inputLabel: { fontSize: 14, fontWeight: '600' },
-    labelPicker: { flexDirection: 'row', gap: 12, marginBottom: 8 },
-    labelChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 },
-    input: { height: 56, borderRadius: 12, paddingHorizontal: 16, fontSize: 16 },
-    checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
-    checkbox: { width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: '#DDD', justifyContent: 'center', alignItems: 'center' },
+    modalContent: { 
+        flex: 1, 
+        borderTopLeftRadius: 32, 
+        borderTopRightRadius: 32, 
+        marginTop: -30, 
+        padding: 24,
+    },
+    modalHeaderButtons: { 
+        position: 'absolute', 
+        top: 50, 
+        left: 20, 
+        right: 20, 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        gap: 12 
+    },
+    formHeader: { marginBottom: 24, gap: 4 },
+    modalTitle: { fontSize: 24, fontWeight: 'bold' },
+    form: { gap: 16, paddingBottom: 40 },
+    inputLabel: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
+    labelPicker: { flexDirection: 'row', gap: 12 },
+    labelChip: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 14 },
+    input: { height: 56, borderRadius: 16, paddingHorizontal: 16, fontSize: 16 },
+    checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 },
+    checkbox: { width: 24, height: 24, borderRadius: 8, borderWidth: 2, borderColor: '#DDD', justifyContent: 'center', alignItems: 'center' },
     checkboxLabel: { fontSize: 15 },
     gpsButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 12,
-        paddingVertical: 12,
-        borderWidth: 1,
-        borderRadius: 12,
-        marginTop: 8
+        paddingVertical: 14,
+        borderWidth: 1.5,
+        borderRadius: 16,
+        marginTop: 4
     },
-    cityPickerContent: { width: '80%', padding: 24, borderRadius: 24 },
-    cityOption: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
-    saveButton: { height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginTop: 16 },
-    saveButtonText: { color: 'white', fontSize: 18, fontWeight: 'bold' }
+    saveButton: { height: 58, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginTop: 16 },
+    saveButtonText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
+    backCircle: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4
+    }
 });

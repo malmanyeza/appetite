@@ -1,14 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, TextInput, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform } from 'react-native';
+import { 
+    View, 
+    Text, 
+    StyleSheet, 
+    TouchableOpacity, 
+    ScrollView, 
+    Alert, 
+    Modal, 
+    TextInput, 
+    KeyboardAvoidingView, 
+    TouchableWithoutFeedback, 
+    Keyboard, 
+    Platform, 
+    Animated, 
+    Dimensions 
+} from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../theme';
-import { ArrowLeft, MapPin, Store, Phone, CheckCircle2, Navigation, FileText } from 'lucide-react-native';
+import { ArrowLeft, MapPin, Store, Phone, CheckCircle2, Navigation, FileText, X, ChevronUp, ChevronDown } from 'lucide-react-native';
 import * as Linking from 'expo-linking';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { mapDarkStyle, mapLightStyle } from '../theme/MapStyle';
 
 export const ActiveDelivery = () => {
-    const { theme } = useTheme();
+    const { theme, isDark } = useTheme();
     const navigation = useNavigation<any>();
     const route = useRoute<any>();
     const queryClient = useQueryClient();
@@ -41,6 +58,17 @@ export const ActiveDelivery = () => {
     const [isPinModalVisible, setIsPinModalVisible] = useState(false);
     const [pinEntry, setPinEntry] = useState('');
     const [pinError, setPinError] = useState('');
+    
+    const mapRef = React.useRef<MapView | null>(null);
+    const modalY = React.useRef(new Animated.Value(0)).current;
+    
+    const animateModal = (toValue: number) => {
+        Animated.timing(modalY, {
+            toValue,
+            duration: 600,
+            useNativeDriver: true,
+        }).start();
+    };
 
     const updateStatusMutation = useMutation({
         mutationFn: async (newStatus: string) => {
@@ -102,144 +130,180 @@ export const ActiveDelivery = () => {
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
-            <View style={[styles.header, { borderBottomColor: theme.border }]}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            {/* Full Screen Map */}
+            <MapView
+                ref={mapRef}
+                provider={PROVIDER_GOOGLE}
+                style={StyleSheet.absoluteFillObject}
+                customMapStyle={isDark ? mapDarkStyle : mapLightStyle}
+                mapPadding={{ top: 100, right: 0, left: 0, bottom: Dimensions.get('window').height * 0.4 }}
+                onRegionChangeStart={() => animateModal(Dimensions.get('window').height * 0.5)}
+                onRegionChangeComplete={() => animateModal(0)}
+            >
+                {/* Restaurant Marker */}
+                {order.restaurants?.lat && (
+                    <Marker
+                        coordinate={{
+                            latitude: order.restaurants.lat,
+                            longitude: order.restaurants.lng
+                        }}
+                    >
+                        <View style={[styles.markerContainer, { backgroundColor: isHeadingToRestaurant ? theme.accent : theme.surface }]}>
+                            <Store color={isHeadingToRestaurant ? '#FFF' : theme.textMuted} size={20} />
+                        </View>
+                    </Marker>
+                )}
+
+                {/* Customer Marker */}
+                {order.delivery_address_snapshot?.lat && (
+                    <Marker
+                        coordinate={{
+                            latitude: order.delivery_address_snapshot.lat,
+                            longitude: order.delivery_address_snapshot.lng
+                        }}
+                    >
+                        <View style={[styles.markerContainer, { backgroundColor: isNavigatingToCustomer ? theme.accent : theme.surface }]}>
+                            <MapPin color={isNavigatingToCustomer ? '#FFF' : theme.textMuted} size={20} />
+                        </View>
+                    </Marker>
+                )}
+            </MapView>
+
+            {/* Floating Top Header */}
+            <View style={styles.floatingHeader}>
+                <TouchableOpacity 
+                    onPress={() => navigation.goBack()} 
+                    style={[styles.backButtonFloating, { backgroundColor: theme.surface }]}
+                >
                     <ArrowLeft color={theme.text} size={24} />
                 </TouchableOpacity>
-                <View>
-                    <Text style={[styles.title, { color: theme.text }]}>Active Delivery</Text>
-                    <Text style={[styles.subtitle, { color: theme.accent }]}>
-                        {isHeadingToRestaurant ? 'Head to Restaurant' : 'Navigate to Customer'}
+                <View style={[styles.statusBadge, { backgroundColor: theme.surface }]}>
+                    <View style={[styles.dot, { backgroundColor: theme.accent }]} />
+                    <Text style={[styles.statusText, { color: theme.text }]}>
+                        {isHeadingToRestaurant ? 'Heading to Pickup' : 'Heading to Delivery'}
                     </Text>
                 </View>
             </View>
 
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-
-                {/* Stepper Timeline (Simplified) */}
-                <View style={[styles.card, { backgroundColor: theme.surface }]}>
-                    <View style={styles.step}>
-                        <CheckCircle2 color={isHeadingToRestaurant ? theme.textMuted : theme.accent} size={20} />
-                        <Text style={[styles.stepText, { color: isHeadingToRestaurant ? theme.text : theme.textMuted }]}>Head to Restaurant</Text>
-                    </View>
-                    <View style={styles.stepLine} />
-                    <View style={styles.step}>
-                        <CheckCircle2 color={order.status === 'picked_up' ? theme.accent : theme.textMuted} size={20} />
-                        <Text style={[styles.stepText, { color: order.status === 'picked_up' ? theme.text : theme.textMuted }]}>Confirm Pickup</Text>
-                    </View>
-                    <View style={styles.stepLine} />
-                    <View style={styles.step}>
-                        <CheckCircle2 color={order.status === 'on_the_way' ? theme.accent : theme.textMuted} size={20} />
-                        <Text style={[styles.stepText, { color: order.status === 'on_the_way' ? theme.text : theme.textMuted }]}>Navigate to Customer</Text>
-                    </View>
-                    <View style={styles.stepLine} />
-                    <View style={styles.step}>
-                        <CheckCircle2 color={order.status === 'delivered' ? theme.accent : theme.textMuted} size={20} />
-                        <Text style={[styles.stepText, { color: order.status === 'delivered' ? theme.text : theme.textMuted }]}>Confirm Delivery</Text>
-                    </View>
+            {/* Bottom Details Overlay */}
+            <Animated.View 
+                style={[
+                    styles.bottomSheet, 
+                    { 
+                        backgroundColor: theme.background,
+                        transform: [{ translateY: modalY }]
+                    }
+                ]}
+            >
+                <View style={styles.sheetHandle}>
+                    <View style={[styles.handle, { backgroundColor: theme.border }]} />
                 </View>
 
-                {isHeadingToRestaurant ? (
-                    <View style={[styles.card, { backgroundColor: theme.surface }]}>
-                        <View style={styles.cardHeader}>
-                            <Store color={theme.accent} size={24} />
-                            <Text style={[styles.cardTitle, { color: theme.text }]}>{order.restaurants?.name}</Text>
-                        </View>
-                        <Text style={[styles.cardText, { color: theme.textMuted }]}>{order.restaurants?.suburb}, {order.restaurants?.city}</Text>
-
-                        <View style={styles.buttonRow}>
-                            <TouchableOpacity style={[styles.iconButton, { backgroundColor: theme.background }]} onPress={() => callNumber('0000000000')}>
-                                <Phone color={theme.text} size={20} />
-                                <Text style={[styles.iconButtonText, { color: theme.text }]}>Call Restaurant</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        <View style={[styles.summaryBox, { backgroundColor: theme.background }]}>
-                            <View style={styles.summaryHeader}>
-                                <FileText color={theme.textMuted} size={16} />
-                                <Text style={[styles.summaryTitle, { color: theme.text }]}>Order #{order.id.slice(0, 6).toUpperCase()}</Text>
-                                <Text style={[styles.summaryTitle, { color: theme.textMuted, marginLeft: 8 }]}>
-                                    • {order.order_items?.reduce((sum: number, item: any) => sum + item.qty, 0) || 0} items
-                                </Text>
-                            </View>
-
-                            <View style={{ marginTop: 12, padding: 12, backgroundColor: theme.surface, borderRadius: 12, borderLeftWidth: 4, borderLeftColor: '#22c55e' }}>
-                                <Text style={{ fontSize: 12, color: theme.textMuted }}>YOUR PAYOUT</Text>
-                                <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#22c55e' }}>
-                                    ${(order.pricing?.driver_earnings || order.pricing?.driverEarnings || 0).toFixed(2)}
-                                </Text>
-                            </View>
-                        </View>
-
-                        {order.restaurants?.lat && (
-                            <TouchableOpacity
-                                style={[styles.navButton, { backgroundColor: theme.surface, borderColor: theme.accent, borderWidth: 1 }]}
-                                onPress={() => openMaps(order.restaurants.lat, order.restaurants.lng)}
-                            >
-                                <Navigation color={theme.accent} size={20} style={{ marginRight: 8 }} />
-                                <Text style={[styles.primaryButtonText, { color: theme.accent }]}>Navigate to Restaurant</Text>
-                            </TouchableOpacity>
-                        )}
-
-                        <TouchableOpacity
-                            style={[styles.primaryButton, { backgroundColor: theme.accent }]}
-                            onPress={() => setIsPickupModalVisible(true)}
-                        >
-                            <Text style={styles.primaryButtonText}>Confirm Pickup</Text>
-                        </TouchableOpacity>
-                    </View>
-                ) : (
-                    <View style={[styles.card, { backgroundColor: theme.surface }]}>
-                        <View style={styles.cardHeader}>
-                            <Navigation color={theme.accent} size={24} />
-                            <Text style={[styles.cardTitle, { color: theme.text, fontSize: 24 }]}>{order.delivery_address_snapshot?.suburb?.toUpperCase() || 'UNKNOWN SUBURB'}</Text>
-                        </View>
-                        <Text style={[styles.cardText, { color: theme.text, fontSize: 18, fontWeight: 'bold', marginVertical: 8 }]}>
-                            {order.delivery_address_snapshot?.landmark_notes || 'No landmark provided'}
-                        </Text>
-                        <Text style={[styles.cardText, { color: theme.textMuted }]}>
-                            {order.delivery_address_snapshot?.street_address}
-                        </Text>
-
-                        <View style={styles.buttonRow}>
-                            <TouchableOpacity style={[styles.iconButton, { backgroundColor: theme.background }]} onPress={() => callNumber(order.profiles?.phone || '')}>
-                                <Phone color={theme.text} size={20} />
-                                <Text style={[styles.iconButtonText, { color: theme.text }]}>Call Customer</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        {order.status === 'picked_up' && (
-                            <TouchableOpacity
-                                style={[styles.primaryButton, { backgroundColor: theme.accent }]}
-                                onPress={() => updateStatusMutation.mutate('on_the_way')}
-                            >
-                                <Text style={styles.primaryButtonText}>Start Trip / On The Way</Text>
-                            </TouchableOpacity>
-                        )}
-
-                        {order.status === 'on_the_way' && (
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetContent}>
+                    {/* Primary Info Card */}
+                    <View style={[styles.infoCard, { backgroundColor: theme.surface }]}>
+                        {isHeadingToRestaurant ? (
                             <>
-                                {order.delivery_address_snapshot?.lat && (
-                                    <TouchableOpacity
-                                        style={[styles.navButton, { backgroundColor: theme.surface, borderColor: theme.accent, borderWidth: 1 }]}
-                                        onPress={() => openMaps(order.delivery_address_snapshot.lat, order.delivery_address_snapshot.lng)}
-                                    >
-                                        <Navigation color={theme.accent} size={20} style={{ marginRight: 8 }} />
-                                        <Text style={[styles.primaryButtonText, { color: theme.accent }]}>Navigate to Customer</Text>
-                                    </TouchableOpacity>
+                                <View style={styles.cardRow}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[styles.label, { color: theme.textMuted }]}>PICKUP FROM</Text>
+                                        <Text style={[styles.value, { color: theme.text }]}>{order.restaurants?.name}</Text>
+                                        <Text style={[styles.subValue, { color: theme.textMuted }]}>{order.restaurants?.suburb}, {order.restaurants?.city}</Text>
+                                    </View>
+                                    <Store color={theme.accent} size={32} />
+                                </View>
+                                {order.restaurants?.landmark_notes && (
+                                    <View style={[styles.noteBox, { backgroundColor: theme.background }]}>
+                                        <Text style={[styles.noteText, { color: theme.text }]}>"{order.restaurants.landmark_notes}"</Text>
+                                    </View>
                                 )}
-
-                                <TouchableOpacity
-                                    style={[styles.primaryButton, { backgroundColor: '#22c55e' }]}
-                                    onPress={() => setIsPinModalVisible(true)}
-                                >
-                                    <Text style={styles.primaryButtonText}>Complete Delivery</Text>
-                                </TouchableOpacity>
+                            </>
+                        ) : (
+                            <>
+                                <View style={styles.cardRow}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[styles.label, { color: theme.textMuted }]}>DELIVER TO</Text>
+                                        <Text style={[styles.value, { color: theme.text }]}>{order.delivery_address_snapshot?.suburb?.toUpperCase()}</Text>
+                                        <Text style={[styles.subValue, { color: theme.textMuted }]}>{order.delivery_address_snapshot?.street_address}</Text>
+                                    </View>
+                                    <MapPin color={theme.accent} size={32} />
+                                </View>
+                                {order.delivery_address_snapshot?.landmark_notes && (
+                                    <View style={[styles.noteBox, { backgroundColor: theme.background }]}>
+                                        <Text style={[styles.noteText, { color: theme.text }]}>"{order.delivery_address_snapshot.landmark_notes}"</Text>
+                                    </View>
+                                )}
                             </>
                         )}
+
+                        <View style={styles.actionRow}>
+                            <TouchableOpacity 
+                                style={[styles.actionBtn, { backgroundColor: theme.background }]} 
+                                onPress={() => callNumber(isHeadingToRestaurant ? '0000000000' : order.profiles?.phone || '')}
+                            >
+                                <Phone color={theme.text} size={20} />
+                                <Text style={[styles.actionBtnText, { color: theme.text }]}>Call</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                style={[styles.actionBtn, { backgroundColor: theme.accent + '20' }]} 
+                                onPress={() => {
+                                    const loc = isHeadingToRestaurant ? order.restaurants : order.delivery_address_snapshot;
+                                    openMaps(loc.lat, loc.lng);
+                                }}
+                            >
+                                <Navigation color={theme.accent} size={20} />
+                                <Text style={[styles.actionBtnText, { color: theme.accent }]}>Navigate</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
-                )}
-            </ScrollView>
+
+                    {/* Order Payout Section */}
+                    <View style={[styles.payoutCard, { backgroundColor: theme.surface }]}>
+                        <View>
+                            <Text style={[styles.label, { color: theme.textMuted }]}>ESTIMATED EARNINGS</Text>
+                            <Text style={[styles.payoutValue, { color: '#22c55e' }]}>
+                                ${(order.pricing?.driver_earnings || order.pricing?.driverEarnings || 0).toFixed(2)}
+                            </Text>
+                        </View>
+                        <View style={styles.itemBadge}>
+                            <FileText color={theme.textMuted} size={14} />
+                            <Text style={[styles.itemText, { color: theme.textMuted }]}>
+                                {order.order_items?.reduce((sum: number, item: any) => sum + item.qty, 0) || 0} items
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Status Primary Actions */}
+                    <View style={{ marginTop: 8 }}>
+                        {isHeadingToRestaurant ? (
+                            <TouchableOpacity
+                                style={[styles.mainActionBtn, { backgroundColor: theme.accent }]}
+                                onPress={() => setIsPickupModalVisible(true)}
+                            >
+                                <CheckCircle2 color="#FFF" size={24} style={{ marginRight: 8 }} />
+                                <Text style={styles.mainActionText}>Confirm Pickup</Text>
+                            </TouchableOpacity>
+                        ) : order.status === 'picked_up' ? (
+                            <TouchableOpacity
+                                style={[styles.mainActionBtn, { backgroundColor: theme.accent }]}
+                                onPress={() => updateStatusMutation.mutate('on_the_way')}
+                            >
+                                <Navigation color="#FFF" size={24} style={{ marginRight: 8 }} />
+                                <Text style={styles.mainActionText}>Start Trip to Customer</Text>
+                            </TouchableOpacity>
+                        ) : order.status === 'on_the_way' ? (
+                            <TouchableOpacity
+                                style={[styles.mainActionBtn, { backgroundColor: '#22c55e' }]}
+                                onPress={() => setIsPinModalVisible(true)}
+                            >
+                                <CheckCircle2 color="#FFF" size={24} style={{ marginRight: 8 }} />
+                                <Text style={styles.mainActionText}>Complete Delivery</Text>
+                            </TouchableOpacity>
+                        ) : null}
+                    </View>
+                </ScrollView>
+            </Animated.View>
 
             {/* Pickup Modal */}
             <Modal visible={isPickupModalVisible} transparent animationType="slide">
@@ -313,55 +377,195 @@ export const ActiveDelivery = () => {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    header: { flexDirection: 'row', alignItems: 'center', padding: 20, paddingTop: 40, borderBottomWidth: 1 },
-    backButton: { marginRight: 16 },
-    title: { fontSize: 20, fontWeight: 'bold' },
-    subtitle: { fontSize: 14, fontWeight: '600' },
-    scrollContent: { padding: 16, gap: 16 },
-    card: { padding: 20, borderRadius: 16, gap: 16 },
-    cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    cardTitle: { fontSize: 18, fontWeight: 'bold' },
-    cardText: { fontSize: 14 },
-    step: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    stepText: { fontSize: 14, fontWeight: '600' },
-    stepLine: { width: 2, height: 20, backgroundColor: '#333', marginLeft: 9, marginVertical: 4 },
-    buttonRow: { flexDirection: 'row', gap: 12 },
-    iconButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12, borderRadius: 12 },
-    iconButtonText: { fontSize: 14, fontWeight: '600' },
-    summaryBox: { padding: 16, borderRadius: 12 },
-    summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    summaryTitle: { fontSize: 14, fontWeight: 'bold' },
-    primaryButton: { padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 8 },
-    navButton: { padding: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', marginBottom: 12, marginTop: 8 },
-    primaryButtonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
-    secondaryButton: { padding: 16, borderRadius: 12, alignItems: 'center', borderWidth: 1, marginTop: 8 },
-    secondaryButtonText: { fontSize: 16, fontWeight: 'bold' },
-    modalOverlayCentered: { 
-        flex: 1, 
-        backgroundColor: 'rgba(0,0,0,0.7)', 
-        justifyContent: 'center', 
+    markerContainer: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        justifyContent: 'center',
         alignItems: 'center',
-        padding: 20
-    },
-    modalContentCentered: { 
-        width: '100%',
-        maxWidth: 400,
-        padding: 24, 
-        borderRadius: 32, 
-        gap: 16,
-        elevation: 5,
+        borderWidth: 3,
+        borderColor: '#FFF',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
-        shadowRadius: 20
+        shadowRadius: 5,
+        elevation: 8
     },
-    modalHandle: {
+    floatingHeader: {
+        position: 'absolute',
+        top: 60,
+        left: 20,
+        right: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+    },
+    backButtonFloating: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 5
+    },
+    statusBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 25,
+        gap: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3
+    },
+    dot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4
+    },
+    statusText: {
+        fontSize: 14,
+        fontWeight: 'bold'
+    },
+    bottomSheet: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -10 },
+        shadowOpacity: 0.15,
+        shadowRadius: 15,
+        elevation: 20,
+        maxHeight: '60%'
+    },
+    sheetHandle: {
+        alignItems: 'center',
+        paddingVertical: 12
+    },
+    handle: {
         width: 40,
-        height: 6,
-        borderRadius: 3,
-        marginBottom: 8
+        height: 5,
+        borderRadius: 3
     },
+    sheetContent: {
+        paddingHorizontal: 24,
+        gap: 16
+    },
+    infoCard: {
+        padding: 20,
+        borderRadius: 24,
+        gap: 16
+    },
+    cardRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 16
+    },
+    label: {
+        fontSize: 11,
+        fontWeight: 'bold',
+        letterSpacing: 1,
+        marginBottom: 6
+    },
+    value: {
+        fontSize: 20,
+        fontWeight: '900'
+    },
+    subValue: {
+        fontSize: 14,
+        marginTop: 2
+    },
+    noteBox: {
+        padding: 12,
+        borderRadius: 12,
+        borderLeftWidth: 4,
+        borderLeftColor: '#E87A5D'
+    },
+    noteText: {
+        fontSize: 13,
+        fontStyle: 'italic',
+        lineHeight: 18
+    },
+    actionRow: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: 4
+    },
+    actionBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 14,
+        borderRadius: 16
+    },
+    actionBtnText: {
+        fontSize: 14,
+        fontWeight: 'bold'
+    },
+    payoutCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 20,
+        borderRadius: 24
+    },
+    payoutValue: {
+        fontSize: 28,
+        fontWeight: '900'
+    },
+    itemBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255,255,255,0.05)'
+    },
+    itemText: {
+        fontSize: 12,
+        fontWeight: 'bold'
+    },
+    mainActionBtn: {
+        height: 64,
+        borderRadius: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 5
+    },
+    mainActionText: {
+        color: '#FFF',
+        fontSize: 18,
+        fontWeight: 'bold'
+    },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+    modalContent: { padding: 32, borderTopLeftRadius: 32, borderTopRightRadius: 32, gap: 16 },
+    modalOverlayCentered: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+    modalContentCentered: { width: '100%', padding: 32, borderRadius: 32, gap: 20 },
+    modalHandle: { width: 40, height: 6, borderRadius: 3, marginBottom: 8 },
     modalTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 8 },
     modalText: { fontSize: 16, marginBottom: 16 },
-    pinInput: { fontSize: 32, letterSpacing: 16, padding: 20, borderRadius: 12, borderWidth: 1, marginBottom: 20 }
+    pinInput: { fontSize: 32, letterSpacing: 16, padding: 20, borderRadius: 12, borderWidth: 1, marginBottom: 20 },
+    secondaryButton: { padding: 16, borderRadius: 12, alignItems: 'center', borderWidth: 1, marginTop: 8 },
+    secondaryButtonText: { fontSize: 16, fontWeight: 'bold' },
+    primaryButton: { padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 8 },
+    primaryButtonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' }
 });
