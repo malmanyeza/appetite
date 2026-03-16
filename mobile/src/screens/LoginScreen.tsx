@@ -8,7 +8,8 @@ import {
     KeyboardAvoidingView,
     Platform,
     Alert,
-    ActivityIndicator
+    ActivityIndicator,
+    ScrollView
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../theme';
@@ -76,73 +77,82 @@ export const LoginScreen = ({ navigation }: any) => {
 
     return (
         <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={[styles.container, { backgroundColor: theme.background }]}
         >
-            <View style={styles.content}>
-                <View style={styles.header}>
-                    <View style={[styles.logoContainer, { backgroundColor: theme.accent }]}>
-                        <LogIn color="white" size={32} />
-                    </View>
-                    <Text style={[styles.title, { color: theme.text }]}>Welcome Back</Text>
-                    <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-                        Sign in to continue ordering delicious food
-                    </Text>
-                </View>
-
-                <View style={styles.form}>
-                    <View style={[styles.inputContainer, { backgroundColor: theme.surface }]}>
-                        <Mail size={20} color={theme.textMuted} />
-                        <TextInput
-                            placeholder="Email Address"
-                            placeholderTextColor={theme.textMuted}
-                            value={email}
-                            onChangeText={setEmail}
-                            autoCapitalize="none"
-                            keyboardType="email-address"
-                            style={[styles.input, { color: theme.text }]}
-                        />
+            <ScrollView 
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+            >
+                <View style={{ flex: 1 }} />
+                <View style={styles.content}>
+                    <View style={styles.header}>
+                        <View style={[styles.logoContainer, { backgroundColor: theme.accent }]}>
+                            <LogIn color="white" size={32} />
+                        </View>
+                        <Text style={[styles.title, { color: theme.text }]}>Welcome Back</Text>
+                        <Text style={[styles.subtitle, { color: theme.textMuted }]}>
+                            Sign in to continue ordering delicious food
+                        </Text>
                     </View>
 
-                    <View style={[styles.inputContainer, { backgroundColor: theme.surface }]}>
-                        <Lock size={20} color={theme.textMuted} />
-                        <TextInput
-                            placeholder="Password"
-                            placeholderTextColor={theme.textMuted}
-                            value={password}
-                            onChangeText={setPassword}
-                            secureTextEntry
-                            style={[styles.input, { color: theme.text }]}
-                        />
+                    <View style={styles.form}>
+                        <View style={[styles.inputContainer, { backgroundColor: theme.surface }]}>
+                            <Mail size={20} color={theme.textMuted} />
+                            <TextInput
+                                placeholder="Email Address"
+                                placeholderTextColor={theme.textMuted}
+                                value={email}
+                                onChangeText={setEmail}
+                                autoCapitalize="none"
+                                keyboardType="email-address"
+                                style={[styles.input, { color: theme.text }]}
+                            />
+                        </View>
+
+                        <View style={[styles.inputContainer, { backgroundColor: theme.surface }]}>
+                            <Lock size={20} color={theme.textMuted} />
+                            <TextInput
+                                placeholder="Password"
+                                placeholderTextColor={theme.textMuted}
+                                value={password}
+                                onChangeText={setPassword}
+                                secureTextEntry
+                                style={[styles.input, { color: theme.text }]}
+                            />
+                        </View>
+
+                        <TouchableOpacity
+                            style={[styles.loginButton, { backgroundColor: theme.accent }]}
+                            onPress={handleLogin}
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                <ActivityIndicator color="white" />
+                            ) : (
+                                <Text style={styles.loginButtonText}>Sign In</Text>
+                            )}
+                        </TouchableOpacity>
                     </View>
 
-                    <TouchableOpacity
-                        style={[styles.loginButton, { backgroundColor: theme.accent }]}
-                        onPress={handleLogin}
-                        disabled={loading}
-                    >
-                        {loading ? (
-                            <ActivityIndicator color="white" />
-                        ) : (
-                            <Text style={styles.loginButtonText}>Sign In</Text>
-                        )}
-                    </TouchableOpacity>
+                    <View style={styles.footer}>
+                        <Text style={[styles.footerText, { color: theme.textMuted }]}>Don't have an account?</Text>
+                        <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
+                            <Text style={[styles.signUpLink, { color: theme.accent }]}>Sign Up</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
-
-                <View style={styles.footer}>
-                    <Text style={[styles.footerText, { color: theme.textMuted }]}>Don't have an account?</Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
-                        <Text style={[styles.signUpLink, { color: theme.accent }]}>Sign Up</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
+                <View style={{ flex: 1 }} />
+            </ScrollView>
         </KeyboardAvoidingView>
     );
 };
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    content: { flex: 1, padding: 24, justifyContent: 'center' },
+    scrollContent: { flexGrow: 1 },
+    content: { padding: 24 },
     header: { alignItems: 'center', marginBottom: 48 },
     logoContainer: {
         width: 80,

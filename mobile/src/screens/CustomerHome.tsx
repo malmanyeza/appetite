@@ -17,11 +17,13 @@ import {
     Alert
 } from 'react-native';
 import * as ExpoLocation from 'expo-location';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../theme';
 import { Search, MapPin, ChevronRight, Filter, X, CheckCircle2 } from 'lucide-react-native';
 import { Image } from 'expo-image';
+import { useLocationStore } from '../store/locationStore';
+import { useAuthStore } from '../store/authStore';
 export const CustomerHome = ({ navigation }: any) => {
     const { theme, isDark } = useTheme();
     const [selectedCategory, setSelectedCategory] = React.useState<string | null>(null);
@@ -35,57 +37,99 @@ export const CustomerHome = ({ navigation }: any) => {
     const [isFetchingLocation, setIsFetchingLocation] = React.useState(false);
     const [modalLocationFetched, setModalLocationFetched] = React.useState(false);
 
-    // Strict MVP Location Enforcement
-    const [hasLocationPermission, setHasLocationPermission] = React.useState<boolean | null>(null);
-    const [userCoordinates, setUserCoordinates] = React.useState<{ lat: number, lng: number } | null>(null);
+    const { selectedLocation, setSelectedLocation } = useLocationStore();
+    const { profile } = useAuthStore();
+    const queryClient = useQueryClient();
 
-    React.useEffect(() => {
-        (async () => {
-            try {
-                const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
-                if (status !== 'granted') {
-                    setHasLocationPermission(false);
-                    return;
-                }
-                setHasLocationPermission(true);
-                const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
-                setUserCoordinates({ lat: loc.coords.latitude, lng: loc.coords.longitude });
-                // We could reverse-geocode here, but for now just keep the current location label
-            } catch (err) {
-                console.warn('Customer Location Auth failed:', err);
-                setHasLocationPermission(false);
+    // 1. Load default address if none is selected
+    useQuery({
+        queryKey: ['default_address', profile?.id],
+        queryFn: async () => {
+            if (selectedLocation) return selectedLocation;
+            
+            const { data, error } = await supabase
+                .from('addresses')
+                .select('*')
+                .eq('user_id', profile?.id)
+                .eq('is_default', true)
+                .single();
+            
+            if (data && !selectedLocation) {
+                setSelectedLocation(data);
             }
-        })();
-    }, []);
+            return data;
+        },
+        enabled: !!profile?.id && !selectedLocation
+    });
+
+    // 2. Fallback to GPS if absolutely no saved address
+    React.useEffect(() => {
+        if (!selectedLocation) {
+            (async () => {
+                try {
+                    const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+                    if (status === 'granted') {
+                        const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
+                        setSelectedLocation({
+                            city: 'Current Location',
+                            suburb: 'Detecting...',
+                            lat: loc.coords.latitude,
+                            lng: loc.coords.longitude
+                        });
+                        
+                        // Try to reverse geocode for a better label
+                        const [rev] = await ExpoLocation.reverseGeocodeAsync({
+                            latitude: loc.coords.latitude,
+                            longitude: loc.coords.longitude
+                        });
+                        
+                        if (rev) {
+                            setSelectedLocation({
+                                city: rev.city || 'Current Location',
+                                suburb: rev.district || rev.subregion || 'Nearby',
+                                lat: loc.coords.latitude,
+                                lng: loc.coords.longitude
+                            });
+                        }
+                    }
+                } catch (err) {
+                    console.warn('GPS Fallback failed:', err);
+                }
+            })();
+        }
+    }, [selectedLocation]);
+
+    // 3. Fetch saved addresses for the modal
+    const { data: savedAddresses } = useQuery({
+        queryKey: ['user_addresses', profile?.id],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('addresses')
+                .select('*')
+                .eq('user_id', profile?.id)
+                .order('is_default', { ascending: false });
+            if (error) throw error;
+            return data || [];
+        },
+        enabled: !!profile?.id
+    });
 
     if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
         UIManager.setLayoutAnimationEnabledExperimental(true);
     }
 
     const { data: restaurants, isLoading } = useQuery({
-        queryKey: ['restaurants', selectedCategory, userCoordinates],
+        queryKey: ['restaurants', selectedCategory, selectedLocation?.lat, selectedLocation?.lng],
         queryFn: async () => {
-            if (!userCoordinates) {
-                // Fallback (shouldn't really happen since we block rendering, but just in case)
-                let query = supabase
-                    .from('restaurants')
-                    .select('*')
-                    .eq('is_open', true)
-                    .not('lat', 'is', null)
-                    .not('lng', 'is', null);
-
-                if (selectedCategory) {
-                    query = query.contains('categories', [selectedCategory]);
-                }
-                const { data, error } = await query;
-                if (error) throw error;
-                return data;
+            if (!selectedLocation?.lat || !selectedLocation?.lng) {
+                // Return empty if no location yet
+                return [];
             }
 
             // Fetch with distance calc
             const { data, error } = await supabase.rpc('get_restaurants_with_distance', {
-                u_lat: userCoordinates.lat,
-                u_lng: userCoordinates.lng
+                u_lat: selectedLocation.lat,
+                u_lng: selectedLocation.lng
             });
 
             if (error) {
@@ -114,6 +158,8 @@ export const CustomerHome = ({ navigation }: any) => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     }, [filteredRestaurants, selectedCategory]);
 
+    const tempCoords = React.useRef<{ lat: number, lng: number } | null>(null);
+
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             {/* Header / Location */}
@@ -129,7 +175,7 @@ export const CustomerHome = ({ navigation }: any) => {
                     >
                         <MapPin size={16} color={theme.accent} />
                         <Text style={[styles.locationText, { color: theme.text }]}>
-                            {currentLocation ? currentLocation : 'Pick Location...'}
+                            {selectedLocation ? `${selectedLocation.suburb || selectedLocation.city}` : 'Pick Location...'}
                         </Text>
                         <ChevronRight size={16} color={theme.textMuted} />
                     </TouchableOpacity>
@@ -195,7 +241,7 @@ export const CustomerHome = ({ navigation }: any) => {
                     <Text style={[styles.sectionTitle, { color: theme.text, paddingHorizontal: 0, marginBottom: 0 }]}>
                         {selectedCategory ? `${selectedCategory} near you` : 'Popular Nearby'}
                     </Text>
-                    <TouchableOpacity><Text style={{ color: theme.accent }}>View all</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => { setSelectedCategory(null); setSearchQuery(''); }}><Text style={{ color: theme.accent }}>View all</Text></TouchableOpacity>
                 </View>
 
                 {isLoading ? (
@@ -261,6 +307,39 @@ export const CustomerHome = ({ navigation }: any) => {
 
                         <ScrollView showsVerticalScrollIndicator={false}>
                             <View style={{ gap: 16, paddingBottom: 100 }}>
+                                {savedAddresses && savedAddresses.length > 0 && (
+                                    <View style={{ marginBottom: 24 }}>
+                                        <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.text, marginBottom: 12 }}>Your Saved Locations</Text>
+                                        {savedAddresses.map((addr: any) => (
+                                            <TouchableOpacity 
+                                                key={addr.id}
+                                                style={{ 
+                                                    flexDirection: 'row', 
+                                                    alignItems: 'center', 
+                                                    padding: 16, 
+                                                    backgroundColor: theme.surface, 
+                                                    borderRadius: 16, 
+                                                    marginBottom: 8,
+                                                    borderWidth: selectedLocation?.id === addr.id ? 1 : 0,
+                                                    borderColor: theme.accent
+                                                }}
+                                                onPress={() => {
+                                                    setSelectedLocation(addr);
+                                                    setLocationModalVisible(false);
+                                                }}
+                                            >
+                                                <MapPin size={18} color={theme.accent} />
+                                                <View style={{ marginLeft: 12, flex: 1 }}>
+                                                    <Text style={{ color: theme.text, fontWeight: 'bold' }}>{addr.label}</Text>
+                                                    <Text style={{ color: theme.textMuted, fontSize: 12 }}>{addr.street ? `${addr.street}, ` : ''}{addr.suburb}</Text>
+                                                </View>
+                                                {selectedLocation?.id === addr.id && <CheckCircle2 size={16} color={theme.accent} />}
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                )}
+
+                                <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.text, marginBottom: 12 }}>Or Enter New Location</Text>
                                 <TextInput
                                     placeholder="City (e.g., Harare)"
                                     placeholderTextColor={theme.textMuted}
@@ -299,8 +378,8 @@ export const CustomerHome = ({ navigation }: any) => {
                                         const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
                                         if (status === 'granted') {
                                             const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
-                                            setUserCoordinates({ lat: loc.coords.latitude, lng: loc.coords.longitude });
                                             setModalLocationFetched(true);
+                                            tempCoords.current = { lat: loc.coords.latitude, lng: loc.coords.longitude };
                                         } else {
                                             Alert.alert('Permission Denied', 'Location permission is required.');
                                         }
@@ -323,16 +402,27 @@ export const CustomerHome = ({ navigation }: any) => {
                                 <TouchableOpacity
                                     style={{ backgroundColor: theme.accent, padding: 16, borderRadius: 16, alignItems: 'center', marginTop: 16 }}
                                     onPress={() => {
-                                        if (!modalLocationFetched) {
+                                        if (!modalLocationFetched || !tempCoords.current) {
                                             Alert.alert('Location Required', 'Please tap "Use Current Location (GPS)" to confirm your exact delivery coordinates.');
                                             return;
                                         }
-                                        const finalLoc = [suburb.trim(), city.trim()].filter(Boolean).join(', ');
-                                        setCurrentLocation(finalLoc || 'Current Location');
+                                        if (!city.trim() || !suburb.trim()) {
+                                            Alert.alert('Missing Info', 'Please enter at least the City and Suburb.');
+                                            return;
+                                        }
+                                        
+                                        setSelectedLocation({
+                                            city: city.trim(),
+                                            suburb: suburb.trim(),
+                                            street: street.trim(),
+                                            landmark_notes: landmark.trim(),
+                                            lat: tempCoords.current.lat,
+                                            lng: tempCoords.current.lng
+                                        });
                                         setLocationModalVisible(false);
                                     }}
                                 >
-                                    <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>Confirm Location</Text>
+                                    <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>Confirm New Location</Text>
                                 </TouchableOpacity>
                             </View>
                         </ScrollView>

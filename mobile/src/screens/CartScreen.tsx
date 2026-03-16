@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useCartStore } from '../store/cartStore';
 import { useAuthStore } from '../store/authStore';
+import { useLocationStore } from '../store/locationStore';
 import { useTheme } from '../theme';
 import { ChevronLeft, Trash2, MapPin, Smartphone, CheckCircle2, DollarSign, CreditCard } from 'lucide-react-native';
 import * as WebBrowser from 'expo-web-browser';
@@ -26,6 +27,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 export const CartScreen = ({ navigation }: any) => {
     const { items, total, updateQty, clearCart } = useCartStore();
     const { profile } = useAuthStore();
+    const { selectedLocation } = useLocationStore();
     const { theme } = useTheme();
     const [loading, setLoading] = React.useState(false);
     const queryClient = useQueryClient();
@@ -44,7 +46,7 @@ export const CartScreen = ({ navigation }: any) => {
         enabled: !!profile?.id
     });
 
-    const [selectedAddress, setSelectedAddress] = React.useState<any>(null);
+    const [selectedAddress, setSelectedAddress] = React.useState<any>(selectedLocation);
     const [paymentMethod, setPaymentMethod] = React.useState<'cod' | 'ecocash' | 'card'>('ecocash');
     const [ecocashPhone, setEcocashPhone] = React.useState('');
     const [deliveryFee, setDeliveryFee] = React.useState(0);
@@ -172,10 +174,10 @@ export const CartScreen = ({ navigation }: any) => {
     }, [selectedAddress, restaurant, deliveryConfig]);
 
     React.useEffect(() => {
-        if (addresses && addresses.length > 0 && !selectedAddress) {
+        if (!selectedAddress && addresses && addresses.length > 0) {
             setSelectedAddress(addresses[0]);
         }
-    }, [addresses]);
+    }, [addresses, selectedAddress]);
 
     const handleCheckout = () => {
         if (items.length === 0) return;

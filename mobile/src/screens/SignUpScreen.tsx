@@ -147,10 +147,11 @@ export const SignUpScreen = ({ navigation }: any) => {
 
     return (
         <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={[styles.container, { backgroundColor: theme.background }]}
         >
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { flexGrow: 1 }]}>
+                <View style={{ flex: 1 }} />
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={() => navigation.goBack()}
@@ -164,7 +165,6 @@ export const SignUpScreen = ({ navigation }: any) => {
                         Join Appetite and start your journey
                     </Text>
                 </View>
-
                 <View style={styles.form}>
                     <View style={[styles.inputContainer, { backgroundColor: theme.surface }]}>
                         <User size={20} color={theme.textMuted} />
@@ -243,14 +243,14 @@ export const SignUpScreen = ({ navigation }: any) => {
                             <Text style={styles.signUpButtonText}>Create Account</Text>
                         )}
                     </TouchableOpacity>
+                    <View style={styles.footer}>
+                        <Text style={[styles.footerText, { color: theme.textMuted }]}>Already have an account?</Text>
+                        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+                            <Text style={[styles.loginLink, { color: theme.accent }]}>Sign In</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
-
-                <View style={styles.footer}>
-                    <Text style={[styles.footerText, { color: theme.textMuted }]}>Already have an account?</Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-                        <Text style={[styles.loginLink, { color: theme.accent }]}>Sign In</Text>
-                    </TouchableOpacity>
-                </View>
+                <View style={{ flex: 1 }} />
             </ScrollView>
         </KeyboardAvoidingView>
     );
@@ -258,7 +258,7 @@ export const SignUpScreen = ({ navigation }: any) => {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    scrollContent: { padding: 24, paddingTop: Platform.OS === 'ios' ? 60 : 40 },
+    scrollContent: { padding: 24 },
     backButton: {
         width: 44,
         height: 44,
