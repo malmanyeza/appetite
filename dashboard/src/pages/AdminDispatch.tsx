@@ -33,7 +33,7 @@ export const AdminDispatch = () => {
                 r_lat: selectedOrder.restaurants.lat,
                 r_lng: selectedOrder.restaurants.lng,
                 max_distance_km: 15,
-                exclude_driver_id: selectedOrder.customer_id
+                exclude_driver_id: null // No exclusion needed here
             });
 
             if (error) {
