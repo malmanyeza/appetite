@@ -28,6 +28,7 @@ import { twMerge } from 'tailwind-merge';
 import { ImageUploadField } from '../components/ImageUploadField';
 import { CategoryInput } from '../components/CategoryInput';
 import { SectionHeader, InputField, SelectField, getStepTitle } from '../components/FormComponents';
+import { MapPicker } from '../components/MapPicker';
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -377,9 +378,32 @@ export const RestaurantSettings = () => {
                                             </button>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
-                                            <InputField label="Latitude" name="lat" type="number" step="any" required defaultValue={restaurant?.lat} placeholder="-17.82..." />
-                                            <InputField label="Longitude" name="lng" type="number" step="any" required defaultValue={restaurant?.lng} placeholder="31.05..." />
+                                            <InputField 
+                                                label="Latitude" 
+                                                name="lat" 
+                                                type="number" 
+                                                step="any" 
+                                                required 
+                                                value={restaurant?.lat || 0} 
+                                                onChange={(e) => updateRestaurant.mutate({ lat: parseFloat(e.target.value) })}
+                                                placeholder="-17.82..." 
+                                            />
+                                            <InputField 
+                                                label="Longitude" 
+                                                name="lng" 
+                                                type="number" 
+                                                step="any" 
+                                                required 
+                                                value={restaurant?.lng || 0} 
+                                                onChange={(e) => updateRestaurant.mutate({ lng: parseFloat(e.target.value) })}
+                                                placeholder="31.05..." 
+                                            />
                                         </div>
+                                        <MapPicker 
+                                            lat={restaurant?.lat || -17.8248} 
+                                            lng={restaurant?.lng || 31.0530} 
+                                            onChange={(lat, lng) => updateRestaurant.mutate({ lat, lng })}
+                                        />
                                     </div>
 
                                     <SelectField label="Delivery Radius (km)" name="delivery_radius_km" defaultValue={restaurant?.delivery_radius_km || 5}>
@@ -670,6 +694,11 @@ export const RestaurantSettings = () => {
                                 <InputField label="Latitude" name="lat" type="number" step="any" required value={registrationData.lat || ''} onChange={(e) => setRegistrationData({ ...registrationData, lat: e.target.value })} placeholder="-17.82..." />
                                 <InputField label="Longitude" name="lng" type="number" step="any" required value={registrationData.lng || ''} onChange={(e) => setRegistrationData({ ...registrationData, lng: e.target.value })} placeholder="31.05..." />
                             </div>
+                            <MapPicker 
+                                lat={registrationData.lat} 
+                                lng={registrationData.lng} 
+                                onChange={(lat, lng) => setRegistrationData({ ...registrationData, lat, lng })}
+                            />
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-white/5">

@@ -17,8 +17,8 @@ import {
     ScrollView,
     Animated
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+import MapView, { Marker, PROVIDER_GOOGLE } from '../components/Map';
+import { GooglePlacesAutocomplete } from '../components/GooglePlacesAutocomplete';
 import { mapDarkStyle, mapLightStyle } from '../theme/MapStyle';
 import { useTheme } from '../theme';
 import { supabase } from '../lib/supabase';
@@ -304,7 +304,7 @@ export const AddressManagementScreen = ({ navigation }: any) => {
                                             };
                                             setCoords(newCoords);
                                             setCity(details.address_components.find(c => c.types.includes('locality'))?.long_name || 'Harare');
-                                            setSuburb(details.address_components.find(c => c.types.includes('sublocality') || c.types.includes('neighborhood'))?.long_name || data.structured_formatting.main_text);
+                                            setSuburb(data.structured_formatting.main_text);
                                             setStreet(details.address_components.find(c => c.types.includes('route'))?.long_name || '');
                                             
                                             const region = {

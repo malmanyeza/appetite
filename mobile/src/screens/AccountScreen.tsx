@@ -13,15 +13,12 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import {
     User,
-    Settings,
     LogOut,
     ChevronRight,
     MapPin,
-    CreditCard,
     Bell,
     Share2,
     HelpCircle,
-    Smartphone,
     Briefcase,
     Trash2,
     FileText
@@ -186,7 +183,6 @@ export const AccountScreen = ({ navigation }: any) => {
                 <View style={[styles.menuContainer, { backgroundColor: theme.surface }]}>
                     <MenuItem icon={User} label="Profile Information" onPress={() => navigation.navigate('Profile')} />
                     <MenuItem icon={MapPin} label="Saved Addresses" onPress={() => navigation.navigate('AddressManagement')} />
-                    <MenuItem icon={CreditCard} label="Payment Methods" onPress={() => { }} />
                     <MenuItem icon={Bell} label="Notifications" onPress={() => { }} showBorder={false} />
                 </View>
             </View>
@@ -197,8 +193,7 @@ export const AccountScreen = ({ navigation }: any) => {
                     <MenuItem icon={Share2} label="Invite Friends" onPress={handleShare} />
                     <MenuItem icon={HelpCircle} label="Help & Support" onPress={() => { }} />
                     <MenuItem icon={FileText} label="Terms of Service" onPress={() => navigation.navigate('TermsOfService')} />
-                    <MenuItem icon={FileText} label="Privacy Policy" onPress={() => navigation.navigate('PrivacyPolicy')} />
-                    <MenuItem icon={Settings} label="App Settings" onPress={() => { }} showBorder={false} />
+                    <MenuItem icon={FileText} label="Privacy Policy" onPress={() => navigation.navigate('PrivacyPolicy')} showBorder={false} />
                 </View>
             </View>
 

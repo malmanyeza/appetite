@@ -10,21 +10,18 @@ import {
     Linking,
     RefreshControl,
     Alert,
-    Image,
-    Dimensions
+    Image
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import { mapDarkStyle, mapLightStyle } from '../theme/MapStyle';
 import { useNavigation } from '@react-navigation/native';
 import * as ExpoLocation from 'expo-location';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { useTheme } from '../theme';
-import { MapPin, Package, Phone, CheckCircle2, Navigation, ExternalLink, Store } from 'lucide-react-native';
+import { MapPin, Package, Phone, CheckCircle2, Navigation, Store } from 'lucide-react-native';
 
 export const DriverJobs = () => {
-    const { theme, isDark } = useTheme();
+    const { theme } = useTheme();
     const { user } = useAuthStore();
     const navigation = useNavigation<any>();
     const queryClient = useQueryClient();
@@ -189,7 +186,7 @@ export const DriverJobs = () => {
                 .from('orders')
                 .select('id, status')
                 .eq('driver_id', user.id)
-                .in('status', ['ready_for_pickup', 'picked_up', 'on_the_way'])
+                .in('status', ['accepted', 'ready_for_pickup', 'picked_up', 'on_the_way'])
                 .maybeSingle();
 
             // Just return data. If no active order, data is null.
@@ -353,42 +350,14 @@ export const DriverJobs = () => {
                     jobs?.map((job) => {
                         const addr = job.delivery_address_snapshot;
                         const pickup = job.restaurants;
+                        const potentialPayout = (job.pricing?.driver_earnings ||
+                                                    ((Number(deliveryConfig?.driver_base) || 1.20) +
+                                                        ((Number(deliveryConfig?.driver_per_km) || 0.30) * (job.pricing?.distance_km || 0)) +
+                                                        (Number(deliveryConfig?.driver_bonus) || 0))
+                                                ).toFixed(2);
                         
                         return (
                             <View key={job.id} style={[styles.jobCard, { backgroundColor: theme.surface }]}>
-                                {/* Map Preview Container */}
-                                {(pickup?.lat && addr?.lat) ? (
-                                    <View style={styles.mapPreviewWrapper}>
-                                        <MapView
-                                            provider={PROVIDER_GOOGLE}
-                                            style={StyleSheet.absoluteFillObject}
-                                            customMapStyle={isDark ? mapDarkStyle : mapLightStyle}
-                                            liteMode={true}
-                                            initialRegion={{
-                                                latitude: (pickup.lat + addr.lat) / 2,
-                                                longitude: (pickup.lng + addr.lng) / 2,
-                                                latitudeDelta: Math.abs(pickup.lat - addr.lat) * 2 + 0.05,
-                                                longitudeDelta: Math.abs(pickup.lng - addr.lng) * 2 + 0.05,
-                                            }}
-                                        >
-                                            <Marker coordinate={{ latitude: pickup.lat, longitude: pickup.lng }}>
-                                                <View style={[styles.miniMarker, { backgroundColor: '#3B82F6' }]}>
-                                                    <Store color="#FFF" size={10} />
-                                                </View>
-                                            </Marker>
-                                            <Marker coordinate={{ latitude: addr.lat, longitude: addr.lng }}>
-                                                <View style={[styles.miniMarker, { backgroundColor: theme.accent }]}>
-                                                    <MapPin color="#FFF" size={10} />
-                                                </View>
-                                            </Marker>
-                                        </MapView>
-                                    </View>
-                                ) : (
-                                    <View style={[styles.mapPlaceholder, { backgroundColor: theme.background }]}>
-                                        <Navigation size={24} color={theme.border} />
-                                    </View>
-                                )}
-
                                 <View style={styles.cardInfo}>
                                     <View style={styles.jobHeader}>
                                         <View>
@@ -396,44 +365,43 @@ export const DriverJobs = () => {
                                             <Text style={[styles.jobStatus, { color: theme.accent, fontWeight: 'bold' }]}>{job.status.replace('_', ' ').toUpperCase()}</Text>
                                         </View>
                                         <View style={{ alignItems: 'flex-end' }}>
-                                            <Text style={[styles.payout, { color: '#22C55E' }]}>
-                                                ${(job.pricing?.driver_earnings ||
-                                                    ((Number(deliveryConfig?.driver_base) || 1.20) +
-                                                        ((Number(deliveryConfig?.driver_per_km) || 0.30) * (job.pricing?.distance_km || 0)) +
-                                                        (Number(deliveryConfig?.driver_bonus) || 0))
-                                                ).toFixed(2)}
-                                            </Text>
+                                            <Text style={[styles.payout, { color: '#22C55E' }]}>${potentialPayout}</Text>
                                             <Text style={{ fontSize: 10, color: theme.textMuted }}>Est. Earnings</Text>
                                         </View>
                                     </View>
 
                                     <View style={styles.addressSection}>
                                         <View style={styles.addressRow}>
-                                            <View style={[styles.dot, { backgroundColor: '#3B82F6' }]} />
+                                            <Store color={theme.accent} size={20} />
                                             <View style={{ flex: 1 }}>
                                                 <Text style={[styles.addressText, { color: theme.text }]}>{pickup?.name}</Text>
                                                 <Text style={[styles.smallText, { color: theme.textMuted }]}>{pickup?.suburb}</Text>
                                             </View>
-                                            <TouchableOpacity onPress={() => handleNavigate(pickup?.lat, pickup?.lng, `${pickup?.name}`)}>
-                                                <Navigation size={18} color={theme.textMuted} />
-                                            </TouchableOpacity>
                                         </View>
 
                                         <View style={[styles.line, { backgroundColor: theme.border }]} />
 
                                         <View style={styles.addressRow}>
-                                            <View style={[styles.dot, { backgroundColor: theme.accent }]} />
+                                            <MapPin color={theme.textMuted} size={20} />
                                             <View style={{ flex: 1 }}>
                                                 <Text style={[styles.addressText, { color: theme.text }]}>{addr?.suburb}</Text>
-                                                <Text style={[styles.smallText, { color: theme.textMuted }]} numberOfLines={1}>{addr?.landmark_notes}</Text>
+                                                <Text style={[styles.smallText, { color: theme.textMuted }]} numberOfLines={1}>To Delivery Location</Text>
                                             </View>
-                                            <TouchableOpacity onPress={() => handleNavigate(addr?.lat, addr?.lng, `${addr?.suburb}`)}>
-                                                <Navigation size={18} color={theme.textMuted} />
-                                            </TouchableOpacity>
                                         </View>
                                     </View>
 
-                                    <View style={styles.actionSection}>
+                                    <View style={styles.metricsRow}>
+                                        <View style={styles.metric}>
+                                            <Text style={[styles.metricLabel, { color: theme.textMuted }]}>DISTANCE</Text>
+                                            <Text style={[styles.metricValue, { color: theme.text }]}>{(job.pricing?.distance_km || 0).toFixed(1)} km</Text>
+                                        </View>
+                                        <View style={styles.metric}>
+                                            <Text style={[styles.metricLabel, { color: theme.textMuted }]}>EST. PAY</Text>
+                                            <Text style={[styles.metricValue, { color: '#22C55E' }]}>${potentialPayout}</Text>
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.actionSectionItems}>
                                         {job.status === 'ready_for_pickup' && !job.driver_id && (
                                             <TouchableOpacity
                                                 style={[styles.primaryBtn, { backgroundColor: theme.accent }]}
@@ -448,8 +416,8 @@ export const DriverJobs = () => {
                                                 style={[styles.primaryBtn, { backgroundColor: '#3B82F6' }]}
                                                 onPress={() => navigation.navigate('ActiveDelivery', { orderId: job.id })}
                                             >
-                                                <Navigation size={20} color="white" style={{ marginRight: 8 }} />
-                                                <Text style={styles.btnText}>Resume Delivery</Text>
+                                                <CheckCircle2 size={20} color="white" style={{ marginRight: 8 }} />
+                                                <Text style={styles.btnText}>Open Active Hub</Text>
                                             </TouchableOpacity>
                                         )}
                                     </View>
@@ -470,23 +438,25 @@ const styles = StyleSheet.create({
     onlineStatus: { fontSize: 18, fontWeight: 'bold' },
     onlineSub: { fontSize: 12, marginTop: 2 },
     scrollContent: { padding: 20, paddingBottom: 100 },
-    jobCard: { borderRadius: 24, marginBottom: 20, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 15, elevation: 5 },
-    mapPreviewWrapper: { height: 140, width: '100%', backgroundColor: '#eee' },
-    mapPlaceholder: { height: 140, width: '100%', justifyContent: 'center', alignItems: 'center' },
+    jobCard: { borderRadius: 24, marginBottom: 20, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
     cardInfo: { padding: 20 },
-    miniMarker: { padding: 4, borderRadius: 10, borderWidth: 1, borderColor: '#FFF' },
     jobHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
     orderId: { fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 },
     jobStatus: { fontSize: 12, marginTop: 2 },
-    payout: { fontSize: 20, fontWeight: '900' },
+    payout: { fontSize: 24, fontWeight: '900' },
     addressSection: { marginBottom: 20 },
-    addressRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    dot: { width: 8, height: 8, borderRadius: 4 },
-    addressText: { fontSize: 15, fontWeight: 'bold' },
-    smallText: { fontSize: 12, marginTop: 1 },
-    line: { width: 1, height: 12, marginLeft: 3, marginVertical: 2 },
-    actionSection: { paddingTop: 16, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)' },
-    primaryBtn: { height: 50, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+    addressRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+    addressText: { fontSize: 17, fontWeight: 'bold' },
+    smallText: { fontSize: 13, marginTop: 1 },
+    line: { width: 2, height: 20, marginLeft: 9, marginVertical: 4, opacity: 0.2 },
+    metricsRow: { flexDirection: 'row', gap: 24, paddingVertical: 16, borderTopWidth: 1, borderBottomWidth: 1, borderColor: 'rgba(0,0,0,0.05)', marginBottom: 20 },
+    metric: { flex: 1 },
+    metricLabel: { fontSize: 10, fontWeight: 'bold', marginBottom: 4 },
+    metricValue: { fontSize: 16, fontWeight: 'bold' },
+    actionSectionItems: { gap: 12 },
+    navBtnSmall: { height: 48, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+    navBtnText: { fontSize: 14, fontWeight: 'bold' },
+    primaryBtn: { height: 56, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
     btnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
     emptyJobs: { marginTop: 100, alignItems: 'center', gap: 16 },
     emptyText: { fontSize: 16 },

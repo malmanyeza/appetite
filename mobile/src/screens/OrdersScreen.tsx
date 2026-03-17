@@ -62,17 +62,26 @@ export const OrdersScreen = ({ navigation }: any) => {
         enabled: !!user
     });
 
+    const getDisplayStatus = (status: string) => {
+        if (['accepted', 'picked_up', 'ready_for_pickup'].includes(status)) return 'ready_for_pickup';
+        return status;
+    };
+
     const formatStatus = (status: string) => {
-        return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+        const displayStatus = getDisplayStatus(status);
+        return displayStatus.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     };
 
     const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'completed': return '#10B981';
+        const displayStatus = getDisplayStatus(status);
+        switch (displayStatus) {
+            case 'completed': 
+            case 'delivered': return '#10B981';
             case 'cancelled': return '#EF4444';
             case 'pending': return '#F59E0B';
             case 'preparing': return '#3B82F6';
-            case 'delivering': return theme.accent;
+            case 'ready_for_pickup': return theme.accent;
+            case 'on_the_way': return theme.accent;
             default: return theme.textMuted;
         }
     };

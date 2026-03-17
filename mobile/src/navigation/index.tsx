@@ -46,6 +46,7 @@ const AccountStack = () => {
             <Stack.Screen name="DriverOnboarding" component={DriverOnboarding} />
             <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
             <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
+            <Stack.Screen name="AddressManagement" component={AddressManagementScreen} />
         </Stack.Navigator>
     );
 };

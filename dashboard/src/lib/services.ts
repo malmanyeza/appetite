@@ -21,21 +21,6 @@ export const ordersService = {
             .update({ status })
             .eq('id', orderId);
         if (error) throw error;
-
-        // Trigger driver notifications if the order is now ready for pickup
-        if (status === 'ready_for_pickup') {
-            console.log('Triggering driver notifications for ready order:', orderId);
-            
-            // Wait for 1.5 seconds to ensure the DB trigger has finished creating job offers
-            await new Promise(resolve => setTimeout(resolve, 1500));
-
-            const { data: order } = await supabase.from('orders').select('*').eq('id', orderId).single();
-            if (order) {
-                supabase.functions.invoke('notify_drivers', {
-                    body: order
-                }).catch(err => console.error('Failed to trigger driver notifications:', err));
-            }
-        }
     },
 
     async getAdminOrders() {

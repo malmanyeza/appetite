@@ -28,8 +28,9 @@ interface AuthState {
     activeRole: 'customer' | 'driver' | null;
     loading: boolean;
     isSigningUp: boolean;
+    isRefreshing: boolean;
 
-    refreshSession: () => Promise<void>;
+    refreshSession: (providedSession?: any) => Promise<void>;
     refreshProfile: () => Promise<void>;
     setActiveRole: (role: 'customer' | 'driver') => void;
     setSigningUp: (status: boolean) => void;
@@ -43,19 +44,38 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     activeRole: null,
     loading: true,
     isSigningUp: false,
+    isRefreshing: false,
 
-    refreshSession: async () => {
+    refreshSession: async (providedSession?: any) => {
+        if (get().isRefreshing) return;
+        
         try {
-            set({ loading: true });
+            set({ isRefreshing: true });
+            if (!get().user) set({ loading: true });
 
             if (!supabase) {
-                set({ user: null, profile: null, roles: [], activeRole: null, loading: false });
+                set({ user: null, profile: null, roles: [], activeRole: null, loading: false, isRefreshing: false });
                 return;
             }
 
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-            if (sessionError || !session) {
-                set({ user: null, profile: null, roles: [], activeRole: null, loading: false });
+            let session = providedSession;
+            if (!session) {
+                const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+                if (sessionError) {
+                    // Check for invalid refresh token and handle silently
+                    if (sessionError.message?.includes('Refresh Token Not Found') || sessionError.message?.includes('Invalid Refresh Token')) {
+                        console.log('[Auth] Invalid session detected, clearing auth state silently.');
+                        await supabase.auth.signOut().catch(() => {});
+                        set({ user: null, profile: null, roles: [], activeRole: null, loading: false, isRefreshing: false });
+                        return;
+                    }
+                    throw sessionError;
+                }
+                session = currentSession;
+            }
+
+            if (!session) {
+                set({ user: null, profile: null, roles: [], activeRole: null, loading: false, isRefreshing: false });
                 return;
             }
 
@@ -116,11 +136,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 profile: profile || null,
                 roles: availableRoles.length > 0 ? availableRoles : ['customer'],
                 activeRole: defaultRole as any,
-                loading: false
+                loading: false,
+                isRefreshing: false
             });
-        } catch (error) {
-            console.error('Session refresh failed:', error);
-            set({ user: null, profile: null, roles: [], activeRole: null, loading: false });
+        } catch (error: any) {
+            // Check for invalid refresh token during getUser or other calls
+            if (error.message?.includes('Refresh Token Not Found') || error.message?.includes('Invalid Refresh Token')) {
+                console.log('[Auth] Invalid refresh token in catch block, clearing auth state.');
+                await supabase.auth.signOut().catch(() => {});
+            } else {
+                console.error('Session refresh failed:', error);
+            }
+            set({ user: null, profile: null, roles: [], activeRole: null, loading: false, isRefreshing: false });
         }
     },
 

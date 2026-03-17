@@ -64,28 +64,8 @@ export const AdminOrders = () => {
             return matchesSearch && matchesStatus;
         });
 
-        // Status-Weighted Sort (Highest Priority First)
-        const statusPriority: Record<string, number> = {
-            'confirmed': 1,
-            'preparing': 2,
-            'ready': 3,
-            'on_the_way': 4,
-            'pending': 5,
-            'delivered': 6,
-            'cancelled': 7
-        };
-
-        return filtered.sort((a, b) => {
-            const priorityA = statusPriority[a.status] || 99;
-            const priorityB = statusPriority[b.status] || 99;
-            
-            if (priorityA !== priorityB) {
-                return priorityA - priorityB;
-            }
-            
-            // If same status, newest first
-            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        });
+        // Sort: newest first
+        return filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }, [orders, searchTerm, statusFilter]);
 
     return (

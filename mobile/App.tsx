@@ -70,9 +70,11 @@ function App() {
         refreshSession();
 
         // Listen for auth state changes safely
-        const authData = supabase?.auth?.onAuthStateChange((event: string, _session: any) => {
-            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'SIGNED_OUT') {
-                refreshSession();
+        const authData = supabase?.auth?.onAuthStateChange((event: string, session: any) => {
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+                refreshSession(session);
+            } else if (event === 'SIGNED_OUT') {
+                refreshSession(null);
             }
         });
 

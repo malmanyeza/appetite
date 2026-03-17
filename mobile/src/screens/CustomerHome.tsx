@@ -18,8 +18,8 @@ import {
     Dimensions,
     Animated
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+import MapView, { Marker, PROVIDER_GOOGLE } from '../components/Map';
+import { GooglePlacesAutocomplete } from '../components/GooglePlacesAutocomplete';
 import { mapDarkStyle, mapLightStyle } from '../theme/MapStyle';
 import * as ExpoLocation from 'expo-location';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -389,7 +389,7 @@ export const CustomerHome = ({ navigation }: any) => {
                                             const newLoc = {
                                                 label: data.structured_formatting.main_text,
                                                 city: details.address_components.find(c => c.types.includes('locality'))?.long_name || '',
-                                                suburb: details.address_components.find(c => c.types.includes('sublocality') || c.types.includes('neighborhood'))?.long_name || data.structured_formatting.main_text,
+                                                suburb: data.structured_formatting.main_text,
                                                 street: details.address_components.find(c => c.types.includes('route'))?.long_name || '',
                                                 lat: details.geometry.location.lat,
                                                 lng: details.geometry.location.lng,

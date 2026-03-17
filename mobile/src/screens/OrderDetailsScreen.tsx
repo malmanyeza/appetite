@@ -90,7 +90,9 @@ export const OrderDetailsScreen = ({ route, navigation }: any) => {
                     <View style={styles.statusHeaderRow}>
                         <Text style={[styles.statusLabel, { color: theme.textMuted }]}>CURRENT STATUS</Text>
                         <View style={[styles.statusBadge, { backgroundColor: `${theme.accent}15` }]}>
-                            <Text style={[styles.statusText, { color: theme.accent }]}>{order.status.replace('_', ' ').toUpperCase()}</Text>
+                            <Text style={[styles.statusText, { color: theme.accent }]}>
+                                {(['accepted', 'picked_up', 'ready_for_pickup'].includes(order.status) ? 'ready_for_pickup' : order.status).replace('_', ' ').toUpperCase()}
+                            </Text>
                         </View>
                     </View>
 
