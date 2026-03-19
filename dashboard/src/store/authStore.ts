@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
-import type { Role } from '../../../shared/src';
+import type { Role } from '@appetite/shared';
 
 interface AuthState {
     user: any | null;

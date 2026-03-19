@@ -5,6 +5,7 @@ on:
     branches: [ main ]
     paths:
       - 'dashboard/**'
+      - 'shared/**'
       - '.github/workflows/deploy-dashboard.yml'
 
 permissions:
@@ -19,8 +20,8 @@ jobs:
 
       - name: Install and Build 🔧
         run: |
-          cd dashboard
           npm install
+          cd dashboard
           npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}

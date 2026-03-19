@@ -1,0 +1,9 @@
+{
+  "name": "appetite-root",
+  "private": true,
+  "workspaces": [
+    "dashboard",
+    "shared",
+    "mobile"
+  ]
+}
