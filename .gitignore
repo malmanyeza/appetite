@@ -6,10 +6,10 @@ dist/
 build/
 .DS_Store
 *.log
-google-services.json
 GoogleService-Info.plist
 *.p12
 *.json
+!google-services.json
 !package.json
 !app.json
 !package-lock.json

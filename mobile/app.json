@@ -2,7 +2,7 @@
   "expo": {
     "name": "Appetite",
     "slug": "appetite-mobile",
-    "version": "1.1.5",
+    "version": "1.1.6",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -34,6 +34,7 @@
         "android.permission.ACCESS_FINE_LOCATION"
       ],
       "package": "com.appetite.mobile",
+      "versionCode": 1,
       "googleServicesFile": "./google-services.json",
       "config": {
         "googleMaps": {
@@ -71,7 +72,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "f9d5d1d3-6f24-44cc-92c1-9269f6e7c69e"
+        "projectId": "22813964-fb96-49d1-aae2-a5a1449bb5a7"
       }
     }
   }
