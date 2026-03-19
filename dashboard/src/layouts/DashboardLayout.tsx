@@ -13,7 +13,9 @@ import {
     Search,
     Bell,
     User,
-    Navigation
+    Navigation,
+    Menu,
+    X
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { clsx, type ClassValue } from 'clsx';
@@ -41,6 +43,7 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
     const { currentRole, profile, signOut, roles, switchRole } = useAuthStore();
     const navigate = useNavigate();
     const location = useLocation();
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const queryClient = useQueryClient();
 
     const [notifications, setNotifications] = useState<{ id: string, message: string }[]>([]);
@@ -139,13 +142,21 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
     return (
         <div className="min-h-screen bg-background text-white flex flex-col">
             {/* Top Bar (Fixed) */}
-            <header className="h-16 border-b border-white/5 px-6 flex items-center justify-between sticky top-0 bg-background/95 backdrop-blur-md z-30">
-                <div className="flex items-center gap-4">
+            <header className="h-16 border-b border-white/5 px-4 md:px-6 flex items-center justify-between sticky top-0 bg-background/95 backdrop-blur-md z-30">
+                <div className="flex items-center gap-3 md:gap-4">
+                    {/* Mobile Menu Toggle */}
+                    <button 
+                        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                        className="p-2 -ml-2 rounded-lg hover:bg-white/5 md:hidden transition-colors"
+                    >
+                        {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                    </button>
+
                     <div className="flex items-center gap-2">
                         <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center font-bold text-xl italic">A</div>
                         <h1 className="text-xl font-bold tracking-tight hidden sm:block">Appetite</h1>
                     </div>
-                    <div className="h-6 w-[1px] bg-white/10 mx-2 hidden sm:block" />
+                    <div className="h-6 w-[1px] bg-white/10 mx-2 hidden md:block" />
                     <div className="flex items-center gap-2">
                         {currentRole === 'admin' ? (
                             <span className="bg-white/5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-muted-foreground border border-white/5">Ops Console</span>
@@ -198,10 +209,32 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
                 </div>
             </header>
 
-            <div className="flex flex-1 overflow-hidden">
+            <div className="flex flex-1 overflow-hidden relative">
+                {/* Mobile Menu Overlay */}
+                {isMobileMenuOpen && (
+                    <div 
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                    />
+                )}
+
                 {/* Side Navigation */}
-                <aside className="w-64 border-r border-white/5 flex flex-col p-4 bg-background overflow-y-auto">
-                    <nav className="flex-1 space-y-1">
+                <aside className={cn(
+                    "fixed md:relative inset-y-0 left-0 w-64 border-r border-white/5 p-4 bg-background overflow-y-auto z-50 md:z-auto transition-transform duration-300 md:translate-x-0",
+                    isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+                )}>
+                    {/* Mobile Close Button */}
+                    <div className="flex md:hidden items-center justify-between mb-8">
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center font-bold text-xl italic text-white">A</div>
+                            <span className="text-xl font-bold tracking-tight">Appetite</span>
+                        </div>
+                        <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 hover:bg-white/5 rounded-lg">
+                            <X size={24} />
+                        </button>
+                    </div>
+
+                    <nav className="flex-1 space-y-1" onClick={() => setIsMobileMenuOpen(false)}>
                         {navItems.map((item) => (
                             <SidebarLink
                                 key={item.to}
@@ -214,7 +247,7 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
 
                 {/* Main Content Area */}
                 <main className="flex-1 overflow-y-auto bg-background/50">
-                    <div className="p-8 max-w-7xl mx-auto">
+                    <div className="p-4 md:p-8 max-w-7xl mx-auto">
                         {children}
                     </div>
                 </main>

@@ -140,14 +140,16 @@ export const RestaurantOrders = () => {
                 <div className="flex justify-between items-start">
                     <div>
                         <div className="flex flex-wrap items-center gap-2 mb-1">
-                            <span className="text-xl font-bold">#{order.id.slice(0, 8)}</span>
+                            <span className="text-lg md:text-xl font-bold">#{order.id.slice(0, 8)}</span>
                             {needsAttention && <AlertTriangle size={14} className="text-red-400" />}
-                            {order.payment?.method === 'paynow' && order.payment?.status === 'paid' && (
-                                <span className="bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 rounded-full font-bold">PAID ONLINE</span>
-                            )}
-                            {order.payment?.method === 'cod' && (
-                                <span className="bg-orange-500/20 text-orange-400 text-[10px] px-2 py-0.5 rounded-full font-bold">COD</span>
-                            )}
+                            <div className="flex gap-1">
+                                {order.payment?.method === 'paynow' && order.payment?.status === 'paid' && (
+                                    <span className="bg-green-500/20 text-green-400 text-[9px] md:text-[10px] px-1.5 md:px-2 py-0.5 rounded-full font-bold uppercase">PAID ONLINE</span>
+                                )}
+                                {order.payment?.method === 'cod' && (
+                                    <span className="bg-orange-500/20 text-orange-400 text-[9px] md:text-[10px] px-1.5 md:px-2 py-0.5 rounded-full font-bold uppercase">COD</span>
+                                )}
+                            </div>
                         </div>
                         <p className={cn("text-xs font-bold uppercase tracking-wider", needsAttention ? "text-red-400" : "text-muted")}>
                             Ordered: {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -224,18 +226,18 @@ export const RestaurantOrders = () => {
     return (
         <div className="space-y-6 flex flex-col h-[calc(100vh-8rem)]">
             {/* Header */}
-            <div className="flex justify-between items-center shrink-0">
-                <h1 className="text-3xl font-black tracking-tight">Orders</h1>
-                <div className="flex bg-surface rounded-lg p-1 border border-white/5">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shrink-0 px-2 sm:px-0">
+                <h1 className="text-2xl md:text-3xl font-black tracking-tight">Orders</h1>
+                <div className="flex bg-surface rounded-xl p-1 border border-white/5 w-full sm:w-auto">
                     <button
                         onClick={() => setViewMode('board')}
-                        className={cn("px-4 py-1.5 rounded-md text-sm font-bold transition-all", viewMode === 'board' ? 'bg-accent text-white' : 'text-muted hover:text-white')}
+                        className={cn("flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs md:text-sm font-bold transition-all", viewMode === 'board' ? 'bg-accent text-white' : 'text-muted hover:text-white')}
                     >
                         Kitchen Board
                     </button>
                     <button
                         onClick={() => setViewMode('table')}
-                        className={cn("px-4 py-1.5 rounded-md text-sm font-bold transition-all", viewMode === 'table' ? 'bg-accent text-white' : 'text-muted hover:text-white')}
+                        className={cn("flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs md:text-sm font-bold transition-all", viewMode === 'table' ? 'bg-accent text-white' : 'text-muted hover:text-white')}
                     >
                         Compact Table
                     </button>
