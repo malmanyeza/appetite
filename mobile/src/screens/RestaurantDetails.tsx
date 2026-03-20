@@ -10,7 +10,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../theme';
-import { ChevronLeft, Share2, Info, Plus, Minus, X, Check } from 'lucide-react-native';
+import { ChevronLeft, Share2, Info, Plus, Minus, X, Check, MapPin } from 'lucide-react-native';
 import { Image } from 'expo-image';
 import { useCartStore } from '../store/cartStore';
 
@@ -22,27 +22,54 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
     const [selectedItemForOptions, setSelectedItemForOptions] = useState<any>(null);
     const [tempSelectedAddons, setTempSelectedAddons] = useState<any[]>([]);
 
-    const { data: restaurant, isLoading: loadingRest } = useQuery({
-        queryKey: ['restaurant', id],
+    const { data: locationData, isLoading: loadingLoc } = useQuery({
+        queryKey: ['location', id],
         queryFn: async () => {
-            const { data, error } = await supabase.from('restaurants').select('*').eq('id', id).single();
+            const { data, error } = await supabase.from('restaurant_locations').select('*').eq('id', id).single();
             if (error) throw error;
             return data;
         }
     });
 
-    const { data: menu, isLoading: loadingMenu } = useQuery({
-        queryKey: ['menu', id],
+    const restaurantId = locationData?.restaurant_id;
+
+    const { data: restaurant, isLoading: loadingRest } = useQuery({
+        queryKey: ['restaurant', restaurantId],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('menu_items')
-                .select('*')
-                .eq('restaurant_id', id)
-                .eq('is_available', true)
-                .order('category');
+            const { data, error } = await supabase.from('restaurants').select('*').eq('id', restaurantId).single();
             if (error) throw error;
             return data;
-        }
+        },
+        enabled: !!restaurantId
+    });
+
+    const { data: menu, isLoading: loadingMenu } = useQuery({
+        queryKey: ['menu', restaurantId, id],
+        queryFn: async () => {
+            // Get all items
+            const { data: items, error: mError } = await supabase
+                .from('menu_items')
+                .select('*')
+                .eq('restaurant_id', restaurantId)
+                .eq('is_available', true)
+                .order('category');
+            if (mError) throw mError;
+
+            // Get location-specific availability
+            const { data: availability, error: aError } = await supabase
+                .from('location_menu_items')
+                .select('menu_item_id, is_available')
+                .eq('location_id', id);
+            
+            if (aError) throw aError;
+
+            // Filter out items that are explicitly set to unavailable for this location
+            return items.filter(item => {
+                const setting = availability?.find(a => a.menu_item_id === item.id);
+                return setting ? setting.is_available : true;
+            });
+        },
+        enabled: !!restaurantId
     });
 
     const addToCart = (item: any) => {
@@ -50,26 +77,30 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
             setSelectedItemForOptions(item);
             setTempSelectedAddons([]); // Start with nothing selected
         } else {
-            addItem(item, id);
+            if (restaurantId) {
+                addItem(item, restaurantId, id);
+            }
         }
     };
 
     const confirmAddToOptionsCart = () => {
-        addItem(selectedItemForOptions, id, tempSelectedAddons);
+        if (restaurantId) {
+            addItem(selectedItemForOptions, restaurantId, id, tempSelectedAddons);
+        }
         setSelectedItemForOptions(null);
         setTempSelectedAddons([]);
     };
 
     const toggleAddon = (addon: any) => {
-        const isSelected = tempSelectedAddons.find(a => a.name === addon.name);
+        const isSelected = tempSelectedAddons.find((a: any) => a.name === addon.name);
         if (isSelected) {
-            setTempSelectedAddons(tempSelectedAddons.filter(a => a.name !== addon.name));
+            setTempSelectedAddons(tempSelectedAddons.filter((a: any) => a.name !== addon.name));
         } else {
             setTempSelectedAddons([...tempSelectedAddons, addon]);
         }
     };
 
-    if (loadingRest || loadingMenu) return (
+    if (loadingRest || loadingMenu || loadingLoc) return (
         <View style={[styles.center, { backgroundColor: theme.background }]}>
             <ActivityIndicator color={theme.accent} size="large" />
         </View>
@@ -101,6 +132,22 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
                 <View style={styles.infoSection}>
                     <Text style={[styles.name, { color: theme.text }]}>{restaurant.name}</Text>
                     <Text style={[styles.description, { color: theme.textMuted }]}>{restaurant.description}</Text>
+
+                    {locationData && (
+                        <View style={{ marginTop: 12, padding: 12, backgroundColor: theme.surface, borderRadius: 12, gap: 4 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <MapPin size={14} color={theme.accent} />
+                                <Text style={{ color: theme.text, fontSize: 13, fontWeight: 'bold' }}>{locationData.location_name}</Text>
+                            </View>
+                            <Text style={{ color: theme.textMuted, fontSize: 12, marginLeft: 20 }}>{locationData.physical_address || `${locationData.suburb}, ${locationData.city}`}</Text>
+                            {(locationData.phone || locationData.email) && (
+                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4, marginLeft: 20 }}>
+                                    {locationData.phone && <Text style={{ color: theme.accent, fontSize: 12 }}>📞 {locationData.phone}</Text>}
+                                    {locationData.email && <Text style={{ color: theme.accent, fontSize: 12 }}>✉️ {locationData.email}</Text>}
+                                </View>
+                            )}
+                        </View>
+                    )}
 
                     <View style={styles.statsRow}>
                         <View style={styles.statItem}>

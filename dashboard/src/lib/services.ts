@@ -167,6 +167,54 @@ export const restaurantService = {
         return data;
     },
 
+    async getLocations(restaurantId: string) {
+        const { data, error } = await supabase
+            .from('restaurant_locations')
+            .select('*')
+            .eq('restaurant_id', restaurantId)
+            .order('created_at', { ascending: true });
+        if (error) throw error;
+        return data;
+    },
+
+    async upsertLocation(location: any) {
+        const { data, error } = await supabase
+            .from('restaurant_locations')
+            .upsert(location)
+            .select()
+            .single();
+        if (error) throw error;
+        return data;
+    },
+
+    async deleteLocation(id: string) {
+        const { error } = await supabase
+            .from('restaurant_locations')
+            .delete()
+            .eq('id', id);
+        if (error) throw error;
+    },
+
+    async getLocationAvailability(locationId: string) {
+        const { data, error } = await supabase
+            .from('location_menu_items')
+            .select('menu_item_id, is_available')
+            .eq('location_id', locationId);
+        if (error) throw error;
+        return data;
+    },
+
+    async updateLocationAvailability(locationId: string, menuItemId: string, isAvailable: boolean) {
+        const { error } = await supabase
+            .from('location_menu_items')
+            .upsert({
+                location_id: locationId,
+                menu_item_id: menuItemId,
+                is_available: isAvailable
+            });
+        if (error) throw error;
+    },
+
     async getAnalytics(restaurantId: string) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);

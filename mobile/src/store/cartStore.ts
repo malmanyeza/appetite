@@ -8,12 +8,13 @@ interface CartItem {
     qty: number;
     image_url?: string;
     restaurant_id: string;
+    location_id: string;
     selected_add_ons: { name: string; price: number }[];
 }
 
 interface CartState {
     items: CartItem[];
-    addItem: (item: any, restaurantId: string, selectedAddOns?: { name: string, price: number }[]) => void;
+    addItem: (item: any, restaurantId: string, locationId: string, selectedAddOns?: { name: string, price: number }[]) => void;
     removeItem: (id: string) => void;
     updateQty: (id: string, delta: number) => void;
     clearCart: () => void;
@@ -24,11 +25,11 @@ export const useCartStore = create<CartState>((set, get) => ({
     items: [],
     total: 0,
 
-    addItem: (item, restaurantId, selectedAddOns = []) => {
+    addItem: (item, restaurantId, locationId, selectedAddOns = []) => {
         const currentItems = get().items;
 
-        // If adding from a different restaurant, clear cart first
-        if (currentItems.length > 0 && currentItems[0].restaurant_id !== restaurantId) {
+        // If adding from a different restaurant OR different branch, clear cart first
+        if (currentItems.length > 0 && (currentItems[0].restaurant_id !== restaurantId || currentItems[0].location_id !== locationId)) {
             const compositeId = `${item.id}-${JSON.stringify(selectedAddOns)}`;
             const newItem = { 
                 ...item, 
@@ -36,6 +37,7 @@ export const useCartStore = create<CartState>((set, get) => ({
                 menu_item_id: item.id,
                 qty: 1, 
                 restaurant_id: restaurantId,
+                location_id: locationId,
                 selected_add_ons: selectedAddOns
             };
             const itemPrice = item.price + selectedAddOns.reduce((s, a) => s + a.price, 0);
@@ -56,6 +58,7 @@ export const useCartStore = create<CartState>((set, get) => ({
                 menu_item_id: item.id,
                 qty: 1, 
                 restaurant_id: restaurantId,
+                location_id: locationId,
                 selected_add_ons: selectedAddOns
             }];
         }

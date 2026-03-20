@@ -19,7 +19,8 @@ import {
     Mail,
     Lock,
     UserPlus,
-    Phone
+    Phone,
+    X
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { clsx, type ClassValue } from 'clsx';
@@ -58,7 +59,9 @@ export const RestaurantSettings = () => {
     const totalSteps = isAdminRoute ? 6 : 5;
 
     // ─── EXISTING RESTAURANT: TABBED EDIT VIEW ────────────────────────
-    const [activeTab, setActiveTab] = useState<'store' | 'payouts'>('store');
+    const [activeTab, setActiveTab] = useState<'store' | 'payouts' | 'locations'>('store');
+    const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+    const [selectedLocationForEdit, setSelectedLocationForEdit] = useState<any>(null);
 
     const { data: restaurant, isLoading } = useQuery({
         queryKey: ['restaurant-settings', paramId || profile?.id],
@@ -146,6 +149,31 @@ export const RestaurantSettings = () => {
         onError: (error: any) => {
             console.error('Registration/Update Error:', error);
             alert(`Error: ${error.message || 'Operation failed. Please check console for details.'}`);
+        }
+    });
+
+    const { data: locations, refetch: refetchLocations } = useQuery({
+        queryKey: ['restaurant-locations', restaurant?.id],
+        queryFn: () => restaurantService.getLocations(restaurant?.id),
+        enabled: !!restaurant?.id && activeTab === 'locations'
+    });
+
+    const upsertLocation = useMutation({
+        mutationFn: (data: any) => restaurantService.upsertLocation({ ...data, restaurant_id: restaurant.id }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['restaurant-locations'] });
+            setIsLocationModalOpen(false);
+            setSelectedLocationForEdit(null);
+            alert('Location saved successfully!');
+        },
+        onError: (error: any) => alert(`Error: ${error.message}`)
+    });
+
+    const deleteLocation = useMutation({
+        mutationFn: (id: string) => restaurantService.deleteLocation(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['restaurant-locations'] });
+            alert('Location deleted successfully!');
         }
     });
 
@@ -293,6 +321,12 @@ export const RestaurantSettings = () => {
                         Store Profile
                     </button>
                     <button
+                        onClick={() => setActiveTab('locations')}
+                        className={cn("pb-4 text-sm font-bold border-b-2 transition-all", activeTab === 'locations' ? "border-accent text-accent" : "border-transparent text-muted hover:text-white")}
+                    >
+                        Locations
+                    </button>
+                    <button
                         onClick={() => setActiveTab('payouts')}
                         className={cn("pb-4 text-sm font-bold border-b-2 transition-all", activeTab === 'payouts' ? "border-accent text-accent" : "border-transparent text-muted hover:text-white")}
                     >
@@ -334,6 +368,20 @@ export const RestaurantSettings = () => {
                                         />
                                         <div className="w-16 h-8 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-green-500"></div>
                                     </label>
+                                </div>
+                            </div>
+
+                            {/* Profile Image - NEW SECTION for existing restaurants */}
+                            <div className="glass p-8 space-y-6">
+                                <h3 className="font-bold flex items-center gap-2 border-b border-white/5 pb-4"><Store size={18} className="text-accent" /> Store Appearance</h3>
+                                <div className="max-w-md">
+                                    <label className="text-sm font-semibold text-[#A3A3A3] ml-1 mb-4 block">Restaurant Cover Image</label>
+                                    <ImageUploadField
+                                        value={restaurant?.cover_image_url}
+                                        onUpload={(url: string) => updateRestaurant.mutate({ cover_image_url: url })}
+                                        path={`restaurants/${restaurant?.id || profile?.id}`}
+                                    />
+                                    <p className="text-xs text-muted mt-4 italic">💡 This image will be shown to customers when browsing and on your store page.</p>
                                 </div>
                             </div>
 
@@ -425,6 +473,74 @@ export const RestaurantSettings = () => {
                         </div>
                     )}
 
+                    {activeTab === 'locations' && (
+                        <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-xl font-bold flex items-center gap-2"><MapPin size={20} className="text-accent" /> Manage Locations</h3>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSelectedLocationForEdit(null);
+                                        setIsLocationModalOpen(true);
+                                    }}
+                                    className="btn-primary flex items-center gap-2 px-4 py-2 text-sm"
+                                >
+                                    <Plus size={16} /> Add Location
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4">
+                                {locations?.map((loc: any) => (
+                                    <div key={loc.id} className="glass p-6 rounded-2xl flex justify-between items-center group">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
+                                                <MapPin size={24} />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-lg">{loc.location_name}</h4>
+                                                <p className="text-sm text-muted">{loc.physical_address || loc.suburb}, {loc.city}</p>
+                                                {loc.phone && <p className="text-xs text-accent/80 mt-1 flex items-center gap-1"><Store size={10} /> {loc.phone}</p>}
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setSelectedLocationForEdit(loc);
+                                                    setIsLocationModalOpen(true);
+                                                }}
+                                                className="p-2 hover:bg-white/5 rounded-lg text-muted hover:text-white transition-colors"
+                                            >
+                                                Edit
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (window.confirm('Are you sure you want to delete this location?')) {
+                                                        deleteLocation.mutate(loc.id);
+                                                    }
+                                                }}
+                                                className="p-2 hover:bg-red-500/10 rounded-lg text-red-500/50 hover:text-red-500 transition-colors"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {(!locations || locations.length === 0) && (
+                                    <div className="glass p-12 rounded-2xl border-dashed border-white/10 flex flex-col items-center justify-center text-center">
+                                        <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
+                                            <MapPin size={32} className="text-muted" />
+                                        </div>
+                                        <h4 className="font-bold text-white mb-2">No locations added yet</h4>
+                                        <p className="text-sm text-muted max-w-xs">Add your main branch and any additional locations here to start receiving orders.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     {activeTab === 'payouts' && (
                         <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
                             <div className="glass p-8 space-y-6 border-l-4 border-l-blue-500">
@@ -447,6 +563,96 @@ export const RestaurantSettings = () => {
                         </div>
                     )}
                 </form>
+
+                {/* Location Modal */}
+                {isLocationModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+                        <div className="glass w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col rounded-3xl shadow-2xl border border-white/10 animate-in zoom-in-95 duration-300">
+                            <div className="p-8 border-b border-white/10 flex justify-between items-center bg-white/5">
+                                <div>
+                                    <h3 className="text-2xl font-bold text-white">{selectedLocationForEdit ? 'Edit Location' : 'Add New Location'}</h3>
+                                    <p className="text-sm text-muted mt-1">Set up your branch details and GPS coordinates.</p>
+                                </div>
+                                <button 
+                                    onClick={() => setIsLocationModalOpen(false)}
+                                    className="p-2 hover:bg-white/10 rounded-xl text-muted hover:text-white transition-all text-white"
+                                >
+                                    <Utensils size={24} />
+                                </button>
+                            </div>
+
+                            <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-8">
+                                <form 
+                                    id="location-form" 
+                                    onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
+                                        e.preventDefault();
+                                        const formData = new FormData(e.currentTarget);
+                                        const data = Object.fromEntries(formData.entries());
+                                        upsertLocation.mutate({
+                                            ...selectedLocationForEdit,
+                                            ...data,
+                                            lat: parseFloat(data.lat as string),
+                                            lng: parseFloat(data.lng as string),
+                                            is_open: true
+                                        });
+                                    }}
+                                    className="space-y-6"
+                                >
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <InputField label="Location Name" name="location_name" required defaultValue={selectedLocationForEdit?.location_name || ''} placeholder="e.g. Avondale Branch" />
+                                        <InputField label="Contact Phone" name="phone" defaultValue={selectedLocationForEdit?.phone || ''} placeholder="+263..." />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-white/5">
+                                        <InputField label="City" name="city" required defaultValue={selectedLocationForEdit?.city || 'Harare'} />
+                                        <InputField label="Suburb" name="suburb" required defaultValue={selectedLocationForEdit?.suburb || ''} />
+                                    </div>
+
+                                    <InputField label="Physical Address" name="physical_address" defaultValue={selectedLocationForEdit?.physical_address || ''} placeholder="Shop 4, Avondale Shopping Centre" />
+
+                                    <div className="space-y-4 pt-4 border-t border-white/5">
+                                        <label className="text-xs font-bold uppercase tracking-widest text-[#A3A3A3] ml-1">GPS Location *</label>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <InputField label="Latitude" name="lat" type="number" step="any" required defaultValue={selectedLocationForEdit?.lat || ''} />
+                                            <InputField label="Longitude" name="lng" type="number" step="any" required defaultValue={selectedLocationForEdit?.lng || ''} />
+                                        </div>
+                                        <p className="text-xs text-muted mb-2">Drag the marker on the map to set exact coordinates.</p>
+                                        <div className="h-64 rounded-2xl overflow-hidden border border-white/10">
+                                            <MapPicker 
+                                                lat={selectedLocationForEdit?.lat || -17.8248} 
+                                                lng={selectedLocationForEdit?.lng || 31.0530} 
+                                                onChange={(lat, lng) => {
+                                                    const latInput = document.getElementsByName('lat')[0] as HTMLInputElement;
+                                                    const lngInput = document.getElementsByName('lng')[0] as HTMLInputElement;
+                                                    if (latInput) latInput.value = lat.toString();
+                                                    if (lngInput) lngInput.value = lng.toString();
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <div className="p-8 border-t border-white/10 bg-white/5 flex justify-end gap-3">
+                                <button 
+                                    type="button"
+                                    onClick={() => setIsLocationModalOpen(false)}
+                                    className="px-6 py-2.5 rounded-xl border border-white/10 text-muted hover:text-white hover:bg-white/5 transition-all text-sm font-bold"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    form="location-form"
+                                    type="submit"
+                                    className="btn-primary px-8 py-2.5 shadow-lg shadow-accent/20"
+                                    disabled={upsertLocation.isPending}
+                                >
+                                    {upsertLocation.isPending ? 'Saving...' : 'Save Location'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }

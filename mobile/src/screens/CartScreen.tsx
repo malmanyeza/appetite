@@ -126,7 +126,8 @@ export const CartScreen = ({ navigation }: any) => {
     }, [ecocashPending, pendingOrderId]);
 
     // Fetch Delivery Settings & Restaurant Location
-    const restaurantId = items[0]?.restaurant_id; // Assumes all items are from same restaurant
+    const restaurantId = items[0]?.restaurant_id;
+    const locationId = items[0]?.location_id;
 
     const { data: deliveryConfig } = useQuery({
         queryKey: ['delivery_config'],
@@ -138,14 +139,14 @@ export const CartScreen = ({ navigation }: any) => {
     });
 
     const { data: restaurant } = useQuery({
-        queryKey: ['restaurant_location', restaurantId],
+        queryKey: ['restaurant_branch_location', locationId],
         queryFn: async () => {
-            const { data, error } = await supabase.from('restaurants').select('lat, lng').eq('id', restaurantId).single();
+            const { data, error } = await supabase.from('restaurant_locations').select('lat, lng').eq('id', locationId).single();
             if (error) throw error;
-            if (!data) throw new Error('Restaurant not found');
+            if (!data) throw new Error('Restaurant branch not found');
             return data;
         },
-        enabled: !!restaurantId
+        enabled: !!locationId
     });
 
     React.useEffect(() => {
@@ -254,6 +255,7 @@ export const CartScreen = ({ navigation }: any) => {
                     },
                     paymentMethod,
                     restaurantId: items[0].restaurant_id,
+                    locationId: items[0].location_id,
                     phone: paymentMethod === 'ecocash' ? phoneToUse?.trim() : undefined
                 })
             });

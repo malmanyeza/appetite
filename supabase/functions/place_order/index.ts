@@ -41,13 +41,13 @@ Deno.serve(async (req: Request) => {
           global: { headers: { Authorization: `Bearer ${jwt}` } }
         });
 
-    const body = await req.json();
-    const { items, address, paymentMethod, restaurantId } = body;
+    const { items, address, paymentMethod, restaurantId, locationId } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       throw new Error('Cart is empty or invalid.');
     }
     if (!restaurantId) throw new Error('Restaurant ID is required.');
+    if (!locationId) throw new Error('Location ID is required.');
     if (!address) throw new Error('Delivery address is required.');
 
     // Fetch master prices to prevent tampering
@@ -93,7 +93,7 @@ Deno.serve(async (req: Request) => {
 
     // Fetch restaurant location and fee config
     const [restaurantRes, settingsRes] = await Promise.all([
-        adminClient.from('restaurants').select('lat, lng').eq('id', restaurantId).single(),
+        adminClient.from('restaurant_locations').select('lat, lng').eq('id', locationId).single(),
         adminClient.from('system_settings').select('value').eq('key', 'delivery_fee_config').single()
     ]);
 
@@ -145,6 +145,7 @@ Deno.serve(async (req: Request) => {
     const orderPayload = {
         customer_id: user.id,
         restaurant_id: restaurantId,
+        location_id: locationId,
         status: (paymentMethod === 'ecocash' || paymentMethod === 'card') ? 'pending' : 'confirmed',
         delivery_pin: deliveryPin,
         delivery_address_snapshot: address,

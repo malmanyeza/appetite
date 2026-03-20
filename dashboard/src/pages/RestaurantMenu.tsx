@@ -29,6 +29,7 @@ export const RestaurantMenu = () => {
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const [editImageUrl, setEditImageUrl] = useState<string>('');
     const [addons, setAddons] = useState<{ name: string; price: number }[]>([]);
+    const [branchAvailabilityItem, setBranchAvailabilityItem] = useState<any>(null); // item object if modal open
 
     const { user, profile } = useAuthStore();
     const { data: menuItems, isLoading } = useQuery({
@@ -41,6 +42,24 @@ export const RestaurantMenu = () => {
             return restaurantService.getMenu(restaurant.id);
         },
         enabled: !!paramId || !!profile?.id
+    });
+
+    const { data: locations } = useQuery({
+        queryKey: ['restaurant-locations', paramId || profile?.id],
+        queryFn: async () => {
+            const restaurant = paramId
+                ? { id: paramId }
+                : await restaurantService.getMyRestaurant(profile?.id);
+            if (!restaurant) return [];
+            return restaurantService.getLocations(restaurant.id);
+        },
+        enabled: !!paramId || !!profile?.id
+    });
+
+    const { data: branchMapping, refetch: refetchBranchMapping } = useQuery({
+        queryKey: ['branch-availability', branchAvailabilityItem?.id],
+        queryFn: () => restaurantService.getLocationAvailability(branchAvailabilityItem.id),
+        enabled: !!branchAvailabilityItem?.id
     });
 
     const mutationOptions = {
@@ -77,6 +96,12 @@ export const RestaurantMenu = () => {
         mutationFn: ({ id, is_available }: { id: string, is_available: boolean }) =>
             restaurantService.updateMenuAvailability(id, is_available),
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['restaurant-menu'] })
+    });
+
+    const toggleBranchAvailability = useMutation({
+        mutationFn: ({ locationId, menuItemId, isAvailable }: { locationId: string, menuItemId: string, isAvailable: boolean }) =>
+            restaurantService.updateLocationAvailability(locationId, menuItemId, isAvailable),
+        onSuccess: () => refetchBranchMapping()
     });
 
     // When opening the edit modal, seed the image URL state
@@ -158,18 +183,28 @@ export const RestaurantMenu = () => {
                                         <span className="font-bold text-accent">${item.price.toFixed(2)}</span>
                                     </td>
                                     <td className="px-6 py-4 text-center">
-                                        <button
-                                            onClick={() => toggleAvailability.mutate({ id: item.id, is_available: !item.is_available })}
-                                            className={cn(
-                                                "w-12 h-6 rounded-full relative transition-colors duration-300 focus:outline-none",
-                                                item.is_available ? "bg-accent" : "bg-white/10"
+                                        <div className="flex flex-col items-center gap-2">
+                                            <button
+                                                onClick={() => toggleAvailability.mutate({ id: item.id, is_available: !item.is_available })}
+                                                className={cn(
+                                                    "w-12 h-6 rounded-full relative transition-colors duration-300 focus:outline-none",
+                                                    item.is_available ? "bg-accent" : "bg-white/10"
+                                                )}
+                                            >
+                                                <div className={cn(
+                                                    "w-4 h-4 rounded-full bg-white absolute top-1 transition-transform duration-300 shadow-sm",
+                                                    item.is_available ? "translate-x-7" : "translate-x-1"
+                                                )} />
+                                            </button>
+                                            {locations && locations.length > 1 && (
+                                                <button
+                                                    onClick={() => setBranchAvailabilityItem(item)}
+                                                    className="text-[10px] font-bold text-accent/60 hover:text-accent underline uppercase tracking-tighter"
+                                                >
+                                                    Per Branch
+                                                </button>
                                             )}
-                                        >
-                                            <div className={cn(
-                                                "w-4 h-4 rounded-full bg-white absolute top-1 transition-transform duration-300 shadow-sm",
-                                                item.is_available ? "translate-x-7" : "translate-x-1"
-                                            )} />
-                                        </button>
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -324,6 +359,57 @@ export const RestaurantMenu = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Branch Availability Modal */}
+            {branchAvailabilityItem && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="w-full max-w-lg glass p-8 space-y-6">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h2 className="text-xl font-bold">Branch Availability</h2>
+                                <p className="text-sm text-muted mt-1">{branchAvailabilityItem.name}</p>
+                            </div>
+                            <button onClick={() => setBranchAvailabilityItem(null)} className="text-muted hover:text-white">
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-3">
+                            {locations?.map((loc: any) => {
+                                const isLocAvailable = (branchMapping as any[])?.find(m => m.location_id === loc.id)?.is_available ?? true;
+                                return (
+                                    <div key={loc.id} className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
+                                        <div>
+                                            <p className="font-bold text-sm text-white">{loc.location_name}</p>
+                                            <p className="text-xs text-muted">{loc.suburb}, {loc.city}</p>
+                                        </div>
+                                        <button
+                                            onClick={() => toggleBranchAvailability.mutate({
+                                                locationId: loc.id,
+                                                menuItemId: branchAvailabilityItem.id,
+                                                isAvailable: !isLocAvailable
+                                            })}
+                                            className={cn(
+                                                "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                                                isLocAvailable ? "bg-green-500/20 text-green-400 border border-green-500/30" : "bg-red-500/20 text-red-400 border border-red-500/30"
+                                            )}
+                                        >
+                                            {isLocAvailable ? 'AVAILABLE' : 'UNAVAILABLE'}
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <button
+                            onClick={() => setBranchAvailabilityItem(null)}
+                            className="w-full btn-primary py-3 font-bold"
+                        >
+                            Done
+                        </button>
                     </div>
                 </div>
             )}
