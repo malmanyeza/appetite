@@ -1,17 +1,19 @@
 import { create } from 'zustand';
 
 interface CartItem {
-    id: string;
+    id: string; // This will now be a composite key: menu_item_id + hash(extras)
+    menu_item_id: string;
     name: string;
     price: number;
     qty: number;
     image_url?: string;
     restaurant_id: string;
+    selected_add_ons: { name: string; price: number }[];
 }
 
 interface CartState {
     items: CartItem[];
-    addItem: (item: any, restaurantId: string) => void;
+    addItem: (item: any, restaurantId: string, selectedAddOns?: { name: string, price: number }[]) => void;
     removeItem: (id: string) => void;
     updateQty: (id: string, delta: number) => void;
     clearCart: () => void;
@@ -22,29 +24,61 @@ export const useCartStore = create<CartState>((set, get) => ({
     items: [],
     total: 0,
 
-    addItem: (item, restaurantId) => {
+    addItem: (item, restaurantId, selectedAddOns = []) => {
         const currentItems = get().items;
 
-        // If adding from a different restaurant, clear cart first (standard UX)
+        // If adding from a different restaurant, clear cart first
         if (currentItems.length > 0 && currentItems[0].restaurant_id !== restaurantId) {
-            const newItem = { ...item, qty: 1, restaurant_id: restaurantId };
-            set({ items: [newItem], total: item.price });
+            const compositeId = `${item.id}-${JSON.stringify(selectedAddOns)}`;
+            const newItem = { 
+                ...item, 
+                id: compositeId, 
+                menu_item_id: item.id,
+                qty: 1, 
+                restaurant_id: restaurantId,
+                selected_add_ons: selectedAddOns
+            };
+            const itemPrice = item.price + selectedAddOns.reduce((s, a) => s + a.price, 0);
+            set({ items: [newItem], total: itemPrice });
             return;
         }
 
-        const existing = currentItems.find(i => i.id === item.id);
+        const compositeId = `${item.id}-${JSON.stringify(selectedAddOns)}`;
+        const existing = currentItems.find(i => i.id === compositeId);
+        
         let newItems;
         if (existing) {
-            newItems = currentItems.map(i => i.id === item.id ? { ...i, qty: i.qty + 1 } : i);
+            newItems = currentItems.map(i => i.id === compositeId ? { ...i, qty: i.qty + 1 } : i);
         } else {
-            newItems = [...currentItems, { ...item, qty: 1, restaurant_id: restaurantId }];
+            newItems = [...currentItems, { 
+                ...item, 
+                id: compositeId, 
+                menu_item_id: item.id,
+                qty: 1, 
+                restaurant_id: restaurantId,
+                selected_add_ons: selectedAddOns
+            }];
         }
-        set({ items: newItems, total: newItems.reduce((sum, i) => sum + (i.price * i.qty), 0) });
+
+        const calculateTotal = (items: CartItem[]) => 
+            items.reduce((sum, i) => {
+                const itemBasePrice = i.price;
+                const extrasPrice = i.selected_add_ons.reduce((s, a) => s + a.price, 0);
+                return sum + ((itemBasePrice + extrasPrice) * i.qty);
+            }, 0);
+
+        set({ items: newItems, total: calculateTotal(newItems) });
     },
 
     removeItem: (id) => {
         const newItems = get().items.filter(i => i.id !== id);
-        set({ items: newItems, total: newItems.reduce((sum, i) => sum + (i.price * i.qty), 0) });
+        const calculateTotal = (items: CartItem[]) => 
+            items.reduce((sum, i) => {
+                const itemBasePrice = i.price;
+                const extrasPrice = i.selected_add_ons.reduce((s, a) => s + a.price, 0);
+                return sum + ((itemBasePrice + extrasPrice) * i.qty);
+            }, 0);
+        set({ items: newItems, total: calculateTotal(newItems) });
     },
 
     updateQty: (id, delta) => {
@@ -55,7 +89,13 @@ export const useCartStore = create<CartState>((set, get) => ({
             }
             return i;
         }).filter(i => i.qty > 0);
-        set({ items: newItems, total: newItems.reduce((sum, i) => sum + (i.price * i.qty), 0) });
+        const calculateTotal = (items: CartItem[]) => 
+            items.reduce((sum, i) => {
+                const itemBasePrice = i.price;
+                const extrasPrice = i.selected_add_ons.reduce((s, a) => s + a.price, 0);
+                return sum + ((itemBasePrice + extrasPrice) * i.qty);
+            }, 0);
+        set({ items: newItems, total: calculateTotal(newItems) });
     },
 
     clearCart: () => set({ items: [], total: 0 }),

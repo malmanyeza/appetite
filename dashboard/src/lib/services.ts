@@ -32,7 +32,8 @@ export const ordersService = {
         restaurants:restaurant_id (
             name,
             owner_phone
-        )
+        ),
+        order_items (*)
       `)
             .order('created_at', { ascending: false });
         if (error) throw error;

@@ -13,7 +13,8 @@ import {
     Truck,
     ChevronDown,
     Activity,
-    MapPin
+    MapPin,
+    Utensils
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -324,6 +325,39 @@ export const AdminOrders = () => {
                                 <div className="p-5 rounded-xl border border-white/5 bg-white/[0.02]">
                                     <p className="font-bold text-sm text-white">{selectedOrder.restaurants?.name || 'Unknown'}</p>
                                     <p className="text-xs text-muted mt-1">{selectedOrder.restaurants?.physical_address || 'Address not listed'}</p>
+                                </div>
+                            </div>
+
+                            {/* Order Items Section */}
+                            <div className="space-y-3">
+                                <h3 className="text-xs font-bold uppercase tracking-widest text-muted flex items-center gap-2">
+                                    <Utensils size={14} /> Order Items
+                                </h3>
+                                <div className="p-5 rounded-xl border border-white/5 bg-white/[0.02] space-y-4">
+                                    {selectedOrder.order_items?.map((item: any) => (
+                                        <div key={item.id} className="pb-3 border-b border-white/5 last:border-0 last:pb-0">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <p className="font-bold text-sm text-white">{item.qty}x {item.name_snapshot}</p>
+                                                    {item.selected_add_ons?.length > 0 && (
+                                                        <div className="mt-1 flex flex-wrap gap-1">
+                                                            {item.selected_add_ons.map((addon: any, idx: number) => (
+                                                                <span key={idx} className="text-[10px] bg-accent/10 text-accent px-1.5 py-0.5 rounded font-bold uppercase">
+                                                                    + {addon.name}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs font-mono text-muted">
+                                                    ${((item.price_snapshot + (item.selected_add_ons?.reduce((s: number, a: any) => s + a.price, 0) || 0)) * item.qty).toFixed(2)}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {(!selectedOrder.order_items || selectedOrder.order_items.length === 0) && (
+                                        <p className="text-xs text-muted italic">No items found for this order.</p>
+                                    )}
                                 </div>
                             </div>
 

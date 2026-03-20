@@ -419,7 +419,14 @@ export const CartScreen = ({ navigation }: any) => {
                                     <Image source={item.image_url} style={styles.itemImage} contentFit="cover" />
                                     <View style={styles.itemInfo}>
                                         <Text style={[styles.itemName, { color: theme.text }]}>{item.name}</Text>
-                                        <Text style={[styles.itemPrice, { color: theme.accent }]}>${item.price.toFixed(2)}</Text>
+                                        {item.selected_add_ons?.length > 0 && (
+                                            <Text style={[styles.itemExtras, { color: theme.textMuted }]}>
+                                                + {item.selected_add_ons.map((a: any) => a.name).join(', ')}
+                                            </Text>
+                                        )}
+                                        <Text style={[styles.itemPrice, { color: theme.accent }]}>
+                                            ${(item.price + (item.selected_add_ons?.reduce((s: number, a: any) => s + a.price, 0) || 0)).toFixed(2)}
+                                        </Text>
                                     </View>
                                     <View style={styles.qtyControls}>
                                         <TouchableOpacity onPress={() => updateQty(item.id, -1)}>
@@ -823,6 +830,7 @@ const styles = StyleSheet.create({
     itemImage: { width: 60, height: 60, borderRadius: 12 },
     itemInfo: { flex: 1, marginLeft: 16 },
     itemName: { fontSize: 16, fontWeight: '600' },
+    itemExtras: { fontSize: 12, marginTop: 2, fontStyle: 'italic', opacity: 0.6 },
     itemPrice: { fontSize: 14, fontWeight: 'bold', marginTop: 2 },
     qtyControls: { flexDirection: 'row', alignItems: 'center', gap: 16 },
     qtyBtn: { fontSize: 20, fontWeight: 'bold', width: 24, textAlign: 'center' },

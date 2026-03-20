@@ -10,7 +10,8 @@ import {
     Eye,
     EyeOff,
     Image as ImageIcon,
-    Utensils
+    Utensils,
+    X
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -27,6 +28,7 @@ export const RestaurantMenu = () => {
     const [isEditing, setIsEditing] = useState<any>(null); // null, 'new', or item object
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const [editImageUrl, setEditImageUrl] = useState<string>('');
+    const [addons, setAddons] = useState<{ name: string; price: number }[]>([]);
 
     const { user, profile } = useAuthStore();
     const { data: menuItems, isLoading } = useQuery({
@@ -81,6 +83,7 @@ export const RestaurantMenu = () => {
     const openEditModal = (item: any) => {
         setIsEditing(item);
         setEditImageUrl(item === 'new' ? '' : (item?.image_url || ''));
+        setAddons(item === 'new' ? [] : (item?.add_ons || []));
     };
 
     if (isLoading) return <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -216,6 +219,7 @@ export const RestaurantMenu = () => {
                                 ...data,
                                 price: parseFloat(data.price as string),
                                 image_url: editImageUrl || null,
+                                add_ons: addons,
                                 is_available: true
                             };
 
@@ -255,6 +259,62 @@ export const RestaurantMenu = () => {
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-muted">Description</label>
                                 <textarea name="description" rows={3} defaultValue={isEditing?.description} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-accent/50" />
+                            </div>
+
+                            {/* ── Add-ons / Extras ── */}
+                            <div className="space-y-4 pt-4 border-t border-white/5">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-sm font-bold uppercase tracking-wider text-accent">Extras & Toppings</label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setAddons([...addons, { name: '', price: 0 }])}
+                                        className="text-xs bg-accent/20 text-accent px-3 py-1.5 rounded-lg hover:bg-accent/30 transition-colors font-bold"
+                                    >
+                                        + Add Extra
+                                    </button>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {(addons || []).map((addon, index) => (
+                                        <div key={index} className="flex gap-3 items-center animate-in slide-in-from-right-2 duration-300">
+                                            <input
+                                                placeholder="e.g. Extra Cheese"
+                                                value={addon.name}
+                                                onChange={(e) => {
+                                                    const newAddons = [...addons];
+                                                    newAddons[index].name = e.target.value;
+                                                    setAddons(newAddons);
+                                                }}
+                                                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                                            />
+                                            <div className="relative w-24">
+                                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted text-xs">$</span>
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    placeholder="0.00"
+                                                    value={addon.price}
+                                                    onChange={(e) => {
+                                                        const newAddons = [...addons];
+                                                        newAddons[index].price = parseFloat(e.target.value) || 0;
+                                                        setAddons(newAddons);
+                                                    }}
+                                                    className="w-full bg-white/5 border border-white/10 rounded-lg pl-5 pr-2 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent text-right"
+                                                />
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setAddons(addons.filter((_, i) => i !== index))}
+                                                className="text-red-400 p-2 hover:bg-red-400/10 rounded-lg transition-colors"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {(!addons || addons.length === 0) && (
+                                        <p className="text-xs text-muted italic">No extras defined for this item.</p>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="flex gap-4 pt-4">

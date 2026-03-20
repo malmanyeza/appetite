@@ -172,8 +172,15 @@ export const RestaurantOrders = () => {
                     <p className="text-xs font-bold text-muted uppercase mb-2">Items</p>
                     <div className="space-y-1">
                         {order.order_items.slice(0, 2).map((item: any) => (
-                            <div key={item.id} className="flex justify-between text-sm">
-                                <span className="font-medium text-white">{item.qty}x {item.name_snapshot}</span>
+                            <div key={item.id} className="flex flex-col gap-0.5 pb-2 border-b border-white/5 last:border-0 last:pb-0">
+                                <div className="flex justify-between text-sm">
+                                    <span className="font-medium text-white">{item.qty}x {item.name_snapshot}</span>
+                                </div>
+                                {item.selected_add_ons?.length > 0 && (
+                                    <p className="text-[10px] text-accent font-bold uppercase tracking-tight">
+                                        + {item.selected_add_ons.map((a: any) => a.name).join(', ')}
+                                    </p>
+                                )}
                             </div>
                         ))}
                         {order.order_items.length > 2 && (

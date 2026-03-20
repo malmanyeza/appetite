@@ -51,7 +51,7 @@ Deno.serve(async (req: Request) => {
     if (!address) throw new Error('Delivery address is required.');
 
     // Fetch master prices to prevent tampering
-    const itemIds = items.map((i: any) => i.id);
+    const itemIds = items.map((i: any) => i.menu_item_id || i.id);
     const { data: menuItems, error: menuError } = await adminClient
       .from('menu_items')
       .select('*')
@@ -62,14 +62,32 @@ Deno.serve(async (req: Request) => {
 
     let subtotal = 0;
     const finalItemsToInsert = items.map((item: any) => {
-        const dbItem = (menuItems as any[]).find((m: any) => m.id === item.id);
-        if (!dbItem) throw new Error(`Menu item ${item.id} not found in database.`);
-        subtotal += dbItem.price * item.qty;
+        const menuItemId = item.menu_item_id || item.id;
+        const dbItem = (menuItems as any[]).find((m: any) => m.id === menuItemId);
+        if (!dbItem) throw new Error(`Menu item ${menuItemId} not found in database.`);
+        
+        // Calculate extras price and validate them
+        let extrasPrice = 0;
+        const selectedExtras = item.selected_add_ons || [];
+        const dbExtras = dbItem.add_ons || [];
+
+        for (const selected of selectedExtras) {
+            const masterExtra = dbExtras.find((e: any) => e.name === selected.name);
+            if (!masterExtra) {
+                throw new Error(`Extra "${selected.name}" is not a valid option for ${dbItem.name}.`);
+            }
+            // Use the price from the database, not the client
+            extrasPrice += masterExtra.price;
+        }
+
+        subtotal += (dbItem.price + extrasPrice) * item.qty;
+        
         return {
-            menu_item_id: item.id,
+            menu_item_id: menuItemId,
             name_snapshot: dbItem.name,
             price_snapshot: dbItem.price,
-            qty: item.qty
+            qty: item.qty,
+            selected_add_ons: selectedExtras // Store exactly what the user picked
         };
     });
 
