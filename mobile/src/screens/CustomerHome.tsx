@@ -16,7 +16,8 @@ import {
     ActivityIndicator,
     Alert,
     Dimensions,
-    Animated
+    Animated,
+    RefreshControl
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from '../components/Map';
 import { GooglePlacesAutocomplete } from '../components/GooglePlacesAutocomplete';
@@ -149,7 +150,7 @@ export const CustomerHome = ({ navigation }: any) => {
         UIManager.setLayoutAnimationEnabledExperimental(true);
     }
 
-    const { data: restaurants, isLoading } = useQuery({
+    const { data: restaurants, isLoading, refetch, isRefetching } = useQuery({
         queryKey: ['restaurants', selectedCategory, selectedLocation?.lat, selectedLocation?.lng],
         queryFn: async () => {
             if (!selectedLocation?.lat || !selectedLocation?.lng) {
@@ -219,7 +220,16 @@ export const CustomerHome = ({ navigation }: any) => {
                 </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView 
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={isRefetching}
+                        onRefresh={refetch}
+                        tintColor={theme.accent}
+                    />
+                }
+            >
                 {/* Search Bar */}
                 <View style={styles.searchContainer}>
                     <View style={[styles.searchBar, { backgroundColor: theme.surface }]}>

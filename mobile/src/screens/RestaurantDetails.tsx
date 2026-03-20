@@ -5,7 +5,8 @@ import {
     ScrollView,
     TouchableOpacity,
     StyleSheet,
-    ActivityIndicator
+    ActivityIndicator,
+    RefreshControl
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
@@ -22,7 +23,7 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
     const [selectedItemForOptions, setSelectedItemForOptions] = useState<any>(null);
     const [tempSelectedAddons, setTempSelectedAddons] = useState<any[]>([]);
 
-    const { data: locationData, isLoading: loadingLoc } = useQuery({
+    const { data: locationData, isLoading: loadingLoc, refetch: refetchLoc, isRefetching: isRefetchingLoc } = useQuery({
         queryKey: ['location', id],
         queryFn: async () => {
             const { data, error } = await supabase.from('restaurant_locations').select('*').eq('id', id).single();
@@ -33,7 +34,7 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
 
     const restaurantId = locationData?.restaurant_id;
 
-    const { data: restaurant, isLoading: loadingRest } = useQuery({
+    const { data: restaurant, isLoading: loadingRest, refetch: refetchRest, isRefetching: isRefetchingRest } = useQuery({
         queryKey: ['restaurant', restaurantId],
         queryFn: async () => {
             const { data, error } = await supabase.from('restaurants').select('*').eq('id', restaurantId).single();
@@ -43,7 +44,7 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
         enabled: !!restaurantId
     });
 
-    const { data: menu, isLoading: loadingMenu } = useQuery({
+    const { data: menu, isLoading: loadingMenu, refetch: refetchMenu, isRefetching: isRefetchingMenu } = useQuery({
         queryKey: ['menu', restaurantId, id],
         queryFn: async () => {
             // Get all items
@@ -100,6 +101,15 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
         }
     };
 
+    const isRefreshing = isRefetchingLoc || isRefetchingRest || isRefetchingMenu;
+    const onRefresh = async () => {
+        await Promise.all([
+            refetchLoc(),
+            restaurantId ? refetchRest() : Promise.resolve(),
+            restaurantId ? refetchMenu() : Promise.resolve()
+        ]);
+    };
+
     if (loadingRest || loadingMenu || loadingLoc) return (
         <View style={[styles.center, { backgroundColor: theme.background }]}>
             <ActivityIndicator color={theme.accent} size="large" />
@@ -110,7 +120,16 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView 
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={isRefreshing}
+                        onRefresh={onRefresh}
+                        tintColor={theme.accent}
+                    />
+                }
+            >
                 {/* Hero Image */}
                 <View style={styles.imageContainer}>
                     <Image

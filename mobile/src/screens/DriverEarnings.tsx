@@ -4,7 +4,8 @@ import {
     Text,
     ScrollView,
     StyleSheet,
-    ActivityIndicator
+    ActivityIndicator,
+    RefreshControl
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
@@ -17,7 +18,7 @@ export const DriverEarnings = () => {
     const { theme } = useTheme();
     const { user } = useAuthStore();
 
-    const { data: orders, isLoading } = useQuery({
+    const { data: orders, isLoading, refetch, isRefetching } = useQuery({
         queryKey: ['driver-earnings', user?.id],
         queryFn: async () => {
             const { data, error } = await supabase
@@ -42,7 +43,7 @@ export const DriverEarnings = () => {
     startOfWeek.setHours(0, 0, 0, 0);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const stats = (orders || []).reduce((acc, order) => {
+    const stats = (orders || []).reduce((acc: any, order: any) => {
         const earnings = Number(order.pricing?.driver_earnings || order.pricing?.driverEarnings || 0);
         const orderDate = new Date(order.created_at);
 
@@ -60,7 +61,16 @@ export const DriverEarnings = () => {
                 <Text style={[styles.headerTitle, { color: theme.text }]}>Earnings</Text>
             </View>
 
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+            <ScrollView 
+                contentContainerStyle={styles.scrollContent}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={isRefetching}
+                        onRefresh={refetch}
+                        tintColor={theme.accent}
+                    />
+                }
+            >
                 {/* Main Card - Total Balance */}
                 <View style={[styles.earningsCard, { backgroundColor: theme.accent }]}>
                     <Text style={styles.cardLabel}>All-Time Earnings</Text>
@@ -105,7 +115,7 @@ export const DriverEarnings = () => {
                         <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>Recent Trips</Text>
                         <Text style={{ color: theme.accent, fontSize: 14 }}>View All</Text>
                     </View>
-                    {orders?.map((order) => {
+                    {orders?.map((order: any) => {
                         const earnings = Number(order.pricing?.driver_earnings || order.pricing?.driverEarnings || 0);
                         return (
                             <View key={order.id} style={[styles.historyItem, { borderBottomColor: theme.border }]}>
