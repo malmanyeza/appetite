@@ -19,7 +19,7 @@ declare global {
     }
 }
 
-export const MapPicker: React.FC<MapPickerProps> = ({ lat, lng, onChange }) => {
+export const MapPicker: React.FC<MapPickerProps> = ({ lat, lng, onChange, onPlaceSelected }) => {
     const mapRef = useRef<HTMLDivElement>(null);
     const markerRef = useRef<any>(null);
     const googleMapRef = useRef<any>(null);
