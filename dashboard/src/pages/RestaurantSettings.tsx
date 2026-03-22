@@ -740,24 +740,36 @@ export const RestaurantSettings = () => {
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             {scannedItems.map((item, idx) => (
-                                                <div key={idx} className="bg-white/5 border border-white/10 rounded-xl p-4 flex flex-col gap-2">
-                                                    <div className="flex justify-between items-start">
-                                                        <h4 className="font-bold text-lg text-white">{item.name}</h4>
-                                                        <span className="font-bold text-accent">${parseFloat(item.price).toFixed(2)}</span>
-                                                    </div>
-                                                    <p className="text-xs font-bold text-purple-400 uppercase tracking-widest">{item.category}</p>
-                                                    {item.description && <p className="text-sm text-muted">{item.description}</p>}
-                                                    {item.add_ons && item.add_ons.length > 0 && (
-                                                        <div className="mt-2 pt-2 border-t border-white/10">
-                                                            <p className="text-xs text-muted font-bold mb-1">ADD-ONS:</p>
-                                                            {item.add_ons.map((addon: any, i: number) => (
-                                                                <div key={i} className="flex justify-between text-xs">
-                                                                    <span className="text-muted">{addon.name}</span>
-                                                                    <span className="text-white">+${parseFloat(addon.price).toFixed(2)}</span>
-                                                                </div>
-                                                            ))}
-                                                        </div>
+                                                <div key={idx} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden flex flex-col gap-0">
+                                                    {item.image_url ? (
+                                                        <img 
+                                                            src={item.image_url} 
+                                                            alt={item.name}
+                                                            className="w-full h-36 object-cover"
+                                                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-36 bg-white/5 flex items-center justify-center text-muted text-xs">No image</div>
                                                     )}
+                                                    <div className="p-4 flex flex-col gap-2">
+                                                        <div className="flex justify-between items-start">
+                                                            <h4 className="font-bold text-lg text-white">{item.name}</h4>
+                                                            <span className="font-bold text-accent">${parseFloat(item.price).toFixed(2)}</span>
+                                                        </div>
+                                                        <p className="text-xs font-bold text-purple-400 uppercase tracking-widest">{item.category}</p>
+                                                        {item.description && <p className="text-sm text-muted">{item.description}</p>}
+                                                        {item.add_ons && item.add_ons.length > 0 && (
+                                                            <div className="mt-2 pt-2 border-t border-white/10">
+                                                                <p className="text-xs text-muted font-bold mb-1">ADD-ONS:</p>
+                                                                {item.add_ons.map((addon: any, i: number) => (
+                                                                    <div key={i} className="flex justify-between text-xs">
+                                                                        <span className="text-muted">{addon.name}</span>
+                                                                        <span className="text-white">+${parseFloat(addon.price).toFixed(2)}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>

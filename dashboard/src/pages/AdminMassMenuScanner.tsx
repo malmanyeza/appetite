@@ -235,13 +235,25 @@ export const AdminMassMenuScanner = () => {
                                 </div>
                                 <div className="max-h-[500px] overflow-y-auto custom-scrollbar space-y-3 pr-2">
                                     {scannedItems.map((item, idx) => (
-                                        <div key={idx} className="bg-white/5 border border-white/10 rounded-xl p-3 flex flex-col gap-1">
-                                            <div className="flex justify-between items-start">
-                                                <h4 className="font-bold text-sm text-white">{item.name}</h4>
-                                                <span className="font-bold text-accent text-sm">${parseFloat(item.price).toFixed(2)}</span>
+                                        <div key={idx} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden flex flex-col">
+                                            {item.image_url ? (
+                                                <img 
+                                                    src={item.image_url} 
+                                                    alt={item.name}
+                                                    className="w-full h-28 object-cover"
+                                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                />
+                                            ) : (
+                                                <div className="w-full h-28 bg-white/5 flex items-center justify-center text-muted text-[10px]">No image</div>
+                                            )}
+                                            <div className="p-3 flex flex-col gap-1">
+                                                <div className="flex justify-between items-start">
+                                                    <h4 className="font-bold text-sm text-white">{item.name}</h4>
+                                                    <span className="font-bold text-accent text-sm">${parseFloat(item.price).toFixed(2)}</span>
+                                                </div>
+                                                <p className="text-[10px] font-bold text-purple-400 flex items-center gap-1 uppercase tracking-widest">{item.category}</p>
+                                                {item.description && <p className="text-xs text-muted">{item.description}</p>}
                                             </div>
-                                            <p className="text-[10px] font-bold text-purple-400 flex items-center gap-1 uppercase tracking-widest">{item.category}</p>
-                                            {item.description && <p className="text-xs text-muted">{item.description}</p>}
                                         </div>
                                     ))}
                                 </div>

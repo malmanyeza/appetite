@@ -18,6 +18,15 @@ function cleanHtml(html: string): string {
         .trim();
 }
 
+/** Normalize lazy-loaded image attributes so AI can find them in raw HTML */
+function normalizeLazyImages(html: string): string {
+    return html
+        .replace(/data-src="/gi, 'src="')
+        .replace(/data-lazy-src="/gi, 'src="')
+        .replace(/data-original="/gi, 'src="')
+        .replace(/data-srcset="/gi, 'srcset="');
+}
+
 serve(async (req) => {
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders });
@@ -80,10 +89,10 @@ Rules:
                     }
                 });
                 const rawHtml = await websiteRes.text();
-                // Keep a generous chunk of the raw HTML for image URL extraction, 
-                // but also feed the cleaned text for better item extraction
-                const rawSnippet = rawHtml.substring(0, 200000);
-                const cleanedText = cleanHtml(rawHtml).substring(0, 150000);
+                // Normalize lazy-loaded images so AI can find their URLs
+                const normalizedHtml = normalizeLazyImages(rawHtml);
+                const rawSnippet = normalizedHtml.substring(0, 300000);
+                const cleanedText = cleanHtml(normalizedHtml).substring(0, 150000);
 
                 messages = [
                     { role: 'system', content: systemPrompt },
