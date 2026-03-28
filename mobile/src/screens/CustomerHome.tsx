@@ -78,6 +78,7 @@ export const CustomerHome = () => {
     const closeLocationModal = () => {
         setHasAutoPrompted(true);
         setIsLocationSelected(false);
+        setIsAutoTrigger(false); // Reset to ensure next manual opening is fast
         doneButtonAnim.setValue(120); // Reset for next time
         Animated.timing(modalEntryAnim, {
             toValue: Dimensions.get('window').height,
@@ -558,11 +559,13 @@ export const CustomerHome = () => {
                             }}
                             onRegionChangeStart={() => {
                                 Keyboard.dismiss();
-                                animateModal(Dimensions.get('window').height * 0.7);
+                                // Only slide sheet down if we haven't locked a selection
+                                if (!isLocationSelected) animateModal(Dimensions.get('window').height * 0.7);
                             }}
                             onRegionChangeComplete={(region) => {
                                 setMapRegion(region);
-                                animateModal(0);
+                                // Only slide sheet back up if we haven't locked a selection
+                                if (!isLocationSelected) animateModal(0);
                             }}
                         >
                             {selectedLocation?.lat && selectedLocation?.lng && (
