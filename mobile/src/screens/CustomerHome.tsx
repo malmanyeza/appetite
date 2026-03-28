@@ -537,11 +537,12 @@ export const CustomerHome = () => {
                 visible={locationModalVisible}
                 animationType="none"
                 transparent={true}
+                statusBarTranslucent={true}
             >
                 <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                     <Animated.View 
                         style={{ 
-                            flex: 1, 
+                            height: Dimensions.get('window').height,
                             backgroundColor: theme.background,
                             transform: [{ translateY: modalEntryAnim }]
                         }}
@@ -605,8 +606,6 @@ export const CustomerHome = () => {
                                     placeholder="Search delivery address..."
                                     textInputProps={{
                                         placeholderTextColor: theme.textMuted,
-                                        onFocus: () => animateModal(Dimensions.get('window').height * 0.8),
-                                        onBlur: () => animateModal(0),
                                     }}
                                     fetchDetails={true}
                                     minLength={2}
