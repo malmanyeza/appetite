@@ -7,6 +7,7 @@ export const ordersService = {
             .select(`
         *,
         profiles:customer_id (full_name, phone),
+        driver:driver_id (full_name, phone),
         order_items (*)
       `)
             .eq('restaurant_id', restaurantId)

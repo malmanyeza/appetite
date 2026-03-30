@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuthStore } from '../store/authStore';
 import {
     View,
     Text,
@@ -68,6 +69,10 @@ export const LoginScreen = ({ navigation }: any) => {
                 await supabase.auth.signOut().catch(() => { });
                 throw new Error('This user does not exist in the database. Please sign up or contact support.');
             }
+
+            // Manually trigger a store refresh to ensure the session is picked up immediately
+            // regardless of the race condition with the initial app boot check.
+            await useAuthStore.getState().refreshSession(data.session);
         } catch (error: any) {
             Alert.alert('Login Failed', error.message);
         } finally {

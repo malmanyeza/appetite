@@ -23,7 +23,8 @@ import {
     X,
     UploadCloud,
     Wand2,
-    ImageIcon
+    ImageIcon,
+    Search
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { clsx, type ClassValue } from 'clsx';
@@ -75,6 +76,7 @@ export const RestaurantSettings = () => {
         suburb: '',
         physical_address: ''
     });
+    const [locationSearchTerm, setLocationSearchTerm] = useState('');
 
     const { data: restaurant, isLoading } = useQuery({
         queryKey: ['restaurant-settings', paramId || profile?.id],
@@ -579,23 +581,47 @@ export const RestaurantSettings = () => {
 
                     {activeTab === 'locations' && (
                         <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
-                            <div className="flex justify-between items-center">
-                                <h3 className="text-xl font-bold flex items-center gap-2"><MapPin size={20} className="text-accent" /> Manage Locations</h3>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setSelectedLocationForEdit(null);
-                                        setLocationDetails({ city: '', suburb: '', physical_address: '' });
-                                        setIsLocationModalOpen(true);
-                                    }}
-                                    className="btn-primary flex items-center gap-2 px-4 py-2 text-sm"
-                                >
-                                    <Plus size={16} /> Add Location
-                                </button>
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                <div className="space-y-1">
+                                    <h3 className="text-xl font-bold flex items-center gap-2"><MapPin size={20} className="text-accent" /> Manage Locations</h3>
+                                    <p className="text-xs text-muted">Filter and manage your restaurant branches</p>
+                                </div>
+                                <div className="flex items-center gap-3 w-full md:w-auto">
+                                    <div className="relative flex-1 md:w-64">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={16} />
+                                        <input
+                                            type="text"
+                                            placeholder="Search branches..."
+                                            value={locationSearchTerm}
+                                            onChange={(e) => setLocationSearchTerm(e.target.value)}
+                                            className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-accent/50 transition-all"
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedLocationForEdit(null);
+                                            setLocationDetails({ city: '', suburb: '', physical_address: '' });
+                                            setIsLocationModalOpen(true);
+                                        }}
+                                        className="btn-primary flex items-center gap-2 px-4 py-2 text-sm whitespace-nowrap"
+                                    >
+                                        <Plus size={16} /> Add Location
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 gap-4">
-                                {locations?.map((loc: any) => (
+                                {locations?.filter((loc: any) => {
+                                    if (!locationSearchTerm) return true;
+                                    const search = locationSearchTerm.toLowerCase();
+                                    return (
+                                        loc.location_name?.toLowerCase().includes(search) ||
+                                        loc.city?.toLowerCase().includes(search) ||
+                                        loc.suburb?.toLowerCase().includes(search) ||
+                                        loc.physical_address?.toLowerCase().includes(search)
+                                    );
+                                }).map((loc: any) => (
                                     <div key={loc.id} className="glass p-6 rounded-2xl flex justify-between items-center group">
                                         <div className="flex items-center gap-4">
                                             <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center text-accent">

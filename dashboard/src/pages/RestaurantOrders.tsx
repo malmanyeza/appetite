@@ -208,9 +208,32 @@ export const RestaurantOrders = () => {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-sm text-muted">
-                    <MapPin size={14} className="shrink-0 text-accent" />
-                    <span className="font-semibold text-white uppercase text-xs tracking-wider">{order.delivery_address_snapshot.suburb}</span>
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2 text-sm text-muted">
+                        <MapPin size={14} className="shrink-0 text-accent" />
+                        <span className="font-semibold text-white uppercase text-xs tracking-wider">{order.delivery_address_snapshot.suburb}</span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 mt-1">
+                        {order.profiles?.phone && (
+                            <a 
+                                href={`tel:${order.profiles.phone}`}
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent/10 border border-accent/20 text-accent hover:bg-accent/20 transition-colors text-[11px] font-bold"
+                            >
+                                <Phone size={12} />
+                                CALL CUSTOMER
+                            </a>
+                        )}
+                        {order.driver?.phone && (
+                            <a 
+                                href={`tel:${order.driver.phone}`}
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 hover:bg-green-500/20 transition-colors text-[11px] font-bold"
+                            >
+                                <Phone size={12} />
+                                CALL DRIVER
+                            </a>
+                        )}
+                    </div>
                 </div>
 
                 <div className="mt-auto pt-4 border-t border-white/5">

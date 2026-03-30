@@ -1,4 +1,5 @@
-const url = "https://ydcbycanrbdcyyabnfxn.supabase.co/functions/v1/scan-menu-ai";
+require('dotenv').config();
+const url = `${process.env.SUPABASE_URL}/functions/v1/scan-menu-ai`;
 
 fetch(url, {
     method: 'OPTIONS'

@@ -17,13 +17,16 @@ import {
     Alert,
     Dimensions,
     Animated,
-    RefreshControl
+    RefreshControl,
+    PanResponder
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from '../components/Map';
+import { MapSkeleton } from '../components/MapSkeleton';
 import { GooglePlacesAutocomplete } from '../components/GooglePlacesAutocomplete';
 import { mapDarkStyle, mapLightStyle } from '../theme/MapStyle';
 import * as ExpoLocation from 'expo-location';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { reverseGeocodeGoogle } from '../services/geocodingService';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../theme';
 import { restaurantService } from '../services/restaurantService';
@@ -32,6 +35,14 @@ import { Image } from 'expo-image';
 import { useLocationStore } from '../store/locationStore';
 import { useAuthStore } from '../store/authStore';
 import { useNavigation } from '@react-navigation/native';
+
+const INITIAL_REGION = {
+    latitude: -17.8248, // Harare
+    longitude: 31.0530,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+};
+
 export const CustomerHome = () => {
     const navigation = useNavigation<any>();
     const queryClient = useQueryClient();
@@ -49,20 +60,41 @@ export const CustomerHome = () => {
 
     const { selectedLocation, setSelectedLocation } = useLocationStore();
     const { profile } = useAuthStore();
-    const [mapRegion, setMapRegion] = React.useState<any>(null);
+    const [mapRegion, setMapRegion] = React.useState<any>(selectedLocation ? {
+        latitude: selectedLocation.lat,
+        longitude: selectedLocation.lng,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+    } : INITIAL_REGION);
     // Live GPS position — used for distance calculations (separate from delivery address)
     const [gpsLocation, setGpsLocation] = React.useState<{ lat: number; lng: number } | null>(null);
     const mapRef = React.useRef<MapView | null>(null);
     const googlePlacesRef = React.useRef<any>(null);
     const modalY = React.useRef(new Animated.Value(0)).current;
+    
+    // Track modalY value for synchronous use in PanResponder
+    const modalYValue = React.useRef(0);
+    React.useEffect(() => {
+        const id = modalY.addListener(({ value }) => {
+            modalYValue.current = value;
+        });
+        return () => modalY.removeListener(id);
+    }, [modalY]);
+
     const scrollY = React.useRef(new Animated.Value(0)).current;
     const [hasAutoPrompted, setHasAutoPrompted] = React.useState(false);
     const modalEntryAnim = React.useRef(new Animated.Value(Dimensions.get('window').height)).current;
     
     // 5. Done Button Animation & State
     const [isLocationSelected, setIsLocationSelected] = React.useState(false);
+    const [isModalDown, setIsModalDown] = React.useState(false);
     const [isAutoTrigger, setIsAutoTrigger] = React.useState(false);
+    const [isMapReady, setIsMapReady] = React.useState(false);
     const doneButtonAnim = React.useRef(new Animated.Value(120)).current;
+    const pinAnim = React.useRef(new Animated.Value(0)).current;
+    const isProgrammaticChange = React.useRef(false);
+    const [isGpsButtonLoading, setIsGpsButtonLoading] = React.useState(false);
+    const gpsRequestCounter = React.useRef(0);
 
     const showDoneButton = () => {
         setHasAutoPrompted(true); // LOCK immediately to prevent any re-popups during selection
@@ -90,38 +122,104 @@ export const CustomerHome = () => {
         });
     };
 
+    const SHEET_HEIGHT = Dimensions.get('window').height * 0.65;
+    const DOWN_VALUE = Dimensions.get('window').height * 0.55;
+
+    const initialPanY = React.useRef(0);
+    const panResponder = React.useMemo(() => PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: () => {
+            initialPanY.current = modalYValue.current;
+        },
+        onPanResponderMove: (_, gestureState) => {
+            // Move in perfect sync with finger by using the baseline from grant
+            const newY = Math.max(0, initialPanY.current + gestureState.dy);
+            modalY.setValue(newY);
+        },
+        onPanResponderRelease: (_, gestureState) => {
+            // Snap logic based on final position and velocity
+            if (gestureState.dy < -50 || (modalYValue.current < DOWN_VALUE / 2 && gestureState.vy < 0)) {
+                // Snapping UP
+                animateModal(0);
+                setIsModalDown(false);
+            } else if (gestureState.dy > 50 || (modalYValue.current >= DOWN_VALUE / 2)) {
+                // Snapping DOWN
+                animateModal(DOWN_VALUE);
+                setIsModalDown(true);
+            } else {
+                // Revert to current state if gesture was too small
+                animateModal(isModalDown ? DOWN_VALUE : 0);
+            }
+        }
+    }), [isModalDown]);
+
     const animateModal = (toValue: number) => {
-        Animated.timing(modalY, {
+        Animated.spring(modalY, {
             toValue,
-            duration: 600,
+            tension: 50,
+            friction: 8,
             useNativeDriver: true,
         }).start();
     };
-    // Sync map region when selected location changes
-    React.useEffect(() => {
-        if (selectedLocation?.lat && selectedLocation?.lng) {
-            const region = {
-                latitude: selectedLocation.lat,
-                longitude: selectedLocation.lng,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
-            };
-            setMapRegion(region);
-            mapRef.current?.animateToRegion(region, 500);
-        }
-    }, [selectedLocation]);
+    // Removed auto-animating map region when selectedLocation changes to solve infinite panning loops.
+    // Instead, explicit actions like pressing GPS and choosing saved locations will manually call animateToRegion.
+    
+    const [hasAnimatedInitialLocation, setHasAnimatedInitialLocation] = React.useState(false);
 
-    // Get live GPS for distance accuracy (independently of the delivery address)
+    React.useEffect(() => {
+        if (!isMapReady || hasAnimatedInitialLocation) return;
+
+        (async () => {
+            // 1. Priority: Selected Location (Saved Address)
+            if (selectedLocation?.lat && selectedLocation?.lng) {
+                mapRef.current?.animateToRegion({
+                    latitude: selectedLocation.lat,
+                    longitude: selectedLocation.lng,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
+                }, 600);
+                setHasAnimatedInitialLocation(true);
+                return;
+            }
+
+            // 2. Fallback: Live GPS Auto-Snap
+            try {
+                const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+                if (status === 'granted') {
+                    // Fast check for last known position to reduce lag
+                    const lastKnown = await ExpoLocation.getLastKnownPositionAsync();
+                    const initialCoords = lastKnown?.coords || (await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced })).coords;
+                    
+                    setGpsLocation({ lat: initialCoords.latitude, lng: initialCoords.longitude });
+                    
+                    mapRef.current?.animateToRegion({
+                        latitude: initialCoords.latitude,
+                        longitude: initialCoords.longitude,
+                        latitudeDelta: 0.01,
+                        longitudeDelta: 0.01,
+                    }, 600);
+                    setHasAnimatedInitialLocation(true);
+                }
+            } catch (err) {
+                console.warn('[Home] Auto-snap GPS failed:', err);
+                // Stays at default Harare (INITIAL_REGION) already in state
+                setHasAnimatedInitialLocation(true);
+            }
+        })();
+    }, [isMapReady, selectedLocation, hasAnimatedInitialLocation]);
+
+    // Background GPS for distance accuracy (separate from the delivery address)
     React.useEffect(() => {
         (async () => {
             try {
                 const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
                 if (status === 'granted') {
-                    const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
+                    const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.High });
                     setGpsLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
                 }
             } catch (err) {
-                console.warn('[Home] GPS for distance failed:', err);
+                console.warn('[Home] Distance GPS failed:', err);
             }
         })();
     }, []);
@@ -154,28 +252,17 @@ export const CustomerHome = () => {
                 try {
                     const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
                     if (status === 'granted') {
-                        const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
+                        const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.High });
+                        
+                        // Try to reverse geocode for a better label using Google API
+                        const rev = await reverseGeocodeGoogle(loc.coords.latitude, loc.coords.longitude);
+                        
                         setSelectedLocation({
-                            city: 'Current Location',
-                            suburb: 'Detecting...',
+                            city: rev?.city || 'Current Location',
+                            suburb: rev?.suburb || 'Nearby',
                             lat: loc.coords.latitude,
                             lng: loc.coords.longitude
                         });
-                        
-                        // Try to reverse geocode for a better label
-                        const [rev] = await ExpoLocation.reverseGeocodeAsync({
-                            latitude: loc.coords.latitude,
-                            longitude: loc.coords.longitude
-                        });
-                        
-                        if (rev) {
-                            setSelectedLocation({
-                                city: rev.city || 'Current Location',
-                                suburb: rev.district || rev.subregion || 'Nearby',
-                                lat: loc.coords.latitude,
-                                lng: loc.coords.longitude
-                            });
-                        }
                     }
                 } catch (err) {
                     console.warn('GPS Fallback failed:', err);
@@ -258,7 +345,8 @@ export const CustomerHome = () => {
     React.useEffect(() => {
         if (locationModalVisible) {
             // Ensure map points to relevant context before showing
-            if (gpsLocation && !selectedLocation) {
+            // Only auto-center if we haven't already interacted/animated
+            if (gpsLocation && !selectedLocation && !hasAnimatedInitialLocation) {
                 const region = {
                     latitude: gpsLocation.lat,
                     longitude: gpsLocation.lng,
@@ -544,6 +632,7 @@ export const CustomerHome = () => {
                     ))
                 )}
             </Animated.ScrollView>
+
             <Modal
                 visible={locationModalVisible}
                 animationType="none"
@@ -558,6 +647,7 @@ export const CustomerHome = () => {
                             transform: [{ translateY: modalEntryAnim }]
                         }}
                     >
+                        <MapSkeleton visible={!isMapReady} />
                         {/* Full Screen Map */}
                         <MapView
                             ref={mapRef}
@@ -566,30 +656,96 @@ export const CustomerHome = () => {
                             initialRegion={mapRegion}
                             mapPadding={{ top: 0, right: 0, left: 0, bottom: Dimensions.get('window').height * 0.4 }}
                             customMapStyle={isDark ? mapDarkStyle : mapLightStyle}
+                            onMapReady={() => setIsMapReady(true)}
                             onPress={() => {
                                 Keyboard.dismiss();
+                                if (!isLocationSelected && !isModalDown) {
+                                    animateModal(DOWN_VALUE);
+                                    setIsModalDown(true);
+                                }
                             }}
                             onRegionChangeStart={() => {
                                 Keyboard.dismiss();
-                                // Only slide sheet down if we haven't locked a selection
-                                if (!isLocationSelected) animateModal(Dimensions.get('window').height * 0.7);
+                                // Only raise pin for manual gestures, not automated ones
+                                if (!isProgrammaticChange.current) {
+                                    Animated.spring(pinAnim, { toValue: -15, useNativeDriver: true }).start();
+                                    // Manual gesture cancels any pending programmatic GPS snaps
+                                    gpsRequestCounter.current += 1;
+                                }
+                                // Internal state for 'Locating...' text, doesn't spin the main button
+                                setIsFetchingLocation(true);
+                                // Prevent any auto-panning from fighting with this manual gesture
+                                setHasAnimatedInitialLocation(true);
+                                
+                                // Only slide sheet down if we haven't locked a selection AND it's not a programmatic move
+                                if (!isLocationSelected && !isProgrammaticChange.current && !isModalDown) {
+                                    animateModal(DOWN_VALUE);
+                                    setIsModalDown(true);
+                                }
                             }}
-                            onRegionChangeComplete={(region) => {
-                                setMapRegion(region);
+                            onRegionChangeComplete={async (region) => {
+                                if (isProgrammaticChange.current) {
+                                    isProgrammaticChange.current = false;
+                                    Animated.spring(pinAnim, { toValue: 0, useNativeDriver: true }).start();
+                                    return;
+                                }
+
+                                Animated.spring(pinAnim, { toValue: 0, useNativeDriver: true }).start();
+                                
+                                try {
+                                    const rev = await reverseGeocodeGoogle(region.latitude, region.longitude);
+                                    if (rev) {
+                                        setSelectedLocation({
+                                            label: 'Selected Area',
+                                            city: rev.city || 'Harare',
+                                            suburb: rev.suburb || 'Nearby',
+                                            street: rev.physical_address || '',
+                                            lat: region.latitude,
+                                            lng: region.longitude
+                                        });
+                                        if (!isLocationSelected) {
+                                            showDoneButton();
+                                        }
+                                    }
+                                } catch (err) {
+                                    console.warn("Drag Pin Reverse Geocode Error:", err);
+                                } finally {
+                                    setIsFetchingLocation(false);
+                                }
+
                                 // Only slide sheet back up if we haven't locked a selection
-                                if (!isLocationSelected) animateModal(0);
+                                if (!isLocationSelected) {
+                                    animateModal(0);
+                                    setIsModalDown(false);
+                                }
                             }}
                         >
-                            {selectedLocation?.lat && selectedLocation?.lng && (
-                                <Marker
-                                    coordinate={{
-                                        latitude: selectedLocation.lat,
-                                        longitude: selectedLocation.lng
-                                    }}
-                                    pinColor={theme.accent}
-                                />
-                            )}
+                            {/* Marker removed in favor of fixed center pin */}
                         </MapView>
+
+                        <View style={styles.fixedPinContainer} pointerEvents="none">
+                            {/* Glowing Target Dot - Appears when map is dragged */}
+                            <Animated.View style={[
+                                styles.glowingDot,
+                                {
+                                    opacity: pinAnim.interpolate({ inputRange: [-15, 0], outputRange: [1, 0] }),
+                                    transform: [{ scale: pinAnim.interpolate({ inputRange: [-15, 0], outputRange: [1.5, 0.5] }) }]
+                                }
+                            ]} />
+
+                            <Animated.View style={{ transform: [{ translateY: pinAnim }] }}>
+                                <View style={styles.destinationMarker}>
+                                    <View style={styles.destinationMarkerInner} />
+                                </View>
+                            </Animated.View>
+                            <Animated.View style={[
+                                styles.pinShadow, 
+                                { 
+                                    opacity: pinAnim.interpolate({ inputRange: [-15, 0], outputRange: [0.3, 1] }),
+                                    transform: [{ scale: pinAnim.interpolate({ inputRange: [-15, 0], outputRange: [0.5, 1] }) }]
+                                }
+                            ]} />
+                        </View>
 
 
                         <View style={{ position: 'absolute', top: 60, left: 20, right: 20, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -637,11 +793,26 @@ export const CustomerHome = () => {
                                                 lng: details.geometry.location.lng,
                                             };
                                             setSelectedLocation(newLoc);
+                                            googlePlacesRef.current?.setAddressText(data.description);
+                                            googlePlacesRef.current?.blur();
+                                            Keyboard.dismiss();
+
+                                            // Animate map to location
+                                            const region = {
+                                                latitude: newLoc.lat,
+                                                longitude: newLoc.lng,
+                                                latitudeDelta: 0.005,
+                                                longitudeDelta: 0.005,
+                                            };
+                                            isProgrammaticChange.current = true;
+                                            setMapRegion(region);
+                                            mapRef.current?.animateToRegion(region, 500);
+
                                             showDoneButton();
                                         }
                                     }}
                                     query={{
-                                        key: 'AIzaSyAfW8js09sB0cfQzz19aRBkSE7sDMy5cu0',
+                                        key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
                                         language: 'en',
                                         components: 'country:zw',
                                         types: 'establishment|geocode',
@@ -717,10 +888,32 @@ export const CustomerHome = () => {
                                 elevation: 15,
                                 shadowColor: '#000',
                                 shadowOffset: { width: 0, height: -4 },
-                                shadowOpacity: 0.2,
-                                shadowRadius: 12
+                                shadowOpacity: 0.1,
+                                shadowRadius: 10
                             }}
                         >
+                            {/* Drag Handle - Larger touch area for usability */}
+                            <View 
+                                {...panResponder.panHandlers}
+                                style={{
+                                    width: '100%',
+                                    height: 40,
+                                    marginTop: -24,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    zIndex: 10
+                                }}
+                            >
+                                <View 
+                                    style={{
+                                        width: 40,
+                                        height: 5,
+                                        borderRadius: 3,
+                                        backgroundColor: theme.textMuted,
+                                        opacity: 0.3
+                                    }} 
+                                />
+                            </View>
                             <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text, marginBottom: 4 }}>Delivery Details</Text>
                             <Text style={{ color: theme.textMuted, marginBottom: 20 }}>Confirm your location or choose a saved one</Text>
 
@@ -748,35 +941,76 @@ export const CustomerHome = () => {
                                                 elevation: selectedLocation?.label === 'Current Spot' ? 4 : 0
                                             }}
                                             onPress={async () => {
+                                                const currentRequestId = ++gpsRequestCounter.current;
+                                                isProgrammaticChange.current = true;
+                                                setIsGpsButtonLoading(true);
                                                 setIsFetchingLocation(true);
                                                 try {
                                                     const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
                                                     if (status === 'granted') {
-                                                        const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
-                                                        const [rev] = await ExpoLocation.reverseGeocodeAsync({
+                                                        // 1. Fast fallback (Last Known Position)
+                                                        const lastKnown = await ExpoLocation.getLastKnownPositionAsync();
+                                                        
+                                                        // Check if still valid
+                                                        if (currentRequestId !== gpsRequestCounter.current) return;
+
+                                                        if (lastKnown) {
+                                                            const rev = await reverseGeocodeGoogle(lastKnown.coords.latitude, lastKnown.coords.longitude);
+                                                            if (rev) {
+                                                                const fastLoc = {
+                                                                    label: 'Current Spot',
+                                                                    city: rev.city || 'Harare',
+                                                                    suburb: rev.suburb || 'Nearby',
+                                                                    street: rev.physical_address || '',
+                                                                    lat: lastKnown.coords.latitude,
+                                                                    lng: lastKnown.coords.longitude
+                                                                };
+                                                                setSelectedLocation(fastLoc);
+                                                                isProgrammaticChange.current = true;
+                                                                mapRef.current?.animateToRegion({
+                                                                    ...fastLoc,
+                                                                    latitude: fastLoc.lat,
+                                                                    longitude: fastLoc.lng,
+                                                                    latitudeDelta: 0.005,
+                                                                    longitudeDelta: 0.005,
+                                                                }, 100);
+                                                                
+                                                                // Clear button loading early once we have a locked 'Current Spot'
+                                                                setIsGpsButtonLoading(false);
+                                                                setIsFetchingLocation(false);
+                                                                showDoneButton();
+                                                            }
+                                                        }
+
+                                                        // 2. High Accuracy Refinement
+                                                        const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Highest });
+                                                        
+                                                        // Check if still valid (user didn't move map manually during wait)
+                                                        if (currentRequestId !== gpsRequestCounter.current) return;
+
+                                                        isProgrammaticChange.current = true;
+                                                        mapRef.current?.animateToRegion({
                                                             latitude: loc.coords.latitude,
-                                                            longitude: loc.coords.longitude
-                                                        });
-                                                        if (rev) {
-                                                            const newLoc = {
+                                                            longitude: loc.coords.longitude,
+                                                            latitudeDelta: 0.005,
+                                                            longitudeDelta: 0.005,
+                                                        }, 300);
+                                                        setHasAnimatedInitialLocation(true);
+
+                                                        const revRefined = await reverseGeocodeGoogle(loc.coords.latitude, loc.coords.longitude);
+                                                        
+                                                        // Check if still valid
+                                                        if (currentRequestId !== gpsRequestCounter.current) return;
+
+                                                        if (revRefined) {
+                                                            setSelectedLocation({
                                                                 label: 'Current Spot',
-                                                                city: rev.city || 'Current Location',
-                                                                suburb: rev.district || rev.subregion || 'Nearby',
-                                                                street: rev.name || '',
+                                                                city: revRefined.city || 'Harare',
+                                                                suburb: revRefined.suburb || 'Nearby',
+                                                                street: revRefined.physical_address || '',
                                                                 lat: loc.coords.latitude,
                                                                 lng: loc.coords.longitude
-                                                            };
-                                                            setSelectedLocation(newLoc);
-                                                            const region = {
-                                                                latitude: loc.coords.latitude,
-                                                                longitude: loc.coords.longitude,
-                                                                latitudeDelta: 0.01,
-                                                                longitudeDelta: 0.01,
-                                                            };
-                                                            setMapRegion(region);
-                                                            mapRef.current?.animateToRegion(region, 500);
-                                                            
-                                                            // Trigger manual Done button instead of auto-close
+                                                                });
                                                             showDoneButton();
                                                         }
                                                     } else {
@@ -785,12 +1019,13 @@ export const CustomerHome = () => {
                                                 } catch (error) {
                                                     console.error('GPS Error:', error);
                                                 } finally {
+                                                    setIsGpsButtonLoading(false);
                                                     setIsFetchingLocation(false);
                                                 }
                                             }}
                                         >
                                             <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: theme.accent + '20', justifyContent: 'center', alignItems: 'center' }}>
-                                                {isFetchingLocation ? (
+                                                {isGpsButtonLoading ? (
                                                     <ActivityIndicator size="small" color={theme.accent} />
                                                 ) : (
                                                     <MapPin size={24} color={theme.accent} />
@@ -798,7 +1033,7 @@ export const CustomerHome = () => {
                                             </View>
                                             <View style={{ flex: 1 }}>
                                                 <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 16 }}>
-                                                    {isFetchingLocation ? 'Locating...' : 'Use Current GPS'}
+                                                    {isGpsButtonLoading ? 'Locating...' : 'Use Current Location'}
                                                 </Text>
                                                 <Text style={{ color: theme.textMuted, fontSize: 12 }}>Pinpoint your exact delivery spot</Text>
                                             </View>
@@ -856,6 +1091,12 @@ export const CustomerHome = () => {
                                                     }}
                                                     onPress={() => {
                                                         setSelectedLocation(addr);
+                                                        mapRef.current?.animateToRegion({
+                                                            latitude: addr.lat,
+                                                            longitude: addr.lng,
+                                                            latitudeDelta: 0.01,
+                                                            longitudeDelta: 0.01,
+                                                        }, 500);
                                                         showDoneButton();
                                                     }}
                                                 >
@@ -967,6 +1208,68 @@ const styles = StyleSheet.create({
     modalTitle: { fontSize: 20, fontWeight: 'bold' },
     modalSubtitle: { fontSize: 14, marginBottom: 24 },
     locationInput: { borderRadius: 16, padding: 16, height: 56, fontSize: 16, marginBottom: 24 },
+    destinationMarker: {
+        width: 30,
+        height: 30,
+        backgroundColor: '#ef4444',
+        borderTopLeftRadius: 15,
+        borderTopRightRadius: 15,
+        borderBottomLeftRadius: 15,
+        transform: [{ rotate: '45deg' }],
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+        elevation: 10,
+    },
+    destinationMarkerInner: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: '#FFF',
+        transform: [{ rotate: '-45deg' }],
+    },
+    fixedPinContainer: {
+        position: 'absolute',
+        top: Dimensions.get('window').height * 0.3 - 38,
+        left: '50%',
+        marginLeft: -15,
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        zIndex: 5
+    },
+    pinShadow: {
+        width: 12,
+        height: 6,
+        borderRadius: 6,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        marginTop: 4,
+    },
+    glowingDot: {
+        position: 'absolute',
+        bottom: 0,
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: 'rgba(239, 68, 68, 0.4)',
+        borderWidth: 2,
+        borderColor: '#ef4444',
+        shadowColor: '#ef4444',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 1,
+        shadowRadius: 6,
+        elevation: 6,
+    },
+    locationHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 20
+    },
     saveLocationBtn: { height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
     saveLocationBtnText: { color: 'white', fontSize: 16, fontWeight: 'bold' }
 });

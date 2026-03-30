@@ -74,7 +74,7 @@ export const DriverJobs = () => {
             }
 
             // Immediately fetch current pos and upload first
-            const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
+            const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.High });
             if (user?.id) {
                 await supabase.from('driver_locations').upsert({
                     driver_id: user.id,
@@ -143,7 +143,7 @@ export const DriverJobs = () => {
     useEffect(() => {
         if (user?.id) {
             supabase.from('driver_profiles').select('is_online').eq('user_id', user.id).single()
-                .then(({ data }) => {
+                .then(({ data }: { data: any }) => {
                     if (data?.is_online) {
                         setIsOnline(true);
                         startLocationTracking();
@@ -212,7 +212,7 @@ export const DriverJobs = () => {
             console.log("RAW OFFERS FROM VIEW:", JSON.stringify(data, null, 2));
 
             // Map the flat SQL View natively back to the expected `job` object hierarchy 
-            const activeOffers = (data || []).map(offer => {
+            const activeOffers = (data || []).map((offer: any) => {
                 return {
                     id: offer.id,
                     offer_id: offer.offer_id,
@@ -347,7 +347,7 @@ export const DriverJobs = () => {
                         <Text style={[styles.emptyText, { color: theme.textMuted }]}>No active jobs at the moment.</Text>
                     </View>
                 ) : (
-                    jobs?.map((job) => {
+                    jobs?.map((job: any) => {
                         const addr = job.delivery_address_snapshot;
                         const pickup = job.restaurants;
                         const potentialPayout = (job.pricing?.driver_earnings ||

@@ -20,7 +20,8 @@ envContent.split('\n').forEach(line => {
 
 const SUPABASE_URL = env['VITE_SUPABASE_URL'];
 const SUPABASE_SERVICE_ROLE_KEY = env['VITE_SUPABASE_SERVICE_ROLE_KEY'];
-const GOOGLE_MAPS_API_KEY = 'AIzaSyAfW8js09sB0cfQzz19aRBkSE7sDMy5cu0';
+require('dotenv').config({ path: '../.env' });
+const GOOGLE_MAPS_API_KEY = process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     console.error('Missing Supabase credentials in .env');

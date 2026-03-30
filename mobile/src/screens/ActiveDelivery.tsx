@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { makeCall } from '../utils/callUtils';
 import { 
     View, 
     Text, 
@@ -21,13 +22,14 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../theme';
-import { ArrowLeft, MapPin, Store, CheckCircle2, Navigation, FileText, X, LocateFixed, Bike } from 'lucide-react-native';
+import { ArrowLeft, MapPin, Store, CheckCircle2, Navigation, FileText, X, LocateFixed, Bike, Phone } from 'lucide-react-native';
 import * as Linking from 'expo-linking';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from '../components/Map';
+import { MapSkeleton } from '../components/MapSkeleton';
 import * as ExpoLocation from 'expo-location';
 import { mapDarkStyle, mapLightStyle } from '../theme/MapStyle';
 import { useAuthStore } from '../store/authStore';
-const GOOGLE_API_KEY = 'AIzaSyAfW8js09sB0cfQzz19aRBkSE7sDMy5cu0';
+const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
 // Polyline Decoder
 const decodePolyline = (t: string) => {
@@ -65,7 +67,8 @@ export const ActiveDelivery = () => {
                 .from('orders')
                 .select(`
                     *,
-                    restaurants:restaurant_id (name, suburb, city, landmark_notes, lat, lng),
+                    restaurants:restaurant_id (name, suburb, city, landmark_notes, owner_phone),
+                    restaurant_locations:location_id (lat, lng, phone, physical_address, landmark_notes, suburb, city),
                     profiles:customer_id (full_name, phone),
                     order_items (qty, name_snapshot)
                 `)
@@ -86,6 +89,7 @@ export const ActiveDelivery = () => {
     const [isNavigating, setIsNavigating] = useState(false);
     const [distance, setDistance] = useState<string>('');
     const [duration, setDuration] = useState<string>('');
+    const [isMapReady, setIsMapReady] = useState(false);
     
     const mapRef = React.useRef<MapView | null>(null);
     const modalY = React.useRef(new Animated.Value(0)).current;
@@ -174,7 +178,7 @@ export const ActiveDelivery = () => {
 
         let dest = null;
         if (isHeadingToRest) {
-            dest = { lat: order.restaurants?.lat, lng: order.restaurants?.lng };
+            dest = { lat: order.restaurant_locations?.lat, lng: order.restaurant_locations?.lng };
         } else if (isDrivingToCustomer) {
             dest = { lat: order.delivery_address_snapshot?.lat, lng: order.delivery_address_snapshot?.lng };
         }
@@ -304,12 +308,14 @@ export const ActiveDelivery = () => {
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
+            <MapSkeleton visible={!isMapReady} />
             {/* Full Screen Map */}
             <MapView
                 ref={mapRef}
                 provider={PROVIDER_GOOGLE}
                 style={StyleSheet.absoluteFillObject}
                 customMapStyle={isDark ? mapDarkStyle : mapLightStyle}
+                onMapReady={() => setIsMapReady(true)}
                 onRegionChangeStart={() => {
                     // Auto-collapse slightly when moving map to give more view
                     // but allow manual pull-down to be the primary way
@@ -343,12 +349,13 @@ export const ActiveDelivery = () => {
                 )}
 
                 {/* Restaurant Marker */}
-                {order.restaurants?.lat && (
+                {order.restaurant_locations?.lat && (
                     <Marker
                         coordinate={{
-                            latitude: order.restaurants.lat,
-                            longitude: order.restaurants.lng
+                            latitude: order.restaurant_locations.lat,
+                            longitude: order.restaurant_locations.lng
                         }}
+                        tracksViewChanges={false}
                     >
                         <View style={[styles.markerContainer, { backgroundColor: isHeadingToRestaurant ? theme.accent : theme.surface }]}>
                             <Store color={isHeadingToRestaurant ? '#FFF' : theme.textMuted} size={20} />
@@ -356,16 +363,22 @@ export const ActiveDelivery = () => {
                     </Marker>
                 )}
 
-                {/* Customer Marker */}
+                {/* Customer Marker - Matched to Biker Pin size to prevent cut-off */}
                 {order.delivery_address_snapshot?.lat && (
                     <Marker
+                        key={`customer-${order.id}`}
                         coordinate={{
                             latitude: order.delivery_address_snapshot.lat,
                             longitude: order.delivery_address_snapshot.lng
                         }}
+                        tracksViewChanges={true}
+                        zIndex={2000}
+                        anchor={{ x: 0.5, y: 1 }}
                     >
-                        <View style={[styles.markerContainer, { backgroundColor: isNavigatingToCustomer ? theme.accent : theme.surface }]}>
-                            <MapPin color={isNavigatingToCustomer ? '#FFF' : theme.textMuted} size={20} />
+                        <View style={styles.pinContainer}>
+                            <View style={styles.destinationMarker}>
+                                <View style={styles.destinationMarkerInner} />
+                            </View>
                         </View>
                     </Marker>
                 )}
@@ -430,9 +443,23 @@ export const ActiveDelivery = () => {
                                             {isPostPickupWaiting ? 'PACKAGE SECURED AT' : 'PICKUP FROM'}
                                         </Text>
                                         <Text style={[styles.value, { color: theme.text }]}>{order.restaurants?.name}</Text>
-                                        <Text style={[styles.subValue, { color: theme.textMuted }]}>{order.restaurants?.suburb}, {order.restaurants?.city}</Text>
+                                        <Text style={[styles.subValue, { color: theme.textMuted }]}>{order.restaurant_locations?.suburb}, {order.restaurant_locations?.city}</Text>
+                                        {order.restaurant_locations?.landmark_notes && (
+                                            <View style={{ marginTop: 8 }}>
+                                                <Text style={[styles.noteLabel, { color: theme.textMuted }]}>Restaurant Notes</Text>
+                                                <Text style={[styles.noteText, { color: theme.text }]}>"{order.restaurant_locations.landmark_notes}"</Text>
+                                            </View>
+                                        )}
                                     </View>
-                                    <Store color={theme.accent} size={32} />
+                                    <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                                        <TouchableOpacity 
+                                            style={[styles.smallCallBtn, { backgroundColor: `${theme.accent}15` }]}
+                                            onPress={() => makeCall(order.restaurant_locations?.phone || order.restaurants?.owner_phone)}
+                                        >
+                                            <Phone size={18} color={theme.accent} />
+                                        </TouchableOpacity>
+                                        <Store color={theme.accent} size={32} />
+                                    </View>
                                 </View>
                                 {order.restaurants?.landmark_notes && (
                                     <View style={[styles.noteBox, { backgroundColor: theme.background }]}>
@@ -450,7 +477,15 @@ export const ActiveDelivery = () => {
                                         </Text>
                                         <Text style={[styles.subValue, { color: theme.textMuted }]}>{order.delivery_address_snapshot?.street_address}</Text>
                                     </View>
-                                    <MapPin color={theme.accent} size={32} />
+                                    <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                                        <TouchableOpacity 
+                                            style={[styles.smallCallBtn, { backgroundColor: `${theme.accent}15` }]}
+                                            onPress={() => makeCall(order.profiles?.phone)}
+                                        >
+                                            <Phone size={18} color={theme.accent} />
+                                        </TouchableOpacity>
+                                        <MapPin color={theme.accent} size={32} />
+                                    </View>
                                 </View>
                                 {order.delivery_address_snapshot?.landmark_notes && (
                                     <View style={[styles.noteBox, { backgroundColor: theme.background }]}>
@@ -593,6 +628,22 @@ const styles = StyleSheet.create({
         shadowRadius: 5,
         elevation: 8
     },
+    destinationMarkerNative: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 3,
+        borderColor: '#FFF',
+        backgroundColor: '#ef4444',
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+        zIndex: 2000
+    },
     modalOption: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -731,8 +782,8 @@ const styles = StyleSheet.create({
     },
     recenterBtn: {
         position: 'absolute',
-        bottom: Dimensions.get('window').height * 0.45,
-        right: 20,
+        top: 130,
+        right: 16,
         width: 50,
         height: 50,
         borderRadius: 25,
@@ -865,5 +916,43 @@ const styles = StyleSheet.create({
     secondaryButton: { padding: 16, borderRadius: 12, alignItems: 'center', borderWidth: 1, marginTop: 8 },
     secondaryButtonText: { fontSize: 16, fontWeight: 'bold' },
     primaryButton: { padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 8 },
-    primaryButtonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' }
+    primaryButtonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
+    destinationMarker: {
+        width: 30,
+        height: 30,
+        backgroundColor: '#ef4444',
+        borderTopLeftRadius: 15,
+        borderTopRightRadius: 15,
+        borderBottomLeftRadius: 15,
+        transform: [{ rotate: '45deg' }],
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+        elevation: 10,
+    },
+    destinationMarkerInner: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: '#FFF',
+        transform: [{ rotate: '-45deg' }],
+    },
+    pinContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 40,
+        height: 40,
+    },
+    smallCallBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+    }
 });

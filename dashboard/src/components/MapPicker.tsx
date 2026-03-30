@@ -138,8 +138,56 @@ export const MapPicker: React.FC<MapPickerProps> = ({ lat, lng, onChange, onPlac
 
         markerRef.current = marker;
 
-        // --- Search Integration ---
+        // --- Search & Geocoding Integration ---
+        const geocoder = new window.google.maps.Geocoder();
         const input = document.getElementById('pac-input') as HTMLInputElement;
+
+        const processPlace = (components: any[], address: string, newLat: number, newLng: number) => {
+            let city = '';
+            let suburb = '';
+            let neighborhood = '';
+            let sublocality = '';
+            let locality = '';
+            let adminArea2 = '';
+
+            components?.forEach((c: any, index: number) => {
+                if (c.types.includes('locality')) locality = c.long_name;
+                if (c.types.includes('administrative_area_level_2')) adminArea2 = c.long_name;
+                if (c.types.includes('neighborhood')) neighborhood = c.long_name;
+                if (c.types.includes('sublocality_level_1')) sublocality = c.long_name;
+                if (c.types.includes('sublocality')) {
+                    if (!sublocality) sublocality = c.long_name;
+                }
+                // HACK for Harare: Google often provides the suburb name in the first component with 0 types
+                if (index === 0 && c.types.length === 0 && !neighborhood) {
+                    neighborhood = c.long_name;
+                }
+            });
+
+            city = locality || adminArea2 || 'Harare';
+            // If route (street name) is available, use it, then try neighborhood, then sublocality, then locality only if it's not the same as city
+            let finalSuburb = route || neighborhood || sublocality || (locality !== city ? locality : '') || 'Nearby';
+            
+            // Clean up common over-verbose strings (e.g., "SOUTHLANDS SHOPS SOUTHLANDS" -> "Southlands")
+            if (finalSuburb.toUpperCase().includes('SHOPS')) {
+                const parts = finalSuburb.split(' ');
+                if (parts.length > 1) {
+                    finalSuburb = parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase();
+                }
+            }
+            suburb = finalSuburb;
+
+            if (onPlaceSelected) {
+                onPlaceSelected({
+                    physical_address: address,
+                    city,
+                    suburb,
+                    lat: newLat,
+                    lng: newLng
+                });
+            }
+        };
+
         if (input && window.google.maps.places) {
             const autocomplete = new window.google.maps.places.Autocomplete(input, {
                 fields: ["address_components", "geometry", "name", "formatted_address"],
@@ -162,46 +210,34 @@ export const MapPicker: React.FC<MapPickerProps> = ({ lat, lng, onChange, onPlac
                 marker.setPosition(newPos);
                 onChange(newLat, newLng);
 
-                if (onPlaceSelected) {
-                    // Extract address components
-                    let city = '';
-                    let suburb = '';
-                    let address = place.formatted_address || '';
-
-                    place.address_components?.forEach((c: any) => {
-                        // City Fallbacks
-                        if (c.types.includes('locality')) city = c.long_name;
-                        else if (!city && c.types.includes('administrative_area_level_2')) city = c.long_name;
-                        else if (!city && c.types.includes('administrative_area_level_1')) city = c.long_name;
-
-                        // Suburb Fallbacks
-                        if (c.types.includes('sublocality_level_1')) suburb = c.long_name;
-                        else if (!suburb && c.types.includes('neighborhood')) suburb = c.long_name;
-                        else if (!suburb && c.types.includes('sublocality')) suburb = c.long_name;
-                    });
-
-                    onPlaceSelected({
-                        physical_address: address,
-                        city: city || 'Harare',
-                        suburb: suburb || '',
-                        lat: newLat,
-                        lng: newLng
-                    });
-                }
+                processPlace(place.address_components || [], place.formatted_address || '', newLat, newLng);
             });
         }
+
+        const handleGeocode = (latLng: any) => {
+            onChange(latLng.lat(), latLng.lng());
+            if (onPlaceSelected) {
+                geocoder.geocode({ location: latLng }, (results: any, status: string) => {
+                    if (status === "OK" && results[0]) {
+                        processPlace(results[0].address_components, results[0].formatted_address, latLng.lat(), latLng.lng());
+                    } else {
+                        console.warn("Geocoder failed due to: " + status);
+                    }
+                });
+            }
+        };
 
         // Click to move marker
         map.addListener('click', (e: any) => {
             const newPos = e.latLng;
             marker.setPosition(newPos);
-            onChange(newPos.lat(), newPos.lng());
+            handleGeocode(newPos);
         });
 
         // Drag marker to update
         marker.addListener('dragend', (e: any) => {
             const newPos = e.latLng;
-            onChange(newPos.lat(), newPos.lng());
+            handleGeocode(newPos);
         });
 
     }, []);

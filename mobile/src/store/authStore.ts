@@ -73,7 +73,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     isRefreshing: false,
 
     refreshSession: async (providedSession?: any) => {
-        if (get().isRefreshing) return;
+        // Bypass the refresh lock if a session is explicitly provided (e.g. from SIGNED_IN event)
+        if (get().isRefreshing && !providedSession) {
+            console.log('[Auth] Refresh already in progress, skipping background check');
+            return;
+        }
         
         try {
             set({ isRefreshing: true });
@@ -105,7 +109,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
             let session = providedSession;
             if (!session) {
-                const { data: { session: currentSession }, error: sessionError } = await withTimeout(
+                const { data: { session: currentSession }, error: sessionError }: any = await withTimeout(
                     supabase.auth.getSession(),
                     TIMEOUT_MS,
                     'Session check timed out'
@@ -127,7 +131,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             }
 
             // 3. getUser() verifies the session with the server
-            const { data: { user }, error: authError } = await withTimeout(
+            const { data: { user }, error: authError }: any = await withTimeout(
                 supabase.auth.getUser(),
                 TIMEOUT_MS,
                 'User verification timed out'
@@ -140,7 +144,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             }
 
             // 4. Fetch profile and roles (parallel for speed)
-            const [profileRes, rolesRes] = await Promise.all([
+            const [profileRes, rolesRes]: any[] = await Promise.all([
                 withTimeout(supabase.from('profiles').select('*').eq('id', user.id).single(), TIMEOUT_MS, 'Profile fetch timed out'),
                 withTimeout(supabase.from('user_roles').select('role').eq('user_id', user.id), TIMEOUT_MS, 'Roles fetch timed out')
             ]);

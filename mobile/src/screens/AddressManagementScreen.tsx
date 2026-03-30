@@ -18,6 +18,7 @@ import {
     Animated
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from '../components/Map';
+import { MapSkeleton } from '../components/MapSkeleton';
 import { GooglePlacesAutocomplete } from '../components/GooglePlacesAutocomplete';
 import { mapDarkStyle, mapLightStyle } from '../theme/MapStyle';
 import { useTheme } from '../theme';
@@ -25,6 +26,7 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MapPin, Plus, Trash2, Home, Briefcase, MapIcon, ChevronLeft, CheckCircle2, X } from 'lucide-react-native';
+import { reverseGeocodeGoogle } from '../services/geocodingService';
 
 export const AddressManagementScreen = ({ navigation }: any) => {
     const { theme, isDark } = useTheme();
@@ -42,6 +44,8 @@ export const AddressManagementScreen = ({ navigation }: any) => {
     const [coords, setCoords] = useState<{ lat: number, lng: number } | null>(null);
     const [isDefault, setIsDefault] = useState(false);
     const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+    const [isGpsButtonLoading, setIsGpsButtonLoading] = useState(false);
+    const [isGpsCaptured, setIsGpsCaptured] = useState(false);
     
     const mapRef = useRef<MapView | null>(null);
     const googlePlacesRef = useRef<any>(null);
@@ -53,6 +57,11 @@ export const AddressManagementScreen = ({ navigation }: any) => {
         latitudeDelta: 0.05,
         longitudeDelta: 0.05,
     });
+    const [isMapReady, setIsMapReady] = useState(false);
+    const [isModalDown, setIsModalDown] = useState(false);
+    const pinAnim = useRef(new Animated.Value(0)).current;
+    const isProgrammaticChange = useRef(false);
+    const gpsRequestCounter = useRef(0);
 
     const animateModal = (toValue: number) => {
         Animated.timing(modalY, {
@@ -105,47 +114,80 @@ export const AddressManagementScreen = ({ navigation }: any) => {
     });
 
     const handleUseCurrentLocation = async () => {
+        const currentRequestId = ++gpsRequestCounter.current;
+        isProgrammaticChange.current = true;
+        setIsGpsButtonLoading(true);
         try {
             setIsFetchingLocation(true);
-            const Location = require('expo-location');
-            const { status } = await Location.requestForegroundPermissionsAsync();
+            const ExpoLocation = require('expo-location');
+            const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
                 Alert.alert('Permission Denied', 'Location permission is required.');
+                setIsGpsButtonLoading(false);
                 setIsFetchingLocation(false);
                 return;
             }
 
-            const location = await Location.getCurrentPositionAsync({});
+            // 1. Fast initial jump
+            const lastKnown = await ExpoLocation.getLastKnownPositionAsync();
+            if (currentRequestId !== gpsRequestCounter.current) return;
+
+            if (lastKnown) {
+                const region = {
+                    latitude: lastKnown.coords.latitude,
+                    longitude: lastKnown.coords.longitude,
+                    latitudeDelta: 0.005,
+                    longitudeDelta: 0.005,
+                };
+                isProgrammaticChange.current = true;
+                mapRef.current?.animateToRegion(region, 100);
+
+                const rev = await reverseGeocodeGoogle(lastKnown.coords.latitude, lastKnown.coords.longitude);
+                if (rev) {
+                    setCity(rev.city || 'Harare');
+                    setSuburb(rev.suburb || 'Nearby');
+                    setStreet(rev.physical_address || '');
+                    setCoords({ lat: lastKnown.coords.latitude, lng: lastKnown.coords.longitude });
+                    setIsGpsCaptured(true);
+                    // Clear button loading early once we have a fix
+                    setIsGpsButtonLoading(false);
+                }
+            }
+
+            const location = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Highest });
+            if (currentRequestId !== gpsRequestCounter.current) return;
+
             const newCoords = {
                 lat: location.coords.latitude,
                 lng: location.coords.longitude
             };
             setCoords(newCoords);
             
+            // 2. Animate immediately once accurate coordinates are in
             const region = {
                 latitude: newCoords.lat,
                 longitude: newCoords.lng,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
+                latitudeDelta: 0.005,
+                longitudeDelta: 0.005,
             };
-            setMapRegion(region);
-            mapRef.current?.animateToRegion(region, 500);
+            isProgrammaticChange.current = true;
+            mapRef.current?.animateToRegion(region, 300);
 
-            // Reverse geocode to fill fields
-            const [rev] = await Location.reverseGeocodeAsync({
-                latitude: newCoords.lat,
-                longitude: newCoords.lng
-            });
+            // 3. Geocode in the background
+            const rev = await reverseGeocodeGoogle(newCoords.lat, newCoords.lng);
             if (rev) {
                 setCity(rev.city || 'Harare');
-                setSuburb(rev.district || rev.subregion || '');
-                setStreet(rev.street || '');
+                setSuburb(rev.suburb || 'Nearby');
+                setStreet(rev.physical_address || '');
             }
 
+            setIsGpsCaptured(true);
             setIsFetchingLocation(false);
+            setIsGpsButtonLoading(false);
         } catch (error) {
             console.warn('GPS logic failed:', error);
             setIsFetchingLocation(false);
+            setIsGpsButtonLoading(false);
             Alert.alert('Location Error', 'Could not access GPS. Please ensure location services are enabled.');
         }
     };
@@ -252,6 +294,7 @@ export const AddressManagementScreen = ({ navigation }: any) => {
             <Modal visible={modalVisible} animationType="slide" transparent={false}>
                 <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                     <View style={{ flex: 1, backgroundColor: theme.background }}>
+                        <MapSkeleton visible={!isMapReady} />
                         {/* Full Screen Map */}
                         <MapView
                             ref={mapRef}
@@ -260,28 +303,93 @@ export const AddressManagementScreen = ({ navigation }: any) => {
                             initialRegion={mapRegion}
                             mapPadding={{ top: 0, right: 0, left: 0, bottom: Dimensions.get('window').height * 0.4 }}
                             customMapStyle={isDark ? mapDarkStyle : mapLightStyle}
+                            onMapReady={() => setIsMapReady(true)}
                             onPress={() => {
                                 Keyboard.dismiss();
+                                if (isModalDown) {
+                                    animateModal(0);
+                                    setIsModalDown(false);
+                                } else {
+                                    animateModal(Dimensions.get('window').height * 0.7);
+                                    setIsModalDown(true);
+                                }
                             }}
                             onRegionChangeStart={() => {
                                 Keyboard.dismiss();
+                                // Only raise pin for manual gestures, not automated ones
+                                if (!isProgrammaticChange.current) {
+                                    Animated.spring(pinAnim, { toValue: -15, useNativeDriver: true }).start();
+                                    // Manual gesture cancels any pending programmatic GPS snaps
+                                    gpsRequestCounter.current += 1;
+                                }
+                                setIsGpsCaptured(false);
+                                setCity('Locating...');
+                                setSuburb('');
+                                setStreet('');
                                 animateModal(Dimensions.get('window').height * 0.7);
+                                if (!isProgrammaticChange.current) {
+                                    setIsModalDown(true);
+                                }
                             }}
-                            onRegionChangeComplete={(region) => {
-                                setMapRegion(region);
+                            onRegionChangeComplete={async (region) => {
+                                if (isProgrammaticChange.current) {
+                                    isProgrammaticChange.current = false;
+                                    Animated.spring(pinAnim, { toValue: 0, useNativeDriver: true }).start();
+                                    animateModal(0);
+                                    setIsModalDown(false);
+                                    return;
+                                }
+
+                                // Reset the flag
+                                isProgrammaticChange.current = false;
+                                Animated.spring(pinAnim, { toValue: 0, useNativeDriver: true }).start();
                                 animateModal(0);
+                                setIsModalDown(false);
+                                
+                                setCoords({ lat: region.latitude, lng: region.longitude });
+                                try {
+                                    const rev = await reverseGeocodeGoogle(region.latitude, region.longitude);
+                                    if (rev) {
+                                        setCity(rev.city || 'Harare');
+                                        setSuburb(rev.suburb || 'Nearby');
+                                        setStreet(rev.physical_address || '');
+                                    } else {
+                                        setCity('Harare');
+                                        setSuburb('Nearby');
+                                    }
+                                } catch (error) {
+                                    setCity('Harare');
+                                    setSuburb('Nearby');
+                                    console.warn("Drag Pin Geocode Error:", error);
+                                }
                             }}
                         >
-                            {coords && (
-                                <Marker
-                                    coordinate={{
-                                        latitude: coords.lat,
-                                        longitude: coords.lng
-                                    }}
-                                    pinColor={theme.accent}
-                                />
-                            )}
+                            {/* Marker removed in favor of center pin */}
                         </MapView>
+
+                        <View style={styles.fixedPinContainer} pointerEvents="none">
+                            {/* Glowing Target Dot - Appears when map is dragged */}
+                            <Animated.View style={[
+                                styles.glowingDot,
+                                {
+                                    opacity: pinAnim.interpolate({ inputRange: [-15, 0], outputRange: [1, 0] }),
+                                    transform: [{ scale: pinAnim.interpolate({ inputRange: [-15, 0], outputRange: [1.5, 0.5] }) }]
+                                }
+                            ]} />
+
+                            <Animated.View style={{ transform: [{ translateY: pinAnim }] }}>
+                                <View style={styles.destinationMarker}>
+                                    <View style={styles.destinationMarkerInner} />
+                                </View>
+                            </Animated.View>
+                            <Animated.View style={[
+                                styles.pinShadow, 
+                                { 
+                                    opacity: pinAnim.interpolate({ inputRange: [-15, 0], outputRange: [0.3, 1] }),
+                                    transform: [{ scale: pinAnim.interpolate({ inputRange: [-15, 0], outputRange: [0.5, 1] }) }]
+                                }
+                            ]} />
+                        </View>
 
                         <View style={styles.modalHeaderButtons}>
                             <TouchableOpacity 
@@ -307,19 +415,23 @@ export const AddressManagementScreen = ({ navigation }: any) => {
                                             setSuburb(data.structured_formatting.main_text);
                                             setStreet(details.address_components.find(c => c.types.includes('route'))?.long_name || '');
                                             
+                                            googlePlacesRef.current?.setAddressText(data.description);
+                                            googlePlacesRef.current?.blur();
+                                            Keyboard.dismiss();
+
                                             const region = {
                                                 latitude: newCoords.lat,
                                                 longitude: newCoords.lng,
                                                 latitudeDelta: 0.01,
                                                 longitudeDelta: 0.01,
                                             };
+                                            isProgrammaticChange.current = true;
                                             setMapRegion(region);
                                             mapRef.current?.animateToRegion(region, 500);
-                                            Keyboard.dismiss();
                                         }
                                     }}
                                     query={{
-                                        key: 'AIzaSyAfW8js09sB0cfQzz19aRBkSE7sDMy5cu0',
+                                        key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
                                         language: 'en',
                                         components: 'country:zw',
                                         types: 'establishment|geocode',
@@ -417,19 +529,19 @@ export const AddressManagementScreen = ({ navigation }: any) => {
                                         />
 
                                         <TouchableOpacity
-                                            style={[styles.gpsButton, { borderColor: coords ? '#10B981' : theme.accent, backgroundColor: coords ? '#10B98110' : 'transparent' }]}
+                                            style={[styles.gpsButton, { borderColor: isGpsCaptured ? '#10B981' : theme.accent, backgroundColor: isGpsCaptured ? '#10B98110' : 'transparent' }]}
                                             onPress={handleUseCurrentLocation}
-                                            disabled={isFetchingLocation}
+                                            disabled={isGpsButtonLoading}
                                         >
-                                            {isFetchingLocation ? (
+                                            {isGpsButtonLoading ? (
                                                 <ActivityIndicator size="small" color={theme.accent} />
-                                            ) : coords ? (
+                                            ) : isGpsCaptured ? (
                                                 <CheckCircle2 size={20} color="#10B981" />
                                             ) : (
                                                 <MapPin size={20} color={theme.accent} />
                                             )}
-                                            <Text style={{ color: coords ? '#10B981' : theme.accent, fontWeight: 'bold' }}>
-                                                {isFetchingLocation ? 'Acquiring GPS...' : coords ? 'GPS Captured' : 'Use Current GPS'}
+                                            <Text style={{ color: isGpsCaptured ? '#10B981' : theme.accent, fontWeight: 'bold' }}>
+                                                {isGpsButtonLoading ? 'Acquiring GPS...' : isGpsCaptured ? 'GPS Captured' : 'Use Current GPS'}
                                             </Text>
                                         </TouchableOpacity>
 
@@ -565,5 +677,61 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4
+    },
+    destinationMarker: {
+        width: 30,
+        height: 30,
+        backgroundColor: '#ef4444',
+        borderTopLeftRadius: 15,
+        borderTopRightRadius: 15,
+        borderBottomLeftRadius: 15,
+        transform: [{ rotate: '45deg' }],
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+        elevation: 10,
+    },
+    destinationMarkerInner: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: '#FFF',
+        transform: [{ rotate: '-45deg' }],
+    },
+    fixedPinContainer: {
+        position: 'absolute',
+        top: Dimensions.get('window').height * 0.3 - 38,
+        left: '50%',
+        marginLeft: -15,
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        zIndex: 5
+    },
+    pinShadow: {
+        width: 12,
+        height: 6,
+        borderRadius: 6,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        marginTop: 4,
+    },
+    glowingDot: {
+        position: 'absolute',
+        bottom: 0,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: 'rgba(239, 68, 68, 0.4)',
+        borderWidth: 2,
+        borderColor: '#ef4444',
+        shadowColor: '#ef4444',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 1,
+        shadowRadius: 8,
+        elevation: 8,
     }
 });

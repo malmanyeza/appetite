@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { makeCall } from '../utils/callUtils';
 import {
     View,
     Text,
@@ -20,9 +21,10 @@ import { useTheme } from '../theme';
 import { ChevronLeft, MapPin, Package, Bike, CheckCircle2, Search, Navigation, Clock, LocateFixed, X, Phone, Target } from 'lucide-react-native';
 import { useAuthStore } from '../store/authStore';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from '../components/Map';
+import { MapSkeleton } from '../components/MapSkeleton';
 import { mapDarkStyle, mapLightStyle } from '../theme/MapStyle';
 
-const GOOGLE_API_KEY = 'AIzaSyAfW8js09sB0cfQzz19aRBkSE7sDMy5cu0';
+const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
 // Polyline Decoder (reuse logic)
 const decodePolyline = (t: string) => {
@@ -66,6 +68,7 @@ export const OrderTracking = ({ route, navigation }: any) => {
     const [isIncomingCall, setIsIncomingCall] = React.useState(false);
     const [activeCallId, setActiveCallId] = React.useState<string | null>(null);
     const [callStartedAt, setCallStartedAt] = React.useState<Date | null>(null);
+    const [isMapReady, setIsMapReady] = React.useState(false);
 
     const { data: activeOrder, isLoading: isActiveLoading } = useQuery({
         queryKey: ['active-order', user?.id],
@@ -95,7 +98,9 @@ export const OrderTracking = ({ route, navigation }: any) => {
                 .from('orders')
                 .select(`
                     *,
-                    restaurants (name, suburb, city, landmark_notes, lat, lng),
+                    *,
+                    restaurants:restaurant_id (name, suburb, city, landmark_notes, owner_phone),
+                    restaurant_locations:location_id (lat, lng, phone, physical_address, landmark_notes, suburb, city),
                     profiles:driver_id (id, full_name, phone, lat, lng)
                 `)
                 .eq('id', resolvedOrderId)
@@ -198,7 +203,7 @@ export const OrderTracking = ({ route, navigation }: any) => {
             const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
             if (status !== 'granted') return;
             subscription = await ExpoLocation.watchPositionAsync(
-                { accuracy: ExpoLocation.Accuracy.Balanced, distanceInterval: 15 },
+                { accuracy: ExpoLocation.Accuracy.High, distanceInterval: 15 },
                 (loc) => setUserLocation(loc.coords)
             );
         })();
@@ -250,7 +255,7 @@ export const OrderTracking = ({ route, navigation }: any) => {
 
         // Pickup: route from user location to restaurant
         if (isPickup) {
-            const dest = order?.delivery_address_snapshot;
+            const dest = order?.restaurant_locations || order?.delivery_address_snapshot;
             if (!userLocation || !dest?.lat) return;
             const fetchPickupRoute = async () => {
                 try {
@@ -333,7 +338,13 @@ export const OrderTracking = ({ route, navigation }: any) => {
 
         if (isPickup) {
             if (userLocation?.latitude) coords.push({ latitude: userLocation.latitude, longitude: userLocation.longitude });
-            if (order?.restaurants?.lat) coords.push({ latitude: Number(order.restaurants.lat), longitude: Number(order.restaurants.lng) });
+            // Add restaurant location
+            if (order?.restaurant_locations?.lat) {
+                coords.push({ 
+                    latitude: Number(order.restaurant_locations.lat), 
+                    longitude: Number(order.restaurant_locations.lng) 
+                });
+            }
         } else {
             if (order?.delivery_address_snapshot?.lat) coords.push({ latitude: order.delivery_address_snapshot.lat, longitude: order.delivery_address_snapshot.lng });
             if (driverLocation?.latitude) coords.push(driverLocation);
@@ -475,7 +486,9 @@ export const OrderTracking = ({ route, navigation }: any) => {
                     <ChevronLeft color={theme.text} size={24} />
                 </TouchableOpacity>
                 <Text style={[styles.headerTitle, { color: theme.text }]}>Order Tracking</Text>
-                <View style={{ width: 24 }} />
+                <TouchableOpacity onPress={() => makeCall(order?.restaurant_locations?.phone || order?.restaurants?.owner_phone)}>
+                    <Phone color={theme.accent} size={20} />
+                </TouchableOpacity>
             </View>
 
             <ScrollView 
@@ -503,6 +516,16 @@ export const OrderTracking = ({ route, navigation }: any) => {
                                     displayStatus === 'on_the_way' ? 'Biker is on the way to you!' :
                                         order.fulfillment_type === 'pickup' ? 'Order Collected' : 'Order Delivered'}
                     </Text>
+
+                    {order?.driver_id && (order.status === 'ready_for_pickup' || order.status === 'on_the_way' || order.status === 'picked_up') && (
+                        <TouchableOpacity 
+                            style={[styles.callBtn, { backgroundColor: `${theme.accent}15`, marginTop: 12 }]}
+                            onPress={() => makeCall(order.profiles?.phone)}
+                        >
+                            <Phone size={14} color={theme.accent} />
+                            <Text style={{ color: theme.accent, fontSize: 13, fontWeight: 'bold' }}>Call Biker ({order.profiles?.full_name})</Text>
+                        </TouchableOpacity>
+                    )}
 
                     {order.status === 'on_the_way' && order.delivery_address_snapshot?.landmark_notes && (
                         <Text style={{ color: theme.textMuted, marginTop: 4, fontStyle: 'italic', fontSize: 13 }}>
@@ -579,6 +602,7 @@ export const OrderTracking = ({ route, navigation }: any) => {
                     backgroundColor: theme.background 
                 }
             ]}>
+                <MapSkeleton visible={!isMapReady} />
                 <View style={styles.mapHeader}>
                     <TouchableOpacity style={styles.closeMapBtn} onPress={() => toggleMap(false)}>
                         <X color={theme.text} size={24} />
@@ -598,6 +622,7 @@ export const OrderTracking = ({ route, navigation }: any) => {
                     style={styles.map}
                     provider={PROVIDER_GOOGLE}
                     customMapStyle={isDark ? mapDarkStyle : mapLightStyle}
+                    onMapReady={() => setIsMapReady(true)}
                     initialRegion={{
                         latitude: (order.fulfillment_type === 'pickup' ? (order.delivery_address_snapshot?.lat || order.restaurants?.lat) : (driverLocation?.latitude || order?.delivery_address_snapshot?.lat)) || -17.8248,
                         longitude: (order.fulfillment_type === 'pickup' ? (order.delivery_address_snapshot?.lng || order.restaurants?.lng) : (driverLocation?.longitude || order?.delivery_address_snapshot?.lng)) || 31.0530,
@@ -612,9 +637,15 @@ export const OrderTracking = ({ route, navigation }: any) => {
                                 latitude: Number(order.delivery_address_snapshot.lat),
                                 longitude: Number(order.delivery_address_snapshot.lng)
                             }}
-                            title="You"
-                            pinColor={theme.accent}
-                        />
+                            tracksViewChanges={true}
+                            anchor={{ x: 0.5, y: 1 }}
+                        >
+                            <View style={styles.pinContainer}>
+                                <View style={styles.destinationMarker}>
+                                    <View style={styles.destinationMarkerInner} />
+                                </View>
+                            </View>
+                        </Marker>
                     )}
 
                     {/* Pickup: show restaurant destination marker */}
@@ -624,10 +655,13 @@ export const OrderTracking = ({ route, navigation }: any) => {
                                 latitude: Number(order.delivery_address_snapshot?.lat || order.restaurants?.lat),
                                 longitude: Number(order.delivery_address_snapshot?.lng || order.restaurants?.lng)
                             }}
-                            title={order.restaurants?.name || 'Restaurant'}
+                            tracksViewChanges={true}
+                            anchor={{ x: 0.5, y: 1 }}
                         >
-                            <View style={[styles.driverMarker, { backgroundColor: theme.accent }]}>
-                                <MapPin color="#FFF" size={16} />
+                            <View style={styles.pinContainer}>
+                                <View style={styles.destinationMarker}>
+                                    <View style={styles.destinationMarkerInner} />
+                                </View>
                             </View>
                         </Marker>
                     )}
@@ -834,27 +868,71 @@ const styles = StyleSheet.create({
         flex: 1
     },
     userMarker: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 30,
+        height: 30,
+        backgroundColor: '#3B82F6',
+        borderTopLeftRadius: 15,
+        borderTopRightRadius: 15,
+        borderBottomLeftRadius: 15,
+        transform: [{ rotate: '45deg' }],
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 2,
-        borderColor: '#FFF'
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+        elevation: 10,
     },
     driverMarker: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 30,
+        height: 30,
+        backgroundColor: '#3B82F6',
+        borderTopLeftRadius: 15,
+        borderTopRightRadius: 15,
+        borderBottomLeftRadius: 15,
+        transform: [{ rotate: '45deg' }],
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 3,
-        borderColor: '#FFF',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-        elevation: 5
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+        elevation: 10
+    },
+    destinationMarker: {
+        width: 30,
+        height: 30,
+        backgroundColor: '#ef4444',
+        borderTopLeftRadius: 15,
+        borderTopRightRadius: 15,
+        borderBottomLeftRadius: 15,
+        transform: [{ rotate: '45deg' }],
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+        elevation: 10,
+    },
+    destinationMarkerInner: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: '#FFF',
+        transform: [{ rotate: '-45deg' }],
+    },
+    pinContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 40,
+        height: 40,
     },
     recenterBtn: {
         position: 'absolute',

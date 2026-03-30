@@ -21,6 +21,7 @@ import { useAuthStore } from '../store/authStore';
 import { useLocationStore } from '../store/locationStore';
 import { useTheme } from '../theme';
 import MapView, { Marker, PROVIDER_GOOGLE } from '../components/Map';
+import { MapSkeleton } from '../components/MapSkeleton';
 import { GooglePlacesAutocomplete } from '../components/GooglePlacesAutocomplete';
 import { mapDarkStyle, mapLightStyle } from '../theme/MapStyle';
 import * as ExpoLocation from 'expo-location';
@@ -29,10 +30,17 @@ import * as WebBrowser from 'expo-web-browser';
 import { Image } from 'expo-image';
 import { supabase, supabaseUrl, supabaseAnonKey } from '../lib/supabase';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { reverseGeocodeGoogle } from '../services/geocodingService';
 
+const INITIAL_REGION = {
+    latitude: -17.8248, // Harare
+    longitude: 31.0530,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+};
 
 export const CartScreen = ({ navigation }: any) => {
-    const { items, total, updateQty, clearCart } = useCartStore();
+    const { items, total, updateQty, removeItem, clearCart } = useCartStore();
     const { profile } = useAuthStore();
     const { selectedLocation, setSelectedLocation } = useLocationStore();
     const { theme, isDark } = useTheme();
@@ -53,7 +61,7 @@ export const CartScreen = ({ navigation }: any) => {
         enabled: !!profile?.id
     });
 
-    const [fulfillmentType, setFulfillmentType] = React.useState<'delivery' | 'pickup'>('delivery');
+    const [fulfillmentType, setFulfillmentType] = React.useState<'delivery' | 'pickup' | null>('delivery');
     const [selectedAddress, setSelectedAddress] = React.useState<any>(selectedLocation);
     const [paymentMethod, setPaymentMethod] = React.useState<'cod' | 'ecocash' | 'card'>('ecocash');
     const [ecocashPhone, setEcocashPhone] = React.useState('');
@@ -62,8 +70,17 @@ export const CartScreen = ({ navigation }: any) => {
 
     const [showEcocashModal, setShowEcocashModal] = React.useState(false);
     const [addressModalVisible, setAddressModalVisible] = React.useState(false);
+    const [fulfillmentPromptVisible, setFulfillmentPromptVisible] = React.useState(true);
+    const [hasPrompted, setHasPrompted] = React.useState(false); // Changed to false initially
     const [isFetchingLocation, setIsFetchingLocation] = React.useState(false);
-    const [mapRegion, setMapRegion] = React.useState<any>(null);
+    const [isGpsButtonLoading, setIsGpsButtonLoading] = React.useState(false);
+    const [gpsLocation, setGpsLocation] = React.useState<{ lat: number; lng: number } | null>(null);
+    const [mapRegion, setMapRegion] = React.useState<any>(selectedLocation ? {
+        latitude: selectedLocation.lat,
+        longitude: selectedLocation.lng,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+    } : INITIAL_REGION);
     const mapRef = React.useRef<MapView | null>(null);
     const googlePlacesRef = React.useRef<any>(null);
     const modalY = React.useRef(new Animated.Value(0)).current;
@@ -78,12 +95,21 @@ export const CartScreen = ({ navigation }: any) => {
 
     const [ecocashPending, setEcocashPending] = React.useState(false);
     const [pendingOrderId, setPendingOrderId] = React.useState<string | null>(null);
+    const [isMapReady, setIsMapReady] = React.useState(false);
+    const [isModalDown, setIsModalDown] = React.useState(false);
+    const pinAnim = React.useRef(new Animated.Value(0)).current;
+    const isProgrammaticChange = React.useRef(false);
+    const gpsRequestCounter = React.useRef(0);
 
+    const lastVisibleRef = React.useRef(false);
     React.useEffect(() => {
-        if (addressModalVisible) {
-            animateModal(0);
-        } else {
-            animateModal(Dimensions.get('window').height);
+        if (addressModalVisible !== lastVisibleRef.current) {
+            if (addressModalVisible) {
+                animateModal(0);
+            } else {
+                animateModal(Dimensions.get('window').height);
+            }
+            lastVisibleRef.current = addressModalVisible;
         }
     }, [addressModalVisible]);
 
@@ -134,6 +160,65 @@ export const CartScreen = ({ navigation }: any) => {
             if (interval) clearInterval(interval);
         };
     }, [ecocashPending, pendingOrderId]);
+    
+    const [hasAnimatedInitialLocation, setHasAnimatedInitialLocation] = React.useState(false);
+    
+    React.useEffect(() => {
+        if (!isMapReady || hasAnimatedInitialLocation) return;
+
+        (async () => {
+            // 1. Priority: Selected Location (Saved Address)
+            if (selectedLocation?.lat && selectedLocation?.lng) {
+                mapRef.current?.animateToRegion({
+                    latitude: selectedLocation.lat,
+                    longitude: selectedLocation.lng,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
+                }, 600);
+                setHasAnimatedInitialLocation(true);
+                return;
+            }
+
+            // 2. Fallback: Live GPS Auto-Snap
+            try {
+                const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+                if (status === 'granted') {
+                    // Fast check for last known position
+                    const lastKnown = await ExpoLocation.getLastKnownPositionAsync();
+                    const initialCoords = lastKnown?.coords || (await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced })).coords;
+                    
+                    setGpsLocation({ lat: initialCoords.latitude, lng: initialCoords.longitude });
+                    
+                    mapRef.current?.animateToRegion({
+                        latitude: initialCoords.latitude,
+                        longitude: initialCoords.longitude,
+                        latitudeDelta: 0.01,
+                        longitudeDelta: 0.01,
+                    }, 600);
+                    setHasAnimatedInitialLocation(true);
+                }
+            } catch (err) {
+                console.warn('[Cart] Auto-snap GPS failed:', err);
+                // Stays at default Harare (INITIAL_REGION)
+                setHasAnimatedInitialLocation(true);
+            }
+        })();
+    }, [isMapReady, selectedLocation, hasAnimatedInitialLocation]);
+
+    // Background GPS for distance accuracy (independently of the delivery address)
+    React.useEffect(() => {
+        (async () => {
+            try {
+                const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+                if (status === 'granted') {
+                    const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.High });
+                    setGpsLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+                }
+            } catch (err) {
+                console.warn('[Cart] Distance GPS failed:', err);
+            }
+        })();
+    }, []);
 
     // Fetch Delivery Settings & Restaurant Location
     const restaurantId = items[0]?.restaurant_id;
@@ -181,8 +266,8 @@ export const CartScreen = ({ navigation }: any) => {
         };
     }, [queryClient]);
 
-    // Distance Calculation Logic
     React.useEffect(() => {
+        if (!fulfillmentType) return;
         if (fulfillmentType === 'pickup') {
             setDeliveryFee(0);
             return;
@@ -226,6 +311,10 @@ export const CartScreen = ({ navigation }: any) => {
 
     const handleCheckout = () => {
         if (items.length === 0) return;
+        if (!fulfillmentType) {
+            setFulfillmentPromptVisible(true);
+            return;
+        }
         if (fulfillmentType === 'delivery' && !selectedAddress) {
             Alert.alert('Address Required', 'Please add a delivery address before placing an order.', [
                 { text: 'Add Address', onPress: () => navigation.navigate('AddressManagement') }
@@ -487,6 +576,22 @@ export const CartScreen = ({ navigation }: any) => {
                                         <TouchableOpacity onPress={() => updateQty(item.id, 1)}>
                                             <Text style={[styles.qtyBtn, { color: theme.text }]}>+</Text>
                                         </TouchableOpacity>
+                                        
+                                        <TouchableOpacity 
+                                            onPress={() => {
+                                                Alert.alert(
+                                                    'Remove Item',
+                                                    `Remove ${item.name} from cart?`,
+                                                    [
+                                                        { text: 'Cancel', style: 'cancel' },
+                                                        { text: 'Remove', style: 'destructive', onPress: () => removeItem(item.id) }
+                                                    ]
+                                                );
+                                            }}
+                                            style={{ marginLeft: 8, padding: 8 }}
+                                        >
+                                            <Trash2 size={20} color="#EF4444" />
+                                        </TouchableOpacity>
                                     </View>
                                 </View>
                             ))}
@@ -636,6 +741,7 @@ export const CartScreen = ({ navigation }: any) => {
             <Modal visible={addressModalVisible} animationType="slide" transparent={false}>
                 <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                     <View style={{ flex: 1, backgroundColor: theme.background }}>
+                        <MapSkeleton visible={!isMapReady} />
                         {/* Full Screen Map */}
                         <MapView
                             ref={mapRef}
@@ -649,18 +755,99 @@ export const CartScreen = ({ navigation }: any) => {
                             }}
                             mapPadding={{ top: 0, right: 0, left: 0, bottom: Dimensions.get('window').height * 0.4 }}
                             customMapStyle={isDark ? mapDarkStyle : mapLightStyle}
-                            onRegionChangeComplete={(region) => setMapRegion(region)}
+                            onMapReady={() => setIsMapReady(true)}
+                            onPress={() => {
+                                Keyboard.dismiss();
+                                if (isModalDown) {
+                                    animateModal(0);
+                                    setIsModalDown(false);
+                                } else {
+                                    animateModal(Dimensions.get('window').height * 0.7);
+                                    setIsModalDown(true);
+                                }
+                            }}
+                            onRegionChangeStart={() => {
+                                Keyboard.dismiss();
+                                // Only raise pin for manual gestures, not automated ones
+                                if (!isProgrammaticChange.current) {
+                                    Animated.spring(pinAnim, { toValue: -15, useNativeDriver: true }).start();
+                                    // Manual gesture cancels any pending programmatic GPS snaps
+                                    gpsRequestCounter.current += 1;
+                                }
+                                if (selectedAddress) {
+                                    setSelectedAddress({ ...selectedAddress, city: 'Locating...', suburb: '' });
+                                }
+                                setIsFetchingLocation(true);
+                                animateModal(Dimensions.get('window').height * 0.7);
+                                if (!isProgrammaticChange.current) {
+                                    setIsModalDown(true);
+                                }
+                            }}
+                            onRegionChangeComplete={async (region) => {
+                                if (isProgrammaticChange.current) {
+                                    isProgrammaticChange.current = false;
+                                    Animated.spring(pinAnim, { toValue: 0, useNativeDriver: true }).start();
+                                    animateModal(0);
+                                    setIsModalDown(false);
+                                    return;
+                                }
+
+                                // Reset the flag
+                                isProgrammaticChange.current = false;
+                                Animated.spring(pinAnim, { toValue: 0, useNativeDriver: true }).start();
+                                animateModal(0);
+                                setIsModalDown(false);
+                                
+                                try {
+                                    const rev = await reverseGeocodeGoogle(region.latitude, region.longitude);
+                                    if (rev) {
+                                        const newLoc = {
+                                            label: selectedAddress?.label || 'Selected Location',
+                                            city: rev.city || 'Harare',
+                                            suburb: rev.suburb || 'Nearby',
+                                            street: rev.physical_address || '',
+                                            lat: region.latitude,
+                                            lng: region.longitude
+                                        };
+                                        if (selectedAddress) {
+                                            setSelectedAddress({ ...selectedAddress, city: newLoc.city, suburb: newLoc.suburb, street: newLoc.street, lat: newLoc.lat, lng: newLoc.lng });
+                                        } else {
+                                            setSelectedAddress(newLoc as any);
+                                        }
+                                    }
+                                } catch (error) {
+                                    console.warn("Drag Pin Geocode Error:", error);
+                                } finally {
+                                    setIsFetchingLocation(false);
+                                }
+                            }}
                         >
-                            {selectedAddress?.lat && selectedAddress?.lng && (
-                                <Marker
-                                    coordinate={{
-                                        latitude: selectedAddress.lat,
-                                        longitude: selectedAddress.lng
-                                    }}
-                                    pinColor={theme.accent}
-                                />
-                            )}
+                            {/* Marker removed in favor of center pin */}
                         </MapView>
+
+                        <View style={styles.fixedPinContainer} pointerEvents="none">
+                            {/* Glowing Target Dot - Appears when map is dragged */}
+                            <Animated.View style={[
+                                styles.glowingDot,
+                                {
+                                    opacity: pinAnim.interpolate({ inputRange: [-15, 0], outputRange: [1, 0] }),
+                                    transform: [{ scale: pinAnim.interpolate({ inputRange: [-15, 0], outputRange: [1.5, 0.5] }) }]
+                                }
+                            ]} />
+
+                            <Animated.View style={{ transform: [{ translateY: pinAnim }] }}>
+                                <View style={styles.destinationMarker}>
+                                    <View style={styles.destinationMarkerInner} />
+                                </View>
+                            </Animated.View>
+                            <Animated.View style={[
+                                styles.pinShadow, 
+                                { 
+                                    opacity: pinAnim.interpolate({ inputRange: [-15, 0], outputRange: [0.3, 1] }),
+                                    transform: [{ scale: pinAnim.interpolate({ inputRange: [-15, 0], outputRange: [0.5, 1] }) }]
+                                }
+                            ]} />
+                        </View>
 
                         <View style={styles.modalHeaderExtra}>
                             <TouchableOpacity 
@@ -687,18 +874,22 @@ export const CartScreen = ({ navigation }: any) => {
                                                 lng: details.geometry.location.lng,
                                             };
                                             setSelectedAddress(newLoc);
+                                            googlePlacesRef.current?.setAddressText(data.description);
+                                            googlePlacesRef.current?.blur();
+                                            Keyboard.dismiss();
                                             const region = {
                                                 latitude: newLoc.lat,
                                                 longitude: newLoc.lng,
-                                                latitudeDelta: 0.01,
-                                                longitudeDelta: 0.01,
+                                                latitudeDelta: 0.005,
+                                                longitudeDelta: 0.005,
                                             };
+                                            isProgrammaticChange.current = true;
                                             setMapRegion(region);
                                             mapRef.current?.animateToRegion(region, 500);
                                         }
                                     }}
                                     query={{
-                                        key: 'AIzaSyAfW8js09sB0cfQzz19aRBkSE7sDMy5cu0',
+                                        key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
                                         language: 'en',
                                         components: 'country:zw',
                                         types: 'establishment|geocode',
@@ -758,7 +949,16 @@ export const CartScreen = ({ navigation }: any) => {
                                                         { backgroundColor: theme.surface },
                                                         selectedAddress?.id === addr.id && { borderColor: theme.accent, borderWidth: 1 }
                                                     ]}
-                                                    onPress={() => setSelectedAddress(addr)}
+                                                    onPress={() => {
+                                                        setSelectedAddress(addr);
+                                                        isProgrammaticChange.current = true;
+                                                        mapRef.current?.animateToRegion({
+                                                            latitude: addr.lat,
+                                                            longitude: addr.lng,
+                                                            latitudeDelta: 0.005,
+                                                            longitudeDelta: 0.005,
+                                                        }, 300);
+                                                    }}
                                                 >
                                                     <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: theme.border + '20', justifyContent: 'center', alignItems: 'center' }}>
                                                         <MapPin size={20} color={theme.textMuted} />
@@ -775,34 +975,70 @@ export const CartScreen = ({ navigation }: any) => {
 
                                     {/* GPS Capture */}
                                     <TouchableOpacity
-                                        style={[styles.gpsCaptureBtn, { backgroundColor: theme.surface }]}
+                                        style={[
+                                            styles.gpsCaptureBtn, 
+                                            { backgroundColor: theme.surface },
+                                            (selectedAddress?.lat && Math.abs(selectedAddress.lat - (gpsLocation?.lat || 0)) < 0.0001) && { borderColor: theme.accent, borderWidth: 1 }
+                                        ]}
                                         onPress={async () => {
+                                            const currentRequestId = ++gpsRequestCounter.current;
+                                            isProgrammaticChange.current = true;
+                                            setIsGpsButtonLoading(true);
                                             setIsFetchingLocation(true);
                                             try {
                                                 const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
                                                 if (status === 'granted') {
-                                                    const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
-                                                    const [rev] = await ExpoLocation.reverseGeocodeAsync({
+                                                    // 1. Fast initial jump
+                                                    const lastKnown = await ExpoLocation.getLastKnownPositionAsync();
+                                                    if (currentRequestId !== gpsRequestCounter.current) return;
+
+                                                    if (lastKnown) {
+                                                        const fastRegion = {
+                                                            latitude: lastKnown.coords.latitude,
+                                                            longitude: lastKnown.coords.longitude,
+                                                            latitudeDelta: 0.005,
+                                                            longitudeDelta: 0.005,
+                                                        };
+                                                        isProgrammaticChange.current = true;
+                                                        mapRef.current?.animateToRegion(fastRegion, 100);
+
+                                                        const rev = await reverseGeocodeGoogle(lastKnown.coords.latitude, lastKnown.coords.longitude);
+                                                        if (rev) {
+                                                            const fastLoc = {
+                                                                city: rev.city || 'Harare',
+                                                                suburb: rev.suburb || 'Nearby',
+                                                                street: rev.physical_address || '',
+                                                                lat: lastKnown.coords.latitude,
+                                                                lng: lastKnown.coords.longitude
+                                                            };
+                                                            setSelectedAddress(fastLoc);
+                                                            // Clear button loading early
+                                                            setIsGpsButtonLoading(false);
+                                                        }
+                                                    }
+
+                                                    const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Highest });
+                                                    if (currentRequestId !== gpsRequestCounter.current) return;
+
+                                                    const region = {
                                                         latitude: loc.coords.latitude,
-                                                        longitude: loc.coords.longitude
-                                                    });
+                                                        longitude: loc.coords.longitude,
+                                                        latitudeDelta: 0.005,
+                                                        longitudeDelta: 0.005,
+                                                    };
+                                                    isProgrammaticChange.current = true;
+                                                    mapRef.current?.animateToRegion(region, 300);
+
+                                                    const rev = await reverseGeocodeGoogle(loc.coords.latitude, loc.coords.longitude);
                                                     if (rev) {
                                                         const newLoc = {
-                                                            city: rev.city || 'Current Location',
-                                                            suburb: rev.district || rev.subregion || 'Nearby',
-                                                            street: rev.name || '',
+                                                            city: rev.city || 'Harare',
+                                                            suburb: rev.suburb || 'Nearby',
+                                                            street: rev.physical_address || '',
                                                             lat: loc.coords.latitude,
                                                             lng: loc.coords.longitude
                                                         };
                                                         setSelectedAddress(newLoc);
-                                                        const region = {
-                                                            latitude: loc.coords.latitude,
-                                                            longitude: loc.coords.longitude,
-                                                            latitudeDelta: 0.01,
-                                                            longitudeDelta: 0.01,
-                                                        };
-                                                        setMapRegion(region);
-                                                        mapRef.current?.animateToRegion(region, 500);
                                                     }
                                                 } else {
                                                     Alert.alert('Permission Denied', 'Location permission is required.');
@@ -810,19 +1046,20 @@ export const CartScreen = ({ navigation }: any) => {
                                             } catch (error) {
                                                 console.log('GPS Error:', error);
                                             } finally {
+                                                setIsGpsButtonLoading(false);
                                                 setIsFetchingLocation(false);
                                             }
                                         }}
                                     >
                                         <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: theme.accent + '20', justifyContent: 'center', alignItems: 'center' }}>
-                                            {isFetchingLocation ? (
+                                            {isGpsButtonLoading ? (
                                                 <ActivityIndicator size="small" color={theme.accent} />
                                             ) : (
                                                 <MapPin size={20} color={theme.accent} />
                                             )}
                                         </View>
                                         <Text style={{ color: theme.text, fontWeight: '600' }}>
-                                            {isFetchingLocation ? 'Locating...' : 'Use Current GPS Location'}
+                                            {isGpsButtonLoading ? 'Locating...' : 'Use Current Location'}
                                         </Text>
                                     </TouchableOpacity>
 
@@ -903,6 +1140,70 @@ export const CartScreen = ({ navigation }: any) => {
                     <Text style={{ marginTop: 16, color: '#FFF', fontSize: 18, fontWeight: 'bold' }}>
                         {paymentMethod === 'cod' ? 'Processing Order...' : 'Processing Payment...'}
                     </Text>
+                </View>
+            </Modal>
+
+            {/* Fulfillment Selection Prompt */}
+            <Modal transparent visible={fulfillmentPromptVisible} animationType="fade">
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: 24 }]}>
+                    <View style={{ backgroundColor: theme.background, width: '100%', borderRadius: 32, padding: 24, paddingBottom: 32 }}>
+                        <Text style={{ fontSize: 24, fontWeight: '900', color: theme.text, textAlign: 'center', marginBottom: 8 }}>How would you like your order?</Text>
+                        <Text style={{ fontSize: 16, color: theme.textMuted, textAlign: 'center', marginBottom: 32 }}>Choose your fulfillment method for today.</Text>
+                        
+                        <View style={{ gap: 16 }}>
+                            <TouchableOpacity 
+                                style={{ 
+                                    flexDirection: 'row', 
+                                    alignItems: 'center', 
+                                    backgroundColor: theme.surface, 
+                                    padding: 24, 
+                                    borderRadius: 24, 
+                                    borderWidth: 2,
+                                    borderColor: fulfillmentType === 'delivery' ? theme.accent : 'transparent'
+                                }}
+                                onPress={() => {
+                                    setFulfillmentType('delivery');
+                                    setHasPrompted(true);
+                                    setFulfillmentPromptVisible(false);
+                                }}
+                            >
+                                <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: '#3B82F620', justifyContent: 'center', alignItems: 'center', marginRight: 16 }}>
+                                    <Truck size={32} color="#3B82F6" />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text }}>Delivery</Text>
+                                    <Text style={{ fontSize: 12, color: theme.textMuted }}>Get it brought to your door</Text>
+                                </View>
+                                {fulfillmentType === 'delivery' && <CheckCircle2 size={24} color={theme.accent} />}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                style={{ 
+                                    flexDirection: 'row', 
+                                    alignItems: 'center', 
+                                    backgroundColor: theme.surface, 
+                                    padding: 24, 
+                                    borderRadius: 24, 
+                                    borderWidth: 2,
+                                    borderColor: fulfillmentType === 'pickup' ? theme.accent : 'transparent'
+                                }}
+                                onPress={() => {
+                                    setFulfillmentType('pickup');
+                                    setHasPrompted(true);
+                                    setFulfillmentPromptVisible(false);
+                                }}
+                            >
+                                <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: '#10B98120', justifyContent: 'center', alignItems: 'center', marginRight: 16 }}>
+                                    <ShoppingBag size={32} color="#10B981" />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text }}>Preorder / Pickup</Text>
+                                    <Text style={{ fontSize: 12, color: theme.textMuted }}>Pick it up yourself for free</Text>
+                                </View>
+                                {fulfillmentType === 'pickup' && <CheckCircle2 size={24} color={theme.accent} />}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
                 </View>
             </Modal>
         </KeyboardAvoidingView>
@@ -1085,5 +1386,61 @@ const styles = StyleSheet.create({
         backgroundColor: '#10B98110',
         padding: 8,
         borderRadius: 8
+    },
+    destinationMarker: {
+        width: 30,
+        height: 30,
+        backgroundColor: '#ef4444',
+        borderTopLeftRadius: 15,
+        borderTopRightRadius: 15,
+        borderBottomLeftRadius: 15,
+        transform: [{ rotate: '45deg' }],
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+        elevation: 10,
+    },
+    destinationMarkerInner: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: '#FFF',
+        transform: [{ rotate: '-45deg' }],
+    },
+    fixedPinContainer: {
+        position: 'absolute',
+        top: Dimensions.get('window').height * 0.3 - 38,
+        left: '50%',
+        marginLeft: -15,
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        zIndex: 5
+    },
+    pinShadow: {
+        width: 12,
+        height: 6,
+        borderRadius: 6,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        marginTop: 4,
+    },
+    glowingDot: {
+        position: 'absolute',
+        bottom: 0,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: 'rgba(239, 68, 68, 0.4)',
+        borderWidth: 2,
+        borderColor: '#ef4444',
+        shadowColor: '#ef4444',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 1,
+        shadowRadius: 8,
+        elevation: 8,
     }
 });
