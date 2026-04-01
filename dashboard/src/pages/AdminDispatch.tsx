@@ -238,6 +238,7 @@ export const AdminDispatch = () => {
 
                     {/* Dispatch Console Overlay */}
                     {selectedOrder && (
+                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[550px] glass rounded-2xl border border-white/20 shadow-2xl z-[1000] overflow-hidden flex flex-col">
                             <div className="p-4 bg-[#FF4D00]/10 border-b border-white/10 flex justify-between items-center">
                                 <h3 className="font-bold text-accent">
                                     Assign Rider: 
