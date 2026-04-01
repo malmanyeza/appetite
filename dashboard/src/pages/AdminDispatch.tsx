@@ -9,12 +9,14 @@ import { GoogleMapBox } from '../components/GoogleMapBox';
 export const AdminDispatch = () => {
     const { data: orders, isLoading: isOrdersLoading } = useQuery({
         queryKey: ['admin-orders'],
-        queryFn: ordersService.getAdminOrders
+        queryFn: ordersService.getAdminOrders,
+        refetchInterval: 5000 // Heartbeat every 5s
     });
 
     const { data: drivers } = useQuery({
         queryKey: ['admin-drivers'],
-        queryFn: adminService.getAllDrivers
+        queryFn: adminService.getAllDrivers,
+        refetchInterval: 5000 // Heartbeat every 5s
     });
 
     // 1. Pending Orders (Needs Assignment)
@@ -44,7 +46,8 @@ export const AdminDispatch = () => {
             if (error) throw error;
             return data;
         },
-        enabled: !!selectedOrder?.restaurants?.lat
+        enabled: !!selectedOrder?.restaurants?.lat,
+        refetchInterval: 5000 // Live scanning while dispatching
     });
 
     const assignMutation = { isPending: false }; // Mock to prevent errors if still referenced

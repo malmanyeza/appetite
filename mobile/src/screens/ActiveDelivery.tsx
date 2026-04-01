@@ -133,8 +133,9 @@ export const ActiveDelivery = () => {
                 {
                     accuracy: ExpoLocation.Accuracy.High,
                     distanceInterval: 10,
+                    timeInterval: 15000, // Heartbeat every 15s even if stationary
                 },
-                (location) => {
+                async (location) => {
                     const coords = {
                         lat: location.coords.latitude,
                         lng: location.coords.longitude
@@ -142,26 +143,19 @@ export const ActiveDelivery = () => {
                     setUserLocation(location.coords);
                     
                     if (user?.id) {
-                        // Update main profile
-                        supabase
-                            .from('profiles')
-                            .update(coords)
-                            .eq('id', user.id)
-                            .then(({ error }: any) => {
-                                if (error) console.error("[Driver] Profiles Sync Error:", error);
-                            });
-                            
-                        // Also update driver_profiles extension
-                        supabase
-                            .from('driver_profiles')
-                            .update({
-                                ...coords,
-                                last_location_update: new Date().toISOString()
-                            })
-                            .eq('user_id', user.id)
-                            .then(({ error }: any) => {
-                                if (error) console.error("[Driver] DriverProfiles Sync Error:", error);
-                            });
+                        try {
+                            // Atomic update for both tables
+                            await Promise.all([
+                                supabase.from('profiles').update(coords).eq('id', user.id),
+                                supabase.from('driver_profiles').update({
+                                    ...coords,
+                                    is_online: true, // Ensure they stay online during delivery
+                                    last_location_update: new Date().toISOString()
+                                }).eq('user_id', user.id)
+                            ]);
+                        } catch (err) {
+                            console.error("[GPS Heartbeat] Sync Error:", err);
+                        }
                     }
                 }
             );

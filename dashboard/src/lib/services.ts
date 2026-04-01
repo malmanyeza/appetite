@@ -345,8 +345,11 @@ export const adminService = {
 
         // Transform the payload to match the expected format: 
         // Profiles array where each profile contains its driver_profile as an array [0]
+        // We prioritize the profiles.lat/lng as they are the live heartbeat coordinates.
         return data.map((dp: any) => ({
             ...dp.profiles,
+            lat: dp.profiles.lat || dp.lat, // Prioritize live profile ping
+            lng: dp.profiles.lng || dp.lng, 
             driver_profiles: [dp]
         }));
     },

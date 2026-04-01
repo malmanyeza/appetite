@@ -76,31 +76,41 @@ export const DriverJobs = () => {
             // Immediately fetch current pos and upload first
             const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.High });
             if (user?.id) {
-                await supabase.from('driver_locations').upsert({
-                    driver_id: user.id,
+                // Heartbeat to the live profiles table
+                await supabase.from('profiles').update({
+                    lat: loc.coords.latitude,
+                    lng: loc.coords.longitude
+                }).eq('id', user.id);
+
+                // Heartbeat to the driver monitoring table
+                await supabase.from('driver_profiles').update({
                     lat: loc.coords.latitude,
                     lng: loc.coords.longitude,
-                    heading: loc.coords.heading,
-                    speed: loc.coords.speed
-                });
+                    last_location_update: new Date().toISOString()
+                }).eq('user_id', user.id);
             }
 
-            // Begin continuous watch subscription
+            // Begin continuous watch subscription (15s intervals)
             const subscription = await ExpoLocation.watchPositionAsync(
                 {
                     accuracy: ExpoLocation.Accuracy.High,
-                    timeInterval: 15000,     // 15 seconds
-                    distanceInterval: 75,    // 75 meters
+                    timeInterval: 15000, 
+                    distanceInterval: 50, // 50m displacement
                 },
                 async (newLocation) => {
                     if (user?.id) {
-                        await supabase.from('driver_locations').upsert({
-                            driver_id: user.id,
-                            lat: newLocation.coords.latitude,
-                            lng: newLocation.coords.longitude,
-                            heading: newLocation.coords.heading,
-                            speed: newLocation.coords.speed
-                        });
+                        // Concurrent pings to keep both tables in sync
+                        await Promise.all([
+                            supabase.from('profiles').update({
+                                lat: newLocation.coords.latitude,
+                                lng: newLocation.coords.longitude
+                            }).eq('id', user.id),
+                            supabase.from('driver_profiles').update({
+                                lat: newLocation.coords.latitude,
+                                lng: newLocation.coords.longitude,
+                                last_location_update: new Date().toISOString()
+                            }).eq('user_id', user.id)
+                        ]);
                     }
                 }
             );
