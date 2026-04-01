@@ -48,6 +48,7 @@ export const AdminDispatch = () => {
 
     const [selectedOrder, setSelectedOrder] = useState<any>(null);
     const queryClient = useQueryClient();
+    const mapRef = useRef<any>(null); // New: Link to GoogleMapBox
 
     // 3. Dynamic GPS Dispatch Query
     const { data: closestDrivers, isLoading: isDriversLoading } = useQuery({
@@ -192,9 +193,8 @@ export const AdminDispatch = () => {
                                         key={driver.id} 
                                         className="p-3 rounded-lg bg-white/5 border border-white/5 flex items-center justify-between group hover:bg-white/10 transition-colors cursor-pointer"
                                         onClick={() => {
-                                            if (driver.lat && driver.lng && googleMapRef.current) {
-                                                googleMapRef.current.panTo({ lat: driver.lat, lng: driver.lng });
-                                                googleMapRef.current.setZoom(16);
+                                            if (driver.lat && driver.lng && mapRef.current) {
+                                                mapRef.current.panTo({ lat: driver.lat, lng: driver.lng });
                                             }
                                         }}
                                     >
@@ -220,6 +220,7 @@ export const AdminDispatch = () => {
                 {/* Right Panel: Interactive Google Map */}
                 <div className="flex-1 relative bg-surface">
                     <GoogleMapBox 
+                        ref={mapRef}
                         center={mapCenter}
                         markers={markers}
                         autoFit={true}

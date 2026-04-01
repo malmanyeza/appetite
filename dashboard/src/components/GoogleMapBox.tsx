@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 
 // Night mode styles for a professional look
 const nightModeStyles = [
@@ -105,17 +105,27 @@ interface GoogleMapBoxProps {
     };
 }
 
-export const GoogleMapBox: React.FC<GoogleMapBoxProps> = ({ 
+export const GoogleMapBox = forwardRef<any, GoogleMapBoxProps>(({ 
     center = { lat: -17.8252, lng: 31.0335 }, 
     markers = [],
     autoFit = false,
     route
-}) => {
+}, ref) => {
     const mapRef = useRef<HTMLDivElement>(null);
     const googleMapRef = useRef<any>(null);
     const markersRef = useRef<Map<string, any>>(new Map());
     const infoWindowRef = useRef<any>(null);
     const directionsRendererRef = useRef<any>(null);
+
+    // Expose the map instance functions to parents
+    useImperativeHandle(ref, () => ({
+        panTo: (pos: { lat: number, lng: number }) => {
+            if (googleMapRef.current) {
+                googleMapRef.current.panTo(pos);
+                googleMapRef.current.setZoom(16);
+            }
+        }
+    }));
 
     useEffect(() => {
         if (!window.google || !mapRef.current) return;
@@ -291,4 +301,4 @@ export const GoogleMapBox: React.FC<GoogleMapBoxProps> = ({
             style={{ minHeight: '400px', backgroundColor: '#111' }}
         />
     );
-};
+});
