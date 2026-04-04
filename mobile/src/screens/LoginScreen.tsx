@@ -39,7 +39,7 @@ export const LoginScreen = ({ navigation }: any) => {
 
         setLoading(true);
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({
+            const { error } = await supabase.auth.signInWithPassword({
                 email,
                 password,
             });
@@ -55,28 +55,9 @@ export const LoginScreen = ({ navigation }: any) => {
                 throw error;
             }
 
-            // Explicitly ping the authoritative backend to prevent zombie passwords bypassing cache
-            const { data: { user }, error: authError } = await supabase.auth.getUser();
-            if (authError || !user) {
-                await supabase.auth.signOut().catch(() => { });
-                throw new Error('This account has been administratively disabled or deleted.');
-            }
-
-            // Strictly check if the user exists in our public database (profiles)
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('id')
-                .eq('id', user.id)
-                .single();
-
-            if (!profile) {
-                await supabase.auth.signOut().catch(() => { });
-                throw new Error('This user does not exist in the database. Please sign up or contact support.');
-            }
-
-            // Note: We no longer manually call refreshSession here.
-            // The onAuthStateChange listener in App.tsx combined with the new 
-            // instant-update logic in authStore.ts handles the transition automatically.
+            // Note: We no longer perform any secondary checks (getUser or profiles ping) here.
+            // The onAuthStateChange listener in App.tsx now handles the 
+            // sub-second transition to the Home screen automatically.
         } catch (error: any) {
             Alert.alert('Login Failed', error.message);
         } finally {

@@ -1,7 +1,6 @@
-import 'react-native-url-polyfill/auto';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
 
 export const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 export const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -10,7 +9,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
     console.error('CRITICAL: Supabase environment variables are missing! The app will likely fail to load data.');
 }
 
-const WebStorageAdapter = {
+const storageAdapter = Platform.OS === 'web' ? {
     getItem: (key: string) => {
         if (typeof window !== 'undefined') {
             return window.localStorage.getItem(key);
@@ -27,15 +26,7 @@ const WebStorageAdapter = {
             window.localStorage.removeItem(key);
         }
     },
-};
-
-const ExpoSecureStoreAdapter = {
-    getItem: (key: string) => SecureStore.getItemAsync(key),
-    setItem: (key: string, value: string) => SecureStore.setItemAsync(key, value),
-    removeItem: (key: string) => SecureStore.deleteItemAsync(key),
-};
-
-const storageAdapter = Platform.OS === 'web' ? WebStorageAdapter : ExpoSecureStoreAdapter;
+} : AsyncStorage;
 
 // Create client lazily or handle missing config gracefully
 export const supabase = (supabaseUrl && supabaseAnonKey) 
