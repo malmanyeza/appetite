@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, View, useColorScheme, Text } from 'react-native';
+import * as ExpoLinking from 'expo-linking';
 import { NavigationContainer } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './src/store/authStore';
@@ -19,6 +20,8 @@ import * as Sentry from '@sentry/react-native';
 import { createNavigationContainerRef } from '@react-navigation/native';
 
 export const navigationRef = createNavigationContainerRef();
+
+/* Sentry initialization remains at the top level */
 
 Sentry.init({
   dsn: 'https://a44a140302c25fae7acd8834c1089bc8@o4511050037723136.ingest.us.sentry.io/4511050041720832',
@@ -108,6 +111,23 @@ function App() {
     const colorScheme = useColorScheme();
     const { loading, user, refreshSession } = useAuthStore();
     const { isOnline } = useNetwork();
+    
+    // -------------------------------------------------------------------------
+    // Deep Link Discovery & Debugging
+    // -------------------------------------------------------------------------
+    const initialUrl = ExpoLinking.useURL();
+    
+    useEffect(() => {
+        if (initialUrl) {
+            console.log('--- INCOMING DEEP LINK DETECTED ---');
+            console.log(`URL: ${initialUrl}`);
+            
+            // Helpful for debugging on physical devices where terminal isn't visible 
+            if (__DEV__) {
+                console.log(`[Link Info] Host: ${ExpoLinking.parse(initialUrl).path}`);
+            }
+        }
+    }, [initialUrl]);
 
     const isDark = colorScheme === 'dark';
     const theme = isDark ? Colors.dark : Colors.light;
@@ -119,10 +139,10 @@ function App() {
         // Fail-safe: Always dismiss splash after 10 seconds to prevent getting stuck
         const failSafeTimeout = setTimeout(() => {
             if (showSplash) {
-                console.warn('[App] Fail-safe triggered: Dismissing splash screen after timeout');
+                console.warn('[App] Fail-safe triggered: Dismissing splash screen after 3s');
                 setShowSplash(false);
             }
-        }, 10000);
+        }, 3000);
 
         // Listen for auth state changes safely
         const authData = supabase?.auth?.onAuthStateChange((event: string, session: any) => {
@@ -131,11 +151,9 @@ function App() {
             } else if (event === 'SIGNED_OUT') {
                 refreshSession(null);
             } else if (event === 'PASSWORD_RECOVERY') {
-                // The SDK will handle the session, we just need to navigate to the ResetPassword screen.
-                console.log('[Auth] Password recovery event detected: Navigating to ResetPassword');
-                if (navigationRef.isReady()) {
-                    navigationRef.navigate('ResetPassword' as never);
-                }
+                // We let the NavigationContainer's 'linking' handle the routing now 
+                // to avoid double-navigation conflicts.
+                console.log('[Auth] Password recovery event detected');
             }
         });
 
@@ -147,8 +165,21 @@ function App() {
         };
     }, []);
 
-    // Remove the generic loading spinner because AnimatedSplash now handles the loading phase 
-    // seamlessly on top of everything.
+    const appLinkingConfig = React.useMemo(() => ({
+        prefixes: [
+            ExpoLinking.createURL('/'),
+            'https://malmanyeza.github.io/appetite',
+            'https://malmanyeza.github.io',
+            'appetite://'
+        ],
+        config: {
+            screens: {
+                ResetPassword: 'reset-password',
+                Login: 'signup-callback',
+                ForgotPassword: 'forgot-password',
+            },
+        },
+    }), []);
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
@@ -161,7 +192,11 @@ function App() {
             >
                 <QueryClientProvider client={queryClient}>
                     <ThemeContext.Provider value={{ theme, isDark }}>
-                        <NavigationContainer ref={navigationRef}>
+                        <NavigationContainer 
+                            ref={navigationRef} 
+                            linking={appLinkingConfig}
+                            fallback={<ActivityIndicator color={theme.accent} size="large" style={{ flex: 1 }} />}
+                        >
                             <StatusBar style={isDark ? 'light' : 'dark'} />
                             <ConnectionBanner isOnline={isOnline} theme={theme} />
                             <RootNavigator />

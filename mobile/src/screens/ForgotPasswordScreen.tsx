@@ -11,6 +11,7 @@ import {
     ActivityIndicator,
     ScrollView
 } from 'react-native';
+import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { useTheme } from '../theme';
 import { Mail, ArrowLeft, Send } from 'lucide-react-native';
@@ -26,23 +27,41 @@ export const ForgotPasswordScreen = ({ navigation }: any) => {
             Alert.alert('Missing Email', 'Please enter your email address to reset your password.');
             return;
         }
-
+    
+        const cleanedEmail = email.trim().toLowerCase();
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
+        if (!emailRegex.test(cleanedEmail)) {
             Alert.alert('Invalid Email', 'Please enter a valid email address.');
             return;
         }
-
+    
         setLoading(true);
         try {
-            await resetPasswordForEmail(email.trim());
+            // Pre-check: Status of the user (exists/confirmed)
+            const { data: status, error: statusError } = await supabase
+                .rpc('check_user_status', { email_text: cleanedEmail });
+
+            if (statusError) {
+                console.error('Status check error:', statusError);
+                // Fallback to standard behavior if RPC fails
+            } else {
+                if (!status.exists) {
+                    throw new Error('This email address is not registered. Please sign up first.');
+                }
+                if (!status.confirmed) {
+                    throw new Error('Your email has not been verified yet. Please check your inbox for the confirmation link or sign in to resend it.');
+                }
+            }
+            
+            await resetPasswordForEmail(cleanedEmail);
+            
             Alert.alert(
-                'Check Your Email',
-                'We have sent a password reset link to your email address.',
+                'Link Sent!',
+                'We have sent a password reset link to your email. Please check your inbox and spam folder!',
                 [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
             );
         } catch (error: any) {
-            Alert.alert('Request Failed', error.message || 'Failed to send reset link.');
+            Alert.alert('Unable to Reset', error.message || 'Failed to send reset link.');
         } finally {
             setLoading(false);
         }

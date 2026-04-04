@@ -10,6 +10,7 @@ interface AnimatedSplashProps {
 
 export const AnimatedSplash: React.FC<AnimatedSplashProps> = ({ onReady, isAppReady }) => {
     const [animationDone, setAnimationDone] = useState(false);
+    const [isFading, setIsFading] = useState(false);
     const opacityAnim = useRef(new Animated.Value(1)).current;
     
     // Split the word for wave animation
@@ -45,7 +46,7 @@ export const AnimatedSplash: React.FC<AnimatedSplashProps> = ({ onReady, isAppRe
     }, []);
 
     useEffect(() => {
-        if (isAppReady && !animationDone) {
+        if (isAppReady && !animationDone && !isFading) {
             // Give it a tiny delay to ensure the wave had time to finish or is finishing
             setTimeout(() => {
                 beginFadeOut();
@@ -54,6 +55,8 @@ export const AnimatedSplash: React.FC<AnimatedSplashProps> = ({ onReady, isAppRe
     }, [isAppReady]);
 
     const beginFadeOut = () => {
+        if (isFading) return;
+        setIsFading(true);
         Animated.timing(opacityAnim, {
             toValue: 0,
             duration: 600,
@@ -68,7 +71,14 @@ export const AnimatedSplash: React.FC<AnimatedSplashProps> = ({ onReady, isAppRe
     if (animationDone) return null;
 
     return (
-        <Animated.View style={[styles.container, { opacity: opacityAnim }]}>
+        <Animated.View 
+            pointerEvents={isFading ? "none" : "auto"}
+            style={[
+                styles.container, 
+                { opacity: opacityAnim },
+                isFading && { elevation: 0, zIndex: 0 }
+            ]}
+        >
             <View style={styles.textContainer}>
                 {word.split('').map((letter, index) => (
                     <Animated.Text

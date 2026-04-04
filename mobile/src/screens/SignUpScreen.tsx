@@ -78,7 +78,8 @@ export const SignUpScreen = ({ navigation }: any) => {
                     data: { 
                         full_name: name.trim(),
                         phone: phone.trim()
-                    }
+                    },
+                    emailRedirectTo: 'appetite://signup-callback'
                 }
             });
 

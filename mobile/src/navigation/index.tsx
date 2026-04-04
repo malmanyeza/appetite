@@ -136,15 +136,17 @@ export const RootNavigator = () => {
 
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
+            {/* Always include reset/callback screens to ensure deep links never fail */}
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+            
             {!user || isSigningUp ? (
                 <>
-                    <Stack.Screen name="Login" component={LoginScreen} />
                     <Stack.Screen name="SignUp" component={SignUpScreen} />
                     <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
                     <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
                     <Stack.Screen name="EmailVerification" component={EmailVerificationScreen} />
                     <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-                    <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
                 </>
             ) : activeRole === 'driver' ? (
                 <Stack.Screen name="DriverApp" component={DriverTabs} />
