@@ -3,10 +3,6 @@ name: Deploy Dashboard to GitHub Pages
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'dashboard/**'
-      - 'shared/**'
-      - '.github/workflows/deploy-dashboard.yml'
 
 permissions:
   contents: write
@@ -24,6 +20,11 @@ jobs:
           npm install --legacy-peer-deps
           cd dashboard
           npm run build
+          # Manually copy the root files into the build folder
+          cp ../index.html ./dist/
+          cp ../privacy_policy.html ./dist/
+          cp -r ../reset-password ./dist/
+          cp -r ../signup-callback ./dist/
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
