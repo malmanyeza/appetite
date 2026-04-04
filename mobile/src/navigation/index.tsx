@@ -137,16 +137,13 @@ export const RootNavigator = () => {
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             {user && !isSigningUp ? (
-                // Authenticated Stack
+                // Authenticated Stack: ONLY Dashboard screens
                 <>
                     {activeRole === 'driver' ? (
                         <Stack.Screen name="DriverApp" component={DriverTabs} />
                     ) : (
                         <Stack.Screen name="CustomerApp" component={CustomerTabs} />
                     )}
-                    {/* We still include Login and ResetPassword in the stack as fallbacks for deep links */}
-                    <Stack.Screen name="Login" component={LoginScreen} />
-                    <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
                 </>
             ) : (
                 // Unauthenticated Stack
