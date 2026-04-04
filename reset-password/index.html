@@ -165,7 +165,9 @@
         // Initialize Supabase Client
         const SUPABASE_URL = 'https://ydcbycanrbdcyyabnfxn.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkY2J5Y2FucmJkY3l5YWJuZnhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MTE5NTIsImV4cCI6MjA4Njk4Nzk1Mn0.pjJkJ8PVGa7zeppWYxbBiUhic43lpnaxuVhgsApuv7k';
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // Fix: Use a different name for the client to avoid conflict with the library
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         const submitBtn = document.getElementById('submit-btn');
         const errorMsg = document.getElementById('error-msg');
@@ -191,7 +193,7 @@
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="loading-dots">Updating</span>';
 
-            const { error } = await supabase.auth.updateUser({ password });
+            const { error } = await supabaseClient.auth.updateUser({ password });
 
             if (error) {
                 showError(error.message);
