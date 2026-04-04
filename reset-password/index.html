@@ -3,13 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resetting Your Password - Appetite</title>
+    <title>Reset Password - Appetite</title>
+    <!-- Supabase JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --primary: #FF4D00;
-            --bg: #121212;
+            --primary-hover: #e64500;
+            --bg: #0A0A0A;
+            --card-bg: rgba(255, 255, 255, 0.05);
             --text: #FFFFFF;
             --text-secondary: #AAAAAA;
+            --error: #FF3B30;
+            --success: #34C759;
         }
         body {
             margin: 0;
@@ -18,127 +24,203 @@
             background-color: var(--bg);
             color: var(--text);
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
-            text-align: center;
+            min-height: 100vh;
         }
         .container {
-            max-width: 400px;
+            width: 100%;
+            max-width: 420px;
             padding: 20px;
         }
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
         .logo {
-            font-size: 48px;
-            font-weight: bold;
+            font-size: 32px;
+            font-weight: 800;
             color: var(--primary);
-            margin-bottom: 20px;
+            margin-bottom: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
+            gap: 8px;
         }
-        .flame {
-            font-size: 40px;
+        .logo span { font-size: 28px; }
+        h1 { font-size: 24px; margin-bottom: 8px; font-weight: 700; }
+        p { color: var(--text-secondary); font-size: 15px; margin-bottom: 32px; line-height: 1.5; }
+        
+        .form-group {
+            text-align: left;
+            margin-bottom: 20px;
         }
-        h1 {
-            font-size: 24px;
-            margin-bottom: 10px;
-        }
-        p {
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 8px;
             color: var(--text-secondary);
-            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid rgba(255, 255, 255, 0.1);
-            border-left-color: var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        .btn {
-            background-color: var(--primary);
-            color: white;
-            padding: 16px 32px;
+        input {
+            width: 100%;
+            padding: 14px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1.5px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
-            text-decoration: none;
-            font-weight: bold;
+            color: white;
             font-size: 16px;
-            display: inline-block;
-            transition: transform 0.2s;
+            box-sizing: border-box;
+            transition: all 0.2s;
         }
-        .btn:active {
-            transform: scale(0.95);
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: rgba(255, 255, 255, 0.08);
         }
-        .footer {
-            position: absolute;
-            bottom: 40px;
+        
+        .btn {
+            width: 100%;
+            padding: 16px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 10px;
+        }
+        .btn:hover { background: var(--primary-hover); transform: translateY(-1px); }
+        .btn:active { transform: translateY(0); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        .message {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 10px;
             font-size: 14px;
-            color: var(--text-secondary);
+            display: none;
+        }
+        .message.error { display: block; background: rgba(255, 59, 48, 0.1); color: var(--error); border: 1px solid rgba(255, 59, 48, 0.2); }
+        .message.success { display: block; background: rgba(52, 199, 89, 0.1); color: var(--success); border: 1px solid rgba(52, 199,  green, 0.2); }
+
+        #success-state { display: none; }
+        .success-icon { font-size: 64px; color: var(--success); margin-bottom: 24px; }
+        
+        .loading-dots:after {
+            content: '.';
+            animation: dots 1.5s steps(5, end) infinite;
+        }
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60% { content: '...'; }
+            80%, 100% { content: ''; }
         }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <div class="logo">
-            <span class="flame">🔥</span> Appetite
-        </div>
-        
-        <div class="spinner" id="spinner"></div>
-        
-        <h1 id="title">Taking you to the app...</h1>
-        <p id="subtitle">We're opening the Appetite app so you can securely reset your password.</p>
-        
-        <a href="#" id="manual-btn" class="btn">Open Appetite App</a>
-    </div>
+        <!-- Main Form State -->
+        <div id="reset-form-state" class="card">
+            <div class="logo"><span>🔥</span> Appetite</div>
+            <h1>Secure Reset</h1>
+            <p>Enter your new password below to regain access to your account.</p>
 
-    <div class="footer">
-        &copy; 2026 Appetite Inc.
+            <div class="form-group">
+                <label for="password">New Password</label>
+                <input type="password" id="password" placeholder="Min 6 characters">
+            </div>
+
+            <div class="form-group">
+                <label for="confirm-password">Confirm Password</label>
+                <input type="password" id="confirm-password" placeholder="Repeat your password">
+            </div>
+
+            <button id="submit-btn" class="btn">Update Password</button>
+            <div id="error-msg" class="message error"></div>
+        </div>
+
+        <!-- Success State -->
+        <div id="success-state" class="card">
+            <div class="success-icon">✅</div>
+            <h1>Password Updated</h1>
+            <p>Your password has been changed successfully. You can now close this tab and sign in to the Appetite app.</p>
+            <button onclick="window.location.href='appetite://login'" class="btn">Open Appetite App</button>
+        </div>
     </div>
 
     <script>
-        // Extract the full fragment (hash) from the URL
-        const hash = window.location.hash;
-        
-        // Use the Appetite custom scheme as the primary jump
-        const deepLink = "appetite://reset-password" + hash;
-        
-        // Update the manual button just in case
-        const btn = document.getElementById('manual-btn');
-        btn.href = deepLink;
+        // Initialize Supabase Client
+        const SUPABASE_URL = 'https://ydcbycanrbdcyyabnfxn.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkY2J5Y2FucmJkY3l5YWJuZnhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MTE5NTIsImV4cCI6MjA4Njk4Nzk1Mn0.pjJkJ8PVGa7zeppWYxbBiUhic43lpnaxuVhgsApuv7k';
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        function attemptRedirect() {
-            // If there's no hash, the link might be malformed or already used
-            if (!hash || hash.length < 10) {
-                document.getElementById('title').innerText = "Invalid Link";
-                document.getElementById('subtitle').innerText = "This password reset link appears to be invalid or expired.";
-                document.getElementById('spinner').style.display = 'none';
-                document.getElementById('manual-btn').innerText = "Back to Site";
-                document.getElementById('manual-btn').href = "/";
+        const submitBtn = document.getElementById('submit-btn');
+        const errorMsg = document.getElementById('error-msg');
+        const resetForm = document.getElementById('reset-form-state');
+        const successState = document.getElementById('success-state');
+
+        submitBtn.onclick = async () => {
+            const password = document.getElementById('password').value;
+            const confirm = document.getElementById('confirm-password').value;
+
+            // 1. Validation
+            errorMsg.style.display = 'none';
+            if (password.length < 6) {
+                showError("Password must be at least 6 characters long.");
+                return;
+            }
+            if (password !== confirm) {
+                showError("Passwords do not match.");
                 return;
             }
 
-            console.log("Attempting redirect to:", deepLink);
-            
-            // 1. Try to replace location (most reliable for many browsers)
-            window.location.replace(deepLink);
-            
-            // 2. Set a timeout as a secondary attempt / fallback UI update
-            setTimeout(() => {
-                document.getElementById('title').innerText = "Almost there!";
-                document.getElementById('subtitle').innerText = "If the app didn't open automatically, please tap the button below.";
-                document.getElementById('spinner').style.display = 'none';
-            }, 2500);
+            // 2. Execution
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="loading-dots">Updating</span>';
+
+            const { error } = await supabase.auth.updateUser({ password });
+
+            if (error) {
+                showError(error.message);
+                submitBtn.disabled = false;
+                submitBtn.innerText = "Update Password";
+            } else {
+                resetForm.style.display = 'none';
+                successState.style.display = 'block';
+            }
+        };
+
+        function showError(msg) {
+            errorMsg.innerText = msg;
+            errorMsg.style.display = 'block';
         }
 
-        // Run the redirect on page load
-        window.onload = attemptRedirect;
+        // Automatic App Jump (Optional)
+        // If the URL contains a fragment but the user waits too long, we still handle it.
+        window.onload = () => {
+             const hash = window.location.hash;
+             if (!hash || hash.length < 10) {
+                 // Check if redirected with an error in search params
+                 const params = new URLSearchParams(window.location.hash.substring(1));
+                 if (params.get('error')) {
+                     showError("Link Expired: " + params.get('error_description') || "The reset link is invalid.");
+                     submitBtn.disabled = true;
+                 }
+             }
+        };
     </script>
 </body>
 </html>
