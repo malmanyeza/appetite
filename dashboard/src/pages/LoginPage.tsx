@@ -11,24 +11,6 @@ export const LoginPage = () => {
     const { signIn, resetPasswordForEmail } = useAuthStore();
     const navigate = useNavigate();
 
-    const handleForgotPassword = async () => {
-        if (!email) {
-            setError('Please enter your email address to reset your password.');
-            return;
-        }
-        setError('');
-        setSuccess('');
-        setLoading(true);
-        try {
-            await resetPasswordForEmail(email);
-            setSuccess('Password reset link sent! Please check your email.');
-        } catch (err: any) {
-            setError(err.message || 'Failed to send reset link.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
@@ -85,13 +67,6 @@ export const LoginPage = () => {
                     <div className="space-y-2">
                         <div className="flex justify-between items-center ml-1">
                             <label className="text-sm font-medium text-[#A3A3A3]">Password</label>
-                            <button 
-                                type="button"
-                                onClick={handleForgotPassword}
-                                className="text-xs font-semibold text-[#FF4D00] hover:text-[#FF6A26] transition-colors"
-                            >
-                                Forgot Password?
-                            </button>
                         </div>
                         <input
                             type="password"

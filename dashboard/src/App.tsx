@@ -62,7 +62,6 @@ function App() {
             <HashRouter>
                 <Routes>
                     <Route path="/login" element={<LoginPage />} />
-                    <Route path="/reset-password" element={<ResetPasswordPage />} />
 
                     <Route path="/restaurant/*" element={
                         <ProtectedRoute allowedRoles={['restaurant', 'admin']}>
