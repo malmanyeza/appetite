@@ -24,6 +24,12 @@ export const ConfirmSignupPage = () => {
                 if (exchangeError) throw exchangeError;
                 
                 setStatus('success');
+                
+                // Attempt auto-redirect to app
+                setTimeout(() => {
+                    const deepLink = `exp+appetite-mobile://signup-callback${window.location.search || window.location.hash}`;
+                    window.location.replace(deepLink);
+                }, 1000);
             } catch (err: any) {
                 console.error('Confirmation error:', err);
                 setStatus('error');
@@ -99,6 +105,9 @@ export const ConfirmSignupPage = () => {
                     <div className="grid grid-cols-1 gap-4 pt-4">
                         <p className="text-white font-medium bg-emerald-500/10 p-4 rounded-xl border border-emerald-500/20">
                             Verification complete! You can now close this window and return to the Appetite app to continue.
+                        </p>
+                        <p className="text-xs text-[#A3A3A3]">
+                            App didn't open? <a href={`exp+appetite-mobile://signup-callback${window.location.search || window.location.hash}`} className="text-[#FF4D00] underline font-bold">Tap here to open Appetite</a>
                         </p>
                     </div>
                 </div>
