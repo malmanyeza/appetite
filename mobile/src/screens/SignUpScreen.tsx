@@ -117,7 +117,6 @@ export const SignUpScreen = ({ navigation }: any) => {
             style={[styles.container, { backgroundColor: theme.background }]}
         >
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { flexGrow: 1 }]}>
-                <View style={{ flex: 1 }} />
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={() => navigation.goBack()}
@@ -216,7 +215,6 @@ export const SignUpScreen = ({ navigation }: any) => {
                         </TouchableOpacity>
                     </View>
                 </View>
-                <View style={{ flex: 1 }} />
             </ScrollView>
         </KeyboardAvoidingView>
     );
@@ -224,7 +222,7 @@ export const SignUpScreen = ({ navigation }: any) => {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    scrollContent: { padding: 24 },
+    scrollContent: { flexGrow: 1, justifyContent: 'center', padding: 24 },
     backButton: {
         width: 44,
         height: 44,

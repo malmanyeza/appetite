@@ -75,7 +75,6 @@ export const LoginScreen = ({ navigation }: any) => {
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
             >
-                <View style={{ flex: 1 }} />
                 <View style={styles.content}>
                     <View style={styles.header}>
                         <View style={[styles.logoContainer, { backgroundColor: theme.accent }]}>
@@ -142,7 +141,6 @@ export const LoginScreen = ({ navigation }: any) => {
                         </TouchableOpacity>
                     </View>
                 </View>
-                <View style={{ flex: 1 }} />
             </ScrollView>
         </KeyboardAvoidingView>
     );
@@ -150,8 +148,8 @@ export const LoginScreen = ({ navigation }: any) => {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    scrollContent: { flexGrow: 1 },
-    content: { padding: 24 },
+    scrollContent: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+    content: { padding: 0 },
     header: { alignItems: 'center', marginBottom: 48 },
     logoContainer: {
         width: 80,
