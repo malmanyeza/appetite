@@ -93,9 +93,7 @@
         <div class="spinner" id="spinner"></div>
         
         <h1 id="title">Confirming your account...</h1>
-        <p id="subtitle">We're opening Appetite to verify your email address. You're almost ready to start ordering!</p>
-        
-        <a href="#" id="manual-btn" class="btn">Open Appetite App</a>
+        <p id="subtitle">We're verifying your email address. Once complete, please return to the Appetite app to start ordering!</p>
     </div>
 
     <div class="footer">
@@ -109,10 +107,6 @@
         
         // Priorities search parameters (modern PKCE code) then hash
         const deepLink = "appetite://signup-callback" + (search || hash || "");
-        
-        // Update the manual button just in case
-        const btn = document.getElementById('manual-btn');
-        btn.href = deepLink;
 
         function attemptRedirect() {
             // For signup, if there's no hash or search it might be a valid direct hit or error
@@ -127,8 +121,8 @@
             
             // 2. Set a timeout as a secondary attempt / fallback UI update
             setTimeout(() => {
-                document.getElementById('title').innerText = "Almost there!";
-                document.getElementById('subtitle').innerText = "If the app didn't open automatically, please tap the button below to finish your sign-up.";
+                document.getElementById('title').innerText = "Email Verified!";
+                document.getElementById('subtitle').innerText = "Your account is now ready. Please go back to the Appetite app on your device to sign in.";
                 document.getElementById('spinner').style.display = 'none';
             }, 2500);
         }

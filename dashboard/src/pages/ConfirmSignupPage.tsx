@@ -97,13 +97,9 @@ export const ConfirmSignupPage = () => {
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 pt-4">
-                        <button 
-                            onClick={() => navigate('/login')}
-                            className="bg-[#FF4D00] hover:bg-[#FF6A00] text-white py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 shadow-xl shadow-[#FF4D00]/20 transition-all active:scale-95"
-                        >
-                            <LogIn size={20} />
-                            Go to Login
-                        </button>
+                        <p className="text-white font-medium bg-emerald-500/10 p-4 rounded-xl border border-emerald-500/20">
+                            Verification complete! You can now close this window and return to the Appetite app to continue.
+                        </p>
                     </div>
                 </div>
             </div>
