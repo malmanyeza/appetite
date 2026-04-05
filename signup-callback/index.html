@@ -95,8 +95,9 @@
         <h1 id="title">Confirming your account...</h1>
         <p id="subtitle">We're verifying your email address. Once complete, please return to the Appetite app to start ordering!</p>
         
-        <div id="fallback" style="display: none; margin-top: 20px;">
-            <p style="font-size: 14px; color: var(--text-secondary);">App didn't open? <a href="#" id="fallback-link" style="color: var(--primary); font-weight: bold; text-decoration: underline;">Tap here to open Appetite</a></p>
+        <div id="fallback-container" style="display: none; margin-top: 20px;">
+            <p style="font-size: 14px; margin-bottom: 10px;">Didn't open automatically?</p>
+            <a href="#" id="fallback-link" style="color: var(--primary); font-weight: bold; text-decoration: underline;">Tap here to open Appetite</a>
         </div>
     </div>
 
@@ -112,7 +113,7 @@
         // Priorities search parameters (modern PKCE code) then hash
         const deepLink = "exp+appetite-mobile://signup-callback" + (search || hash || "");
         
-        // Update the fallback link just in case
+        // Update the fallback link
         document.getElementById('fallback-link').href = deepLink;
 
         function attemptRedirect() {
@@ -131,7 +132,7 @@
                 document.getElementById('title').innerText = "Email Verified!";
                 document.getElementById('subtitle').innerText = "Your account is now ready. Please go back to the Appetite app on your device to sign in.";
                 document.getElementById('spinner').style.display = 'none';
-                document.getElementById('fallback').style.display = 'block';
+                document.getElementById('fallback-container').style.display = 'block';
             }, 2500);
         }
 
