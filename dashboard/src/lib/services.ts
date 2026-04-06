@@ -520,7 +520,7 @@ export const adminService = {
         return data;
     },
 
-    async getPayoutStatus(payoutId: string, status: string) {
+    async updatePayoutStatus(payoutId: string, status: string) {
         const { error } = await supabase
             .from('payouts')
             .update({ status })

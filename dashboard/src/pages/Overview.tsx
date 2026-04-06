@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
 import { restaurantService, adminService, ordersService } from '../lib/services';
+import { supabase } from '../lib/supabase';
 import { AlertCircle, Clock, TrendingUp, Users, Store, Activity, ArrowRight, DollarSign } from 'lucide-react';
 import { StatusPill } from '../components/StatusPill';
 import { Link } from 'react-router-dom';
