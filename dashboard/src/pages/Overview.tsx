@@ -27,7 +27,7 @@ export const Overview = () => {
         enabled: currentRole === 'admin' || (currentRole === 'restaurant' && !!restaurant?.id)
     });
 
-    const { data: recentOrders, isLoading: isOrdersLoading } = useQuery({
+    const { data: recentOrders, isLoading: isOrdersLoading, refetch: refetchOrders } = useQuery({
         queryKey: ['recent-orders', currentRole, restaurant?.id],
         queryFn: async () => {
             const allOrders = currentRole === 'restaurant'
@@ -37,6 +37,27 @@ export const Overview = () => {
         },
         enabled: currentRole === 'admin' || (currentRole === 'restaurant' && !!restaurant?.id)
     });
+
+    const { data: adminNotices, refetch: refetchNotices } = useQuery({
+        queryKey: ['admin-notices'],
+        queryFn: () => adminService.getAdminNotifications(),
+        enabled: currentRole === 'admin'
+    });
+
+    useEffect(() => {
+        if (currentRole !== 'admin') return;
+
+        const sub = supabase.channel('admin-notices')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_notifications' }, () => {
+                refetchNotices();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(sub);
+        };
+    }, [currentRole, refetchNotices]);
+
 
     const chartData = useMemo(() => {
         if (!stats?.allOrders) return [];
@@ -268,13 +289,28 @@ export const Overview = () => {
                     </h3>
 
                     <div className="space-y-4 flex-1 overflow-y-auto pr-2">
-                        {stats?.alerts && stats.alerts.length > 0 ? (
-                            stats.alerts.map((alert: any, idx: number) => (
-                                <div key={idx} className={`p-4 rounded-xl bg-${alert.color}-500/10 border border-${alert.color}-500/20 text-${alert.color}-500 space-y-1`}>
-                                    <p className="font-bold text-sm">{alert.title}</p>
-                                    <p className={`text-xs opacity-80`}>{alert.message}</p>
-                                </div>
-                            ))
+                        {/* Combine stats.alerts with adminNotices */}
+                        {((stats?.alerts || []).length > 0 || (adminNotices || []).length >0 ) ? (
+                            <>
+                                {stats?.alerts?.map((alert: any, idx: number) => (
+                                    <div key={`stat-${idx}`} className={`p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 space-y-1`}>
+                                        <p className="font-bold text-sm">{alert.title}</p>
+                                        <p className="text-xs opacity-80">{alert.message}</p>
+                                    </div>
+                                ))}
+                                {adminNotices?.map((notice: any) => (
+                                    <div key={notice.id} className={`p-4 rounded-xl ${notice.read ? 'bg-white/5 opacity-60' : 'bg-accent/10 border border-accent/20'} text-white space-y-1`}>
+                                        <div className="flex justify-between items-start">
+                                            <p className="font-bold text-sm">{notice.title}</p>
+                                            {!notice.read && <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />}
+                                        </div>
+                                        <p className="text-xs text-muted leading-relaxed">{notice.message}</p>
+                                        <p className="text-[10px] opacity-40">
+                                            {new Date(notice.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </p>
+                                    </div>
+                                ))}
+                            </>
                         ) : (
                             <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-muted space-y-1">
                                 <p className="font-bold text-sm text-white">All Systems Normal</p>
@@ -282,6 +318,7 @@ export const Overview = () => {
                             </div>
                         )}
                     </div>
+
                 </div>
             </div>
 

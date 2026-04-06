@@ -196,7 +196,7 @@ export const DriverJobs = () => {
                 .from('orders')
                 .select('id, status')
                 .eq('driver_id', user.id)
-                .in('status', ['accepted', 'ready_for_pickup', 'picked_up', 'on_the_way'])
+                .in('status', ['confirmed', 'preparing', 'ready_for_pickup', 'picked_up', 'on_the_way'])
                 .maybeSingle();
 
             // Just return data. If no active order, data is null.
@@ -412,7 +412,7 @@ export const DriverJobs = () => {
                                     </View>
 
                                     <View style={styles.actionSectionItems}>
-                                        {job.status === 'ready_for_pickup' && !job.driver_id && (
+                                        {(['confirmed', 'preparing', 'ready_for_pickup'].includes(job.status)) && !job.driver_id && (
                                             <TouchableOpacity
                                                 style={[styles.primaryBtn, { backgroundColor: theme.accent }]}
                                                 onPress={() => acceptJob.mutate(job.id)}
@@ -421,7 +421,7 @@ export const DriverJobs = () => {
                                                 {acceptJob.isPending ? <ActivityIndicator color="white" /> : <Text style={styles.btnText}>Accept Job Offer</Text>}
                                             </TouchableOpacity>
                                         )}
-                                        {job.driver_id === user?.id && ['ready_for_pickup', 'picked_up', 'on_the_way'].includes(job.status) && (
+                                        {job.driver_id === user?.id && ['confirmed', 'preparing', 'ready_for_pickup', 'picked_up', 'on_the_way'].includes(job.status) && (
                                             <TouchableOpacity
                                                 style={[styles.primaryBtn, { backgroundColor: '#3B82F6' }]}
                                                 onPress={() => navigation.navigate('ActiveDelivery', { orderId: job.id })}

@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
         'Authorization': `Bearer ${resendApiKey}`
       },
       body: JSON.stringify({
-        from: 'Appetite <orders@appetite.com>', // Update this to your verified domain
+        from: 'Appetite <appetite@nexura.co.zw>', 
         to: [customer.email, manager?.email].filter(Boolean),
         subject: `Order Recieved: #${order.id.slice(0, 8).toUpperCase()}`,
         html: emailHtml

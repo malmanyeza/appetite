@@ -261,7 +261,7 @@ export const AdminDrivers = () => {
                                         <div className="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
                                             <p className="text-[10px] text-muted uppercase font-bold tracking-wider mb-1">City / Area</p>
                                             <p className="text-sm font-bold text-white">
-                                                {selectedDriver.driver_profiles?.[0]?.city || 'N/A'} • {selectedDriver.driver_profiles?.[0]?.operating_area || 'N/A'}
+                                                {selectedDriver.driver_profiles?.[0]?.city || 'N/A'}
                                             </p>
                                         </div>
                                         <div className="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
@@ -281,9 +281,9 @@ export const AdminDrivers = () => {
                                     </div>
 
                                     {/* Documents */}
-                                    <div className="flex gap-4">
+                                    <div className="grid grid-cols-3 gap-4">
                                         <div className="flex-1 space-y-2">
-                                            <p className="text-[10px] text-muted uppercase font-bold tracking-wider">Driver Selfie</p>
+                                            <p className="text-[10px] text-muted uppercase font-bold tracking-wider text-center">Driver Selfie</p>
                                             <div className="h-40 rounded-xl border border-white/5 bg-white/[0.02] flex items-center justify-center overflow-hidden relative group">
                                                 {selectedDriver.driver_profiles?.[0]?.selfie_url ? (
                                                     <img src={selectedDriver.driver_profiles[0].selfie_url} alt="Selfie" className="w-full h-full object-cover" />
@@ -296,7 +296,7 @@ export const AdminDrivers = () => {
                                             </div>
                                         </div>
                                         <div className="flex-1 space-y-2">
-                                            <p className="text-[10px] text-muted uppercase font-bold tracking-wider">National ID</p>
+                                            <p className="text-[10px] text-muted uppercase font-bold tracking-wider text-center">National ID</p>
                                             <div className="h-40 rounded-xl border border-white/5 bg-white/[0.02] flex items-center justify-center overflow-hidden relative group">
                                                 {selectedDriver.driver_profiles?.[0]?.id_photo_url ? (
                                                     <img src={selectedDriver.driver_profiles[0].id_photo_url} alt="National ID" className="w-full h-full object-cover" />
@@ -305,6 +305,19 @@ export const AdminDrivers = () => {
                                                 )}
                                                 {selectedDriver.driver_profiles?.[0]?.id_photo_url && (
                                                     <a href={selectedDriver.driver_profiles[0].id_photo_url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-xs uppercase tracking-wider backdrop-blur-sm">View Full</a>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 space-y-2">
+                                            <p className="text-[10px] text-muted uppercase font-bold tracking-wider text-center">Reg. Book</p>
+                                            <div className="h-40 rounded-xl border border-white/5 bg-white/[0.02] flex items-center justify-center overflow-hidden relative group">
+                                                {selectedDriver.driver_profiles?.[0]?.registration_book_url ? (
+                                                    <img src={selectedDriver.driver_profiles[0].registration_book_url} alt="Reg Book" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <p className="text-xs text-muted">No Document</p>
+                                                )}
+                                                {selectedDriver.driver_profiles?.[0]?.registration_book_url && (
+                                                    <a href={selectedDriver.driver_profiles[0].registration_book_url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-xs uppercase tracking-wider backdrop-blur-sm">View Full</a>
                                                 )}
                                             </div>
                                         </div>

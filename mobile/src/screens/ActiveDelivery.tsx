@@ -52,6 +52,19 @@ const decodePolyline = (t: string) => {
     return points;
 };
 
+// Distance Helper (Haversine)
+const getDistanceInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // Radius of the earth in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; 
+};
+
 export const ActiveDelivery = () => {
     const { theme, isDark } = useTheme();
     const { user } = useAuthStore();
@@ -80,8 +93,8 @@ export const ActiveDelivery = () => {
             if (error) throw error;
             return data;
         },
-        enabled: !!orderId,
-        refetchInterval: 5000
+        enabled: !!orderId && !isNavigating,
+        refetchInterval: isNavigating ? 0 : 5000
     });
 
     const [isPinModalVisible, setIsPinModalVisible] = useState(false);
@@ -93,8 +106,22 @@ export const ActiveDelivery = () => {
     const [distance, setDistance] = useState<string>('');
     const [duration, setDuration] = useState<string>('');
     const [isMapReady, setIsMapReady] = useState(false);
+    const [isArrived, setIsArrived] = useState(false);
+    const [lastStatus, setLastStatus] = useState<string | null>(null);
+
+    // Sync isArrived state with DB flags on load/update
+    useEffect(() => {
+        if (order) {
+            const headingToRest = ['pending', 'confirmed', 'preparing', 'accepted', 'ready_for_pickup'].includes(order.status);
+            const drivingToCust = order.status === 'on_the_way';
+            
+            if (headingToRest && order.is_driver_at_restaurant) setIsArrived(true);
+            if (drivingToCust && order.is_driver_at_customer) setIsArrived(true);
+        }
+    }, [order?.is_driver_at_restaurant, order?.is_driver_at_customer, order?.status]);
     
     const mapRef = React.useRef<MapView | null>(null);
+    const hasInitialRecentered = React.useRef(false);
     const modalY = React.useRef(new Animated.Value(0)).current;
     
     const animateModal = (toValue: number) => {
@@ -144,6 +171,44 @@ export const ActiveDelivery = () => {
                         lng: location.coords.longitude
                     };
                     setUserLocation(location.coords);
+
+                    // Arrival Detection logic
+                    if (order) {
+                        const isHeadingToRest = ['pending', 'confirmed', 'preparing', 'accepted', 'ready_for_pickup'].includes(order.status);
+                        const isDrivingToCustomer = order.status === 'on_the_way';
+                        
+                        let targetLat, targetLng;
+                        if (isHeadingToRest) {
+                            targetLat = order.restaurant_locations?.lat;
+                            targetLng = order.restaurant_locations?.lng;
+                        } else if (isDrivingToCustomer) {
+                            targetLat = order.delivery_address_snapshot?.lat;
+                            targetLng = order.delivery_address_snapshot?.lng;
+                        }
+
+                        if (targetLat && targetLng) {
+                            const distToTarget = getDistanceInKm(
+                                location.coords.latitude, 
+                                location.coords.longitude, 
+                                targetLat, 
+                                targetLng
+                            );
+                            
+                            // 100m threshold (0.1km)
+                            if (distToTarget < 0.1) {
+                                if (!isArrived) {
+                                    setIsArrived(true);
+                                    
+                                    // Set arriving flag in database which triggers customer notification
+                                    updateArrivalStatus.mutate({ 
+                                        field: isHeadingToRest ? 'is_driver_at_restaurant' : 'is_driver_at_customer' 
+                                    });
+                                }
+                            } else {
+                                if (isArrived) setIsArrived(false);
+                            }
+                        }
+                    }
                     
                     if (user?.id) {
                         try {
@@ -164,13 +229,13 @@ export const ActiveDelivery = () => {
             );
         })();
         return () => subscription?.remove();
-    }, [user?.id]);
+    }, [user?.id, order?.id, order?.status]);
 
     // Phased road-based route logic
     useEffect(() => {
         if (!order || !userLocation) return;
         
-        const isHeadingToRest = ['ready_for_pickup', 'accepted', 'pending'].includes(order.status);
+        const isHeadingToRest = ['confirmed', 'preparing', 'ready_for_pickup', 'accepted', 'pending'].includes(order.status);
         const isDrivingToCustomer = order.status === 'on_the_way';
 
         let dest = null;
@@ -221,6 +286,14 @@ export const ActiveDelivery = () => {
         }
     }, [order?.status, userLocation?.latitude, userLocation?.longitude]);
 
+    // Reset Arrived state on status change
+    useEffect(() => {
+        if (order?.status && order.status !== lastStatus) {
+            setIsArrived(false);
+            setLastStatus(order.status);
+        }
+    }, [order?.status]);
+
     // Center map on route
     const handleRecenter = () => {
         if (routeCoords.length > 0 && mapRef.current) {
@@ -231,9 +304,14 @@ export const ActiveDelivery = () => {
         }
     };
 
+    // Auto-recenter removed to prevent disorienting auto-zooms as requested
+    // BUT re-enabled for initial load ONLY
     useEffect(() => {
-        handleRecenter();
-    }, [routeCoords]);
+        if (!hasInitialRecentered.current && routeCoords.length > 0 && isMapReady) {
+            handleRecenter();
+            hasInitialRecentered.current = true;
+        }
+    }, [routeCoords, isMapReady]);
 
     const updateStatusMutation = useMutation({
         mutationFn: async (newStatus: string) => {
@@ -249,11 +327,15 @@ export const ActiveDelivery = () => {
             return newStatus;
         },
         onSuccess: (status) => {
-            queryClient.invalidateQueries({ queryKey: ['active-delivery', orderId] });
-            queryClient.invalidateQueries({ queryKey: ['active-driver-order'] });
             if (status === 'delivered') {
-                if (isNavigating) return;
                 setIsNavigating(true);
+                setRouteCoords([]);
+                setDistance('');
+                setDuration('');
+                queryClient.invalidateQueries({ queryKey: ['active-delivery', orderId] });
+                queryClient.setQueryData(['active-delivery', orderId], null); 
+                queryClient.invalidateQueries({ queryKey: ['active-driver-order'] });
+                
                 navigation.reset({
                     index: 0,
                     routes: [{ name: 'JobsMain' }],
@@ -265,17 +347,29 @@ export const ActiveDelivery = () => {
         }
     });
 
-    // Auto-navigate away if status is delivered (backup for mutation) - REMOVED TO PREVENT CONFLICT
-    /*
+    const updateArrivalStatus = useMutation({
+        mutationFn: async ({ field }: { field: 'is_driver_at_restaurant' | 'is_driver_at_customer' }) => {
+            const { error } = await supabase
+                .from('orders')
+                .update({ [field]: true })
+                .eq('id', orderId);
+            if (error) throw error;
+        }
+    });
+
+    // Robust auto-navigate away when status is delivered
     useEffect(() => {
         if (order?.status === 'delivered') {
+            setIsNavigating(true);
+            setRouteCoords([]);
+            setDistance('');
+            setDuration('');
             navigation.reset({
                 index: 0,
                 routes: [{ name: 'JobsMain' }],
             });
         }
     }, [order?.status]);
-    */
 
     if (isLoading) return <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }]}><ActivityIndicator size="large" color={theme.accent} /></View>;
     if (!order) return <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }]}><Text style={{ color: theme.text }}>Order not found</Text></View>;
@@ -299,7 +393,7 @@ export const ActiveDelivery = () => {
         updateStatusMutation.mutate('delivered');
     };
 
-    const isHeadingToRestaurant = ['pending', 'accepted', 'ready_for_pickup'].includes(order.status);
+    const isHeadingToRestaurant = ['pending', 'confirmed', 'preparing', 'accepted', 'ready_for_pickup'].includes(order.status);
     const isPostPickupWaiting = order.status === 'picked_up';
     const isNavigatingToCustomer = order.status === 'on_the_way';
 
@@ -319,8 +413,8 @@ export const ActiveDelivery = () => {
                 }}
                 onRegionChangeComplete={() => {}}
             >
-                {/* Route Polyline */}
-                {routeCoords.length > 1 && (
+                {/* Route Polyline - Only shown if not arrived */}
+                {!isArrived && routeCoords.length > 1 && (
                     <Polyline
                         coordinates={routeCoords}
                         strokeWidth={6}
@@ -352,10 +446,10 @@ export const ActiveDelivery = () => {
                             latitude: order.restaurant_locations.lat,
                             longitude: order.restaurant_locations.lng
                         }}
-                        tracksViewChanges={false}
+                        tracksViewChanges={true}
                     >
-                        <View style={[styles.markerContainer, { backgroundColor: isHeadingToRestaurant ? theme.accent : theme.surface }]}>
-                            <Store color={isHeadingToRestaurant ? '#FFF' : theme.textMuted} size={20} />
+                        <View style={[styles.markerContainer, { backgroundColor: isHeadingToRestaurant ? theme.accent : '#F59E0B' }]}>
+                            <Store color="#FFF" size={20} />
                         </View>
                     </Marker>
                 )}
@@ -400,9 +494,11 @@ export const ActiveDelivery = () => {
                         </Text>
                     )}
                 </View>
-                <View style={[styles.phaseIndicator, { backgroundColor: theme.accent + '20' }]}>
-                    <Text style={[styles.phaseText, { color: theme.accent }]}>
-                        {isHeadingToRestaurant ? 'TO PICKUP' : 'TO CUSTOMER'}
+                <View style={[styles.phaseIndicator, { backgroundColor: isArrived ? '#22c55e' : theme.accent + '20' }]}>
+                    <Text style={[styles.phaseText, { color: isArrived ? '#FFF' : theme.accent }]}>
+                        {isArrived 
+                            ? (isHeadingToRestaurant ? 'YOU HAVE ARRIVED!' : 'ARRIVED AT CUSTOMER!') 
+                            : (isHeadingToRestaurant ? 'TO PICKUP' : 'TO CUSTOMER')}
                     </Text>
                 </View>
             </View>
@@ -493,19 +589,6 @@ export const ActiveDelivery = () => {
                             </>
                         )}
                         
-                        <View style={[styles.infoCard, { backgroundColor: theme.surface }]}>
-                            <Text style={[styles.label, { color: theme.textMuted }]}>CUSTOMER</Text>
-                            <View style={styles.cardRow}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={[styles.value, { color: theme.text }]}>
-                                        {order.profiles?.full_name}
-                                    </Text>
-                                    <Text style={[styles.subValue, { color: theme.textMuted }]}>
-                                        {order.profiles?.phone}
-                                    </Text>
-                                </View>
-                            </View>
-                        </View>
                     </View>
 
                     {/* Order Payout Section */}
@@ -528,27 +611,48 @@ export const ActiveDelivery = () => {
                     <View style={{ marginTop: 8 }}>
                         {isHeadingToRestaurant ? (
                             <TouchableOpacity
-                                style={[styles.mainActionBtn, { backgroundColor: theme.accent }]}
+                                style={[styles.mainActionBtn, { backgroundColor: theme.accent, opacity: updateStatusMutation.isPending ? 0.7 : 1 }]}
                                 onPress={() => updateStatusMutation.mutate('on_the_way')}
+                                disabled={updateStatusMutation.isPending}
                             >
-                                <CheckCircle2 color="#FFF" size={24} style={{ marginRight: 8 }} />
-                                <Text style={styles.mainActionText}>Confirm Pickup</Text>
+                                {updateStatusMutation.isPending ? (
+                                    <ActivityIndicator color="#FFF" size="small" />
+                                ) : (
+                                    <>
+                                        <CheckCircle2 color="#FFF" size={24} style={{ marginRight: 8 }} />
+                                        <Text style={styles.mainActionText}>Confirm Pickup</Text>
+                                    </>
+                                )}
                             </TouchableOpacity>
                         ) : order.status === 'picked_up' ? (
                             <TouchableOpacity
-                                style={[styles.mainActionBtn, { backgroundColor: theme.accent }]}
+                                style={[styles.mainActionBtn, { backgroundColor: theme.accent, opacity: updateStatusMutation.isPending ? 0.7 : 1 }]}
                                 onPress={() => updateStatusMutation.mutate('on_the_way')}
+                                disabled={updateStatusMutation.isPending}
                             >
-                                <Navigation color="#FFF" size={24} style={{ marginRight: 8 }} />
-                                <Text style={styles.mainActionText}>Start Trip to Customer</Text>
+                                {updateStatusMutation.isPending ? (
+                                    <ActivityIndicator color="#FFF" size="small" />
+                                ) : (
+                                    <>
+                                        <Navigation color="#FFF" size={24} style={{ marginRight: 8 }} />
+                                        <Text style={styles.mainActionText}>Start Trip to Customer</Text>
+                                    </>
+                                )}
                             </TouchableOpacity>
                         ) : order.status === 'on_the_way' ? (
                             <TouchableOpacity
-                                style={[styles.mainActionBtn, { backgroundColor: '#22c55e' }]}
+                                style={[styles.mainActionBtn, { backgroundColor: '#22c55e', opacity: updateStatusMutation.isPending ? 0.7 : 1 }]}
                                 onPress={() => setIsPinModalVisible(true)}
+                                disabled={updateStatusMutation.isPending}
                             >
-                                <CheckCircle2 color="#FFF" size={24} style={{ marginRight: 8 }} />
-                                <Text style={styles.mainActionText}>Complete Delivery</Text>
+                                {updateStatusMutation.isPending ? (
+                                    <ActivityIndicator color="#FFF" size="small" />
+                                ) : (
+                                    <>
+                                        <CheckCircle2 color="#FFF" size={24} style={{ marginRight: 8 }} />
+                                        <Text style={styles.mainActionText}>Complete Delivery</Text>
+                                    </>
+                                )}
                             </TouchableOpacity>
                         ) : null}
                     </View>
@@ -600,8 +704,16 @@ export const ActiveDelivery = () => {
                                         </Text>
                                     )}
 
-                                    <TouchableOpacity style={[styles.primaryButton, { backgroundColor: '#22c55e' }]} onPress={handleConfirmDelivery}>
-                                        <Text style={styles.primaryButtonText}>Confirm Delivery</Text>
+                                    <TouchableOpacity 
+                                        style={[styles.primaryButton, { backgroundColor: '#22c55e', opacity: updateStatusMutation.isPending ? 0.7 : 1 }]} 
+                                        onPress={handleConfirmDelivery}
+                                        disabled={updateStatusMutation.isPending}
+                                    >
+                                        {updateStatusMutation.isPending ? (
+                                            <ActivityIndicator color="#FFF" size="small" />
+                                        ) : (
+                                            <Text style={styles.primaryButtonText}>Confirm Delivery</Text>
+                                        )}
                                     </TouchableOpacity>
                                     <TouchableOpacity style={[styles.secondaryButton, { borderColor: theme.border }]} onPress={() => setIsPinModalVisible(false)}>
                                         <Text style={[styles.secondaryButtonText, { color: theme.text }]}>Cancel</Text>

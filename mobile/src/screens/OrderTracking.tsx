@@ -149,7 +149,7 @@ export const OrderTracking = ({ route, navigation }: any) => {
             };
             setDriverLocation(loc);
             
-            // Initial map centering if visible
+            /* Auto-centering removed to prevent disorienting auto-zooms
             if (isMapVisible && mapRef.current) {
                 mapRef.current.animateToRegion({
                     ...loc,
@@ -157,6 +157,7 @@ export const OrderTracking = ({ route, navigation }: any) => {
                     longitudeDelta: 0.01
                 }, 1000);
             }
+            */
         }
 
         const channel = supabase
@@ -178,7 +179,7 @@ export const OrderTracking = ({ route, navigation }: any) => {
                         };
                         setDriverLocation(newLoc);
                         
-                        // Follow movement
+                        /* Auto-following removed to prevent disorienting auto-zooms
                         if (isMapVisible && mapRef.current) {
                             mapRef.current.animateToRegion({
                                 ...newLoc,
@@ -186,6 +187,7 @@ export const OrderTracking = ({ route, navigation }: any) => {
                                 longitudeDelta: 0.01
                             }, 1000);
                         }
+                        */
                     }
                 }
             )
@@ -505,10 +507,52 @@ export const OrderTracking = ({ route, navigation }: any) => {
                     />
                 }
             >
-                <View style={[styles.statusCard, { backgroundColor: theme.surface }]}>
+                <View style={[styles.statusCard, { 
+                    backgroundColor: theme.surface,
+                    borderWidth: order.is_driver_at_customer ? 2 : 0,
+                    borderColor: theme.accent
+                }]}>
+                    {order.is_driver_at_customer && (
+                        <View style={{ 
+                            backgroundColor: theme.accent, 
+                            padding: 8, 
+                            borderRadius: 8, 
+                            marginBottom: 12,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 8
+                        }}>
+                            <Target size={18} color="#FFF" />
+                            <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 14, letterSpacing: 0.5 }}>
+                                DRIVER HAS ARRIVED!
+                            </Text>
+                        </View>
+                    )}
+                    {order.is_driver_at_restaurant && !order.is_driver_at_customer && (
+                        <View style={{ 
+                            backgroundColor: `${theme.accent}20`, 
+                            padding: 8, 
+                            borderRadius: 8, 
+                            marginBottom: 12,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 8,
+                            borderWidth: 1,
+                            borderColor: theme.accent
+                        }}>
+                            <MapPin size={18} color={theme.accent} />
+                            <Text style={{ color: theme.accent, fontWeight: 'bold', fontSize: 13 }}>
+                                Driver is at the Restaurant
+                            </Text>
+                        </View>
+                    )}
                     <Text style={[styles.restaurantName, { color: theme.text }]}>{order.restaurants?.name}</Text>
                     <Text style={[styles.statusText, { color: theme.accent }]}>
-                        {displayStatus === 'confirmed' ? 'Restaurant is confirming your order' :
+                        {order.is_driver_at_customer ? 'DRIVER HAS ARRIVED! Please meet them at the delivery point.' :
+                         order.is_driver_at_restaurant ? 'Driver has arrived at the restaurant and is picking up your order' :
+                            displayStatus === 'confirmed' ? 'Restaurant is confirming your order' :
                             displayStatus === 'preparing' ? 'Your food is being prepared' :
                                 displayStatus === 'ready_for_pickup' ? (
                                     order.fulfillment_type === 'pickup' ? 'Your order is ready for collection! Please head to the restaurant.' :

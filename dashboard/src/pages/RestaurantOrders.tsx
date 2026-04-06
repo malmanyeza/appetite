@@ -123,6 +123,32 @@ export const RestaurantOrders = () => {
         return () => clearInterval(timer);
     }, []);
 
+    // Realtime listener for this restaurant's orders
+    useEffect(() => {
+        if (!restaurant?.id) return;
+
+        const channel = supabase
+            .channel(`restaurant-orders-${restaurant.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+                    schema: 'public',
+                    table: 'orders',
+                    filter: `restaurant_id=eq.${restaurant.id}`
+                },
+                () => {
+                    console.log('Realtime update detected for restaurant: Refreshing orders...');
+                    queryClient.invalidateQueries({ queryKey: ['restaurant-orders'] });
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [restaurant?.id, queryClient]);
+
     const OrderCard = ({ order }: { order: any }) => {
         const needsAttention = order.status === 'confirmed' && (new Date().getTime() - new Date(order.created_at).getTime() > 120000);
         const minutesAgo = Math.floor((new Date().getTime() - new Date(order.created_at).getTime()) / 60000);

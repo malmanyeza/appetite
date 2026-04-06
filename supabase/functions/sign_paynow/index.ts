@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,8 +19,19 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
     const integrationKey = Deno.env.get('PAYNOW_INTEGRATION_KEY') || '';
     if (!integrationKey) throw new Error('Paynow integration key not configured');
+
+    // Auth Guard: Ensure the request is from a logged-in user
+    const authHeader = req.headers.get('Authorization') || '';
+    const jwt = authHeader.replace('Bearer ', '');
+    if (!jwt) throw new Error('Unauthorized: Auth session missing');
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(jwt);
+    if (authError || !user) throw new Error("Unauthorized: Auth session invalid");
 
     const body = await req.json();
     const { fields, fieldOrder } = body;

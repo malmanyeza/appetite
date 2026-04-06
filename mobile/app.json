@@ -77,7 +77,8 @@
         "expo-notifications",
         {
           "icon": "./assets/icon.png",
-          "color": "#FF4D00"
+          "color": "#FF4D00",
+          "sounds": ["./assets/sounds/appetite_alert.wav"]
         }
       ],
       [

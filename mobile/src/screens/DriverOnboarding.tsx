@@ -58,7 +58,6 @@ export const DriverOnboarding = ({ navigation }: any) => {
     // Form State
     const [phone, setPhone] = useState(profile?.phone || '');
     const [city, setCity] = useState('');
-    const [operatingArea, setOperatingArea] = useState('');
     const [vehicleType, setVehicleType] = useState('Bike'); // Bike, Car, Motorbike
     const [plateNumber, setPlateNumber] = useState('');
     const [emergencyContact, setEmergencyContact] = useState('');
@@ -67,19 +66,20 @@ export const DriverOnboarding = ({ navigation }: any) => {
     const [accountName, setAccountName] = useState('');
     const [idPhoto, setIdPhoto] = useState<ImagePicker.ImagePickerAsset | null>(null);
     const [selfie, setSelfie] = useState<ImagePicker.ImagePickerAsset | null>(null);
+    const [registrationBook, setRegistrationBook] = useState<ImagePicker.ImagePickerAsset | null>(null);
 
-    const pickImage = async (type: 'id' | 'selfie') => {
+    const pickImage = async (type: 'id' | 'selfie' | 'registration_book') => {
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: type === 'id' ? [4, 3] : [1, 1],
+            allowsEditing: false,
             quality: 0.5,
             base64: true,
         });
 
         if (!result.canceled && result.assets && result.assets.length > 0) {
             if (type === 'id') setIdPhoto(result.assets[0]);
-            else setSelfie(result.assets[0]);
+            else if (type === 'selfie') setSelfie(result.assets[0]);
+            else setRegistrationBook(result.assets[0]);
         }
     };
 
@@ -98,6 +98,7 @@ export const DriverOnboarding = ({ navigation }: any) => {
 
             let idPhotoUrl = null;
             let selfieUrl = null;
+            let regBookUrl = null;
 
             if (idPhoto && idPhoto.base64) {
                 const buffer = decodeBase64(idPhoto.base64);
@@ -127,10 +128,23 @@ export const DriverOnboarding = ({ navigation }: any) => {
                 selfieUrl = data.publicUrl;
             }
 
+            if (registrationBook && registrationBook.base64) {
+                const buffer = decodeBase64(registrationBook.base64);
+                const path = `applications/${user?.id}/reg_book_${Date.now()}.jpg`;
+                const { error: uploadError } = await supabase.storage.from('driver-documents').upload(path, buffer, {
+                    contentType: 'image/jpeg',
+                    upsert: true
+                });
+                if (uploadError) {
+                    throw new Error('Failed to upload registration book: ' + uploadError.message);
+                }
+                const { data } = supabase.storage.from('driver-documents').getPublicUrl(path);
+                regBookUrl = data.publicUrl;
+            }
+
             const { error } = await supabase.from('driver_profiles').upsert({
                 user_id: user?.id,
                 city,
-                operating_area: operatingArea,
                 vehicle_type: vehicleType.toLowerCase(),
                 plate_number: plateNumber,
                 emergency_contact: emergencyContact,
@@ -138,6 +152,7 @@ export const DriverOnboarding = ({ navigation }: any) => {
                 account_name: accountName,
                 id_photo_url: idPhotoUrl,
                 selfie_url: selfieUrl,
+                registration_book_url: regBookUrl,
                 status: 'pending',
                 is_online: false
             });
@@ -220,22 +235,11 @@ export const DriverOnboarding = ({ navigation }: any) => {
                 />
             </View>
 
-            <View style={[styles.inputGroup, { backgroundColor: theme.surface }]}>
-                <MapPin size={20} color={theme.textMuted} />
-                <TextInput
-                    style={[styles.input, { color: theme.text }]}
-                    placeholder="Preferred Operating Suburb"
-                    placeholderTextColor={theme.textMuted}
-                    value={operatingArea}
-                    onChangeText={setOperatingArea}
-                />
-            </View>
-
             <TouchableOpacity
                 style={[styles.primaryButton, { backgroundColor: theme.accent, marginTop: 40 }]}
                 onPress={() => {
-                    if (!phone || !city || !operatingArea) {
-                        Alert.alert('Missing Info', 'Please enter your phone, city, and operating area.');
+                    if (!phone || !city) {
+                        Alert.alert('Missing Info', 'Please enter your phone and city.');
                         return;
                     }
                     setStep(2);
@@ -323,7 +327,19 @@ export const DriverOnboarding = ({ navigation }: any) => {
                     <>
                         <User size={32} color={theme.textMuted} />
                         <Text style={[styles.uploadText, { color: theme.text }]}>Upload Profile Selfie</Text>
-                        <Text style={{ color: theme.textMuted, fontSize: 12 }}>(You can add this later)</Text>
+                        <Text style={{ color: theme.textMuted, fontSize: 12 }}>(Required for verification)</Text>
+                    </>
+                )}
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.uploadBox, { backgroundColor: theme.surface }]} onPress={() => pickImage('registration_book')}>
+                {registrationBook ? (
+                    <Image source={{ uri: registrationBook.uri }} style={{ width: '100%', height: '100%', borderRadius: 12 }} resizeMode="cover" />
+                ) : (
+                    <>
+                        <FileText size={32} color={theme.textMuted} />
+                        <Text style={[styles.uploadText, { color: theme.text }]}>Reg. Book / Logbook</Text>
+                        <Text style={{ color: theme.textMuted, fontSize: 12 }}>(Required for Car/Motorbike)</Text>
                     </>
                 )}
             </TouchableOpacity>
@@ -413,7 +429,7 @@ export const DriverOnboarding = ({ navigation }: any) => {
             <Text style={[styles.gateSub, { color: theme.textMuted }]}>
                 Your driver application is now under review. We will notify you via email and app notification once your account is approved.
             </Text>
-            <TouchableOpacity style={[styles.primaryButton, { backgroundColor: theme.accent }]} onPress={() => navigation.navigate('Account')}>
+            <TouchableOpacity style={[styles.primaryButton, { backgroundColor: theme.accent }]} onPress={() => navigation.navigate('AccountMain')}>
                 <Text style={styles.buttonText}>Back to Profile</Text>
             </TouchableOpacity>
         </View>

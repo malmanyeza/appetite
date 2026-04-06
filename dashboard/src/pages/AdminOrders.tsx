@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
@@ -77,6 +77,29 @@ export const AdminOrders = () => {
         queryFn: adminService.getAllDrivers,
         refetchInterval: showTracking ? 5000 : false, // Poll every 5 seconds only when tracking modal is open
     });
+
+    // Realtime listener for global orders
+    useEffect(() => {
+        const channel = supabase
+            .channel('admin-orders-realtime')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+                    schema: 'public',
+                    table: 'orders'
+                },
+                () => {
+                    console.log('Realtime update detected: Refreshing admin orders...');
+                    queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [queryClient]);
 
     const filteredOrders = useMemo(() => {
         if (!orders) return [];

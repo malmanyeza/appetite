@@ -67,6 +67,7 @@ async function registerForPushNotificationsAsync() {
             importance: Notifications.AndroidImportance.MAX,
             vibrationPattern: [0, 250, 250, 250],
             lightColor: '#FF231F7C',
+            sound: 'appetite_alert.wav',
         });
     }
 
@@ -77,10 +78,8 @@ async function registerForPushNotificationsAsync() {
         
         if (isExpoGo) {
             console.log('--- PUSH NOTIFICATIONS ---');
-            console.log('Running in Expo Go. Remote push notifications are not supported here in SDK 54.');
-            console.log('To test push notifications, please use your Development Build (Native App).');
+            console.log('Running in Expo Go. Ensuring projectId is present for token retrieval...');
             console.log('--------------------------');
-            return undefined;
         }
 
         const { status: existingStatus } = await Notifications.getPermissionsAsync();

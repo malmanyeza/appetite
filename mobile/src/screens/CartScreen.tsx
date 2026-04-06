@@ -120,8 +120,10 @@ export const CartScreen = ({ navigation }: any) => {
         if (ecocashPending && pendingOrderId) {
             interval = setInterval(async () => {
                 try {
-                    const session = (await supabase.auth.getSession()).data.session;
-                    if (!session) return;
+                    const { data: { user }, error: authError } = await supabase.auth.getUser();
+                    const { data: { session } } = await supabase.auth.getSession();
+                    
+                    if (authError || !session) return;
                     
                     const response = await fetch(`${supabaseUrl}/functions/v1/check_payment_status`, {
                         method: 'POST',
@@ -336,10 +338,17 @@ export const CartScreen = ({ navigation }: any) => {
             setShowEcocashModal(false);
         }
         try {
-            const session = (await supabase.auth.getSession()).data.session;
-            if (!session) throw new Error('You must be logged in to place an order.');
-
-            const response = await fetch(`${supabaseUrl}/functions/v1/place_order_v2`, {
+            // Hardened Auth Check: getUser() forces a session refresh if token is expired.
+            // This prevents the "Auth session missing" error during checkout.
+            const { data: { user }, error: authError } = await supabase.auth.getUser();
+            const { data: { session } } = await supabase.auth.getSession();
+            
+            if (authError || !user || !session) {
+                throw new Error('Verification failed. Please ensure you are logged in.');
+            }
+            
+            // Fixed Endpoint: place_order (Workspace Standard)
+            const response = await fetch(`${supabaseUrl}/functions/v1/place_order`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

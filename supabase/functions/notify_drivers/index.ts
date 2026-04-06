@@ -19,85 +19,109 @@ Deno.serve(async (req) => {
     const payload = await req.json()
     console.log('Driver Notification payload received:', payload)
 
-    // The payload will contain the order object
-    // Depending on if called via direct API or DB Webhook
-    const order = payload.record || payload
+    // The payload usually contains a 'record' from a Postgres hook or the full object
+    const orderRecord = payload.record || payload
 
-    if (!order || order.status !== 'ready_for_pickup') {
-      return new Response(JSON.stringify({ message: `Ignored: Order status '${order.status}' does not trigger broad driver notification` }), { 
+    // 1. STATUS CHECK - Now including 'preparing' as requested
+    const allowedStatuses = ['confirmed', 'preparing', 'ready_for_pickup'];
+    if (!orderRecord || !allowedStatuses.includes(orderRecord.status)) {
+      return new Response(JSON.stringify({ 
+        message: `Ignored: Status '${orderRecord?.status}' does not trigger broad driver notification` 
+      }), { 
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    // Determine message content based on status
-    const title = 'Order Ready for Pickup';
-    const body = `Order #${order.id.slice(0, 8)} is now ready! Head to the restaurant to pick it up.`;
+    // Ignore pickups for drivers
+    if (orderRecord.fulfillment_type === 'pickup') {
+      return new Response(JSON.stringify({ message: "Ignored fulfillment: pickup" }), { 
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
 
+    // 2. FETCH ENHANCED DATA (Restaurant name, specialized pricing)
+    // We fetch again to ensure we have the most up-to-date data for the notification body
+    const { data: orderData, error: orderError } = await supabase
+      .from('orders')
+      .select(`
+        id, status, pricing, restaurants (name, suburb), delivery_address_snapshot
+      `)
+      .eq('id', orderRecord.id)
+      .single()
 
-    // 1. Fetch drivers assigned to this order via job offers
-    // We join driver_job_offers with profiles to get tokens
-    console.log('Fetching job offers for order:', order.id);
+    if (orderError) {
+      console.error('Error fetching fresh order data:', orderError)
+      // Fallback to record data if the select fails
+    }
+
+    const finalData = orderData || orderRecord;
+    const pricing = finalData.pricing || {};
+    const restaurant = finalData.restaurants || {};
+    
+    const restaurantName = restaurant.name || 'New Job';
+    const earnings = typeof pricing.driver_earnings === 'number' ? pricing.driver_earnings.toFixed(2) : '0.00';
+    const distance = typeof pricing.distance_km === 'number' ? pricing.distance_km.toFixed(1) : '?';
+    const deliverySuburb = finalData.delivery_address_snapshot?.suburb || 'Customer';
+
+    const title = `New Job Available: $${earnings} 🛵`;
+    const body = `${restaurantName} ➔ ${deliverySuburb} (${distance}km). Tap to accept!`;
+
+    // 3. FETCH TARGETED DRIVERS (Those with active job offers)
     const { data: jobOffers, error: offersError } = await supabase
       .from('driver_job_offers')
-      .select(`
-        driver_id,
-        profiles!inner (
-          expo_push_token
-        )
-      `)
-      .eq('order_id', order.id)
+      .select(`profiles!inner (expo_push_token)`)
+      .eq('order_id', orderRecord.id)
 
-    if (offersError) {
-      console.error('Error fetching job offers:', offersError)
-      throw offersError
-    }
+    if (offersError) throw offersError
 
-    // Filter out drivers without tokens manually to be safe
-    const validOffers = (jobOffers || []).filter(h => (h.profiles as any)?.expo_push_token)
-    console.log(`Found ${validOffers.length} valid drivers with tokens for this order.`);
+    const tokens = (jobOffers || [])
+        .map(h => (h.profiles as any)?.expo_push_token)
+        .filter(t => !!t)
 
-    if (validOffers.length === 0) {
-      console.log('No targeted drivers found for order:', order.id)
-      return new Response(JSON.stringify({ message: 'No drivers found with job offers and tokens for this order' }), { 
+    console.log(`Sending to ${tokens.length} target drivers.`);
+
+    if (tokens.length === 0) {
+      return new Response(JSON.stringify({ message: 'No tokens found for targeted drivers' }), { 
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    // 2. Prepare Expo notifications
-    const tokens = validOffers.map(offer => (offer.profiles as any).expo_push_token)
+    // 4. PREPARE EXPO PUSH (High Priority + Custom Alert Sound)
     const messages = tokens.map(token => ({
       to: token,
-      sound: 'default',
+      sound: 'appetite_alert.wav',
       title: title,
       body: body,
-      data: { orderId: order.id, type: 'NEW_JOB', status: order.status },
+      priority: 'high',
+      channelId: 'job-notifications',
+      data: { 
+        orderId: orderRecord.id, 
+        type: 'NEW_JOB', 
+        status: orderRecord.status
+      },
     }))
 
-    // 3. Send to Expo
-    const response = await fetch('https://exp.host/--/api/v2/push/send', {
+    const expoResponse = await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Accept-encoding': 'gzip, deflate',
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(messages),
     })
 
-    const result = await response.json()
-    console.log('Expo notification result:', result)
+    const result = await expoResponse.json()
+    console.log('Expo Result:', result)
 
     return new Response(JSON.stringify({ success: true, result }), { 
-      headers: { 'Content-Type': 'application/json' } 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     })
 
   } catch (error) {
-    console.error('Error in notify_drivers:', error)
+    console.error('CRITICAL ERROR in notify_drivers:', error)
     return new Response(JSON.stringify({ error: error.message }), { 
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
 })

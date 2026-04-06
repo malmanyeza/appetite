@@ -27,12 +27,15 @@ Deno.serve(async (req: Request) => {
     // Extract JWT from Authorization header
     const authHeader = req.headers.get('Authorization') || '';
     const jwt = authHeader.replace('Bearer ', '');
-    if (!jwt) throw new Error('Missing authorization token.');
+    if (!jwt) throw new Error('Unauthorized: Auth session missing (No token provided)');
 
     // Create an anon client just to verify the user's identity
     const anonClient = createClient(supabaseUrl, supabaseAnonKey);
     const { data: { user }, error: authError } = await anonClient.auth.getUser(jwt);
-    if (authError || !user) throw new Error("Unauthorized: " + (authError?.message || 'No user session'));
+    if (authError || !user) {
+        console.error('Edge Function Auth Error:', authError?.message || 'No user session');
+        throw new Error("Unauthorized: Auth session missing (" + (authError?.message || 'Expired or invalid token') + ")");
+    }
 
     // Use service role key for DB operations (bypasses RLS for order creation)
     const adminClient = supabaseServiceKey 

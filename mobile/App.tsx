@@ -11,6 +11,7 @@ import { supabase } from './src/lib/supabase';
 import { usePushNotifications } from './src/hooks/usePushNotifications';
 import { AnimatedSplash } from './src/components/AnimatedSplash';
 import { useNetwork } from './src/hooks/useNetwork';
+import { useApprovalListener } from './src/hooks/useApprovalListener';
 import { WifiOff } from 'lucide-react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -18,6 +19,7 @@ import { ErrorBoundary } from 'react-error-boundary';
 import { GlobalError } from './src/components/GlobalError';
 import * as Sentry from '@sentry/react-native';
 import { createNavigationContainerRef } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const navigationRef = createNavigationContainerRef();
 
@@ -103,7 +105,31 @@ function App() {
 
     // Initialize Push Notifications
     usePushNotifications();
+    
+    // Background listener for driver approval status
+    useApprovalListener();
+
     const [showSplash, setShowSplash] = useState(true);
+    const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
+
+    const checkFirstLaunch = async () => {
+        try {
+            const hasLaunched = await AsyncStorage.getItem('HAS_LAUNCHED_BEFORE');
+            if (hasLaunched === null) {
+                // First time!
+                setIsFirstLaunch(true);
+                await AsyncStorage.setItem('HAS_LAUNCHED_BEFORE', 'true');
+            } else {
+                setIsFirstLaunch(false);
+            }
+        } catch (e) {
+            setIsFirstLaunch(false); // fallback to fast boot on error
+        }
+    };
+
+    useEffect(() => {
+        checkFirstLaunch();
+    }, []);
 
     const colorScheme = useColorScheme();
     const { loading, user, refreshSession } = useAuthStore();
@@ -200,7 +226,8 @@ function App() {
                         </NavigationContainer>
                         {showSplash && (
                             <AnimatedSplash 
-                                isAppReady={!loading} 
+                                isAppReady={!loading && isFirstLaunch !== null} 
+                                isFirstLaunch={isFirstLaunch}
                                 onReady={() => setShowSplash(false)} 
                             />
                         )}

@@ -6,11 +6,13 @@ const { width, height } = Dimensions.get('window');
 interface AnimatedSplashProps {
     onReady: () => void;
     isAppReady: boolean;
+    isFirstLaunch: boolean | null;
 }
 
-export const AnimatedSplash: React.FC<AnimatedSplashProps> = ({ onReady, isAppReady }) => {
+export const AnimatedSplash: React.FC<AnimatedSplashProps> = ({ onReady, isAppReady, isFirstLaunch }) => {
     const [animationDone, setAnimationDone] = useState(false);
     const [isFading, setIsFading] = useState(false);
+    const [minTimeElapsed, setMinTimeElapsed] = useState(false);
     const opacityAnim = useRef(new Animated.Value(1)).current;
     
     // Split the word for wave animation
@@ -50,13 +52,24 @@ export const AnimatedSplash: React.FC<AnimatedSplashProps> = ({ onReady, isAppRe
     }, []);
 
     useEffect(() => {
-        if (isAppReady && !animationDone && !isFading) {
-            // Give it a tiny delay to ensure the wave had time to finish or is finishing
-            setTimeout(() => {
-                beginFadeOut();
-            }, 500);
+        if (isFirstLaunch === true) {
+            // First time loading: Force a 2.5s minimum stay for a premium intro
+            const timer = setTimeout(() => setMinTimeElapsed(true), 2500);
+            return () => clearTimeout(timer);
+        } else if (isFirstLaunch === false) {
+            // Not the first time: be as fast as possible
+            setMinTimeElapsed(true);
         }
-    }, [isAppReady]);
+    }, [isFirstLaunch]);
+
+    useEffect(() => {
+        // Trigger fade out ONLY when BOTH conditions are met:
+        // 1. Core data/auth is ready (isAppReady)
+        // 2. Minimum display time reached (minTimeElapsed - instant on subsequent loads)
+        if (isAppReady && minTimeElapsed && !animationDone && !isFading) {
+            beginFadeOut();
+        }
+    }, [isAppReady, minTimeElapsed]);
 
     const beginFadeOut = () => {
         if (isFading) return;
@@ -74,6 +87,24 @@ export const AnimatedSplash: React.FC<AnimatedSplashProps> = ({ onReady, isAppRe
 
     if (animationDone) return null;
 
+    const Content = () => (
+        <View style={styles.overlay}>
+            <View style={styles.textContainer}>
+                {word.split('').map((letter, index) => (
+                    <Animated.Text
+                        key={index}
+                        style={[
+                            styles.logoText,
+                            { transform: [{ translateY: letterAnims[index] }] }
+                        ]}
+                    >
+                        {letter}
+                    </Animated.Text>
+                ))}
+            </View>
+        </View>
+    );
+
     return (
         <Animated.View 
             pointerEvents={isFading ? "none" : "auto"}
@@ -83,28 +114,19 @@ export const AnimatedSplash: React.FC<AnimatedSplashProps> = ({ onReady, isAppRe
                 isFading && { elevation: 0, zIndex: 0 }
             ]}
         >
-            <ImageBackground
-                source={require('../../assets/images/splash_bg.png')}
-                style={styles.backgroundImage}
-                resizeMode="cover"
-            >
-                {/* Subtle Overlay for typography contrast */}
-                <View style={styles.overlay}>
-                    <View style={styles.textContainer}>
-                        {word.split('').map((letter, index) => (
-                            <Animated.Text
-                                key={index}
-                                style={[
-                                    styles.logoText,
-                                    { transform: [{ translateY: letterAnims[index] }] }
-                                ]}
-                            >
-                                {letter}
-                            </Animated.Text>
-                        ))}
-                    </View>
+            {isFirstLaunch ? (
+                <ImageBackground
+                    source={require('../../assets/images/splash_bg.png')}
+                    style={styles.backgroundImage}
+                    resizeMode="cover"
+                >
+                    <Content />
+                </ImageBackground>
+            ) : (
+                <View style={styles.backgroundImage}>
+                    <Content />
                 </View>
-            </ImageBackground>
+            )}
         </Animated.View>
     );
 };

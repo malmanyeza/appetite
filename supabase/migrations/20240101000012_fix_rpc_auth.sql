@@ -16,7 +16,7 @@ BEGIN
     UPDATE public.orders
     SET 
         driver_id = p_driver_id,
-        status = 'picked_up', 
+        status = 'accepted', 
         updated_at = NOW()
     WHERE id = p_order_id;
 

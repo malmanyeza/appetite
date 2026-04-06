@@ -520,12 +520,30 @@ export const adminService = {
         return data;
     },
 
-    async updatePayoutStatus(payoutId: string, status: string) {
+    async getPayoutStatus(payoutId: string, status: string) {
         const { error } = await supabase
             .from('payouts')
             .update({ status })
             .eq('id', payoutId);
 
+        if (error) throw error;
+    },
+
+    async getAdminNotifications() {
+        const { data, error } = await supabase
+            .from('admin_notifications')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(20);
+        if (error) throw error;
+        return data;
+    },
+
+    async markAdminNotificationRead(id: string) {
+        const { error } = await supabase
+            .from('admin_notifications')
+            .update({ read: true })
+            .eq('id', id);
         if (error) throw error;
     }
 };
