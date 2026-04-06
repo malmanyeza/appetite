@@ -112,7 +112,7 @@
             display: none;
         }
         .message.error { display: block; background: rgba(255, 59, 48, 0.1); color: var(--error); border: 1px solid rgba(255, 59, 48, 0.2); }
-        .message.success { display: block; background: rgba(52, 199, 89, 0.1); color: var(--success); border: 1px solid rgba(52, 199,  green, 0.2); }
+        .message.success { display: block; background: rgba(52, 199, 89, 0.1); color: var(--success); border: 1px solid rgba(52, 199, 89, 0.2); }
 
         .email-badge {
             display: inline-block;
@@ -244,9 +244,6 @@
 
         // 3. Security Initiation on Page Load
         window.addEventListener('load', async () => {
-            // First: Purge any existing sessions from this browser
-            await supabaseClient.auth.signOut();
-
             // Give Supabase a moment to handle the hash if it's currently doing so
             setTimeout(async () => {
                 try {
@@ -278,7 +275,6 @@
                 }
             }, 800); // 800ms delay for stability
         });
- });
     </script>
 </body>
 </html>
