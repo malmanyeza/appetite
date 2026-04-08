@@ -16,8 +16,8 @@ Whether you're a hungry customer tracking a delivery or a driver managing orders
 If you need direct assistance, please don't hesitate to reach out to our dedicated support representatives. We aim to respond to all inquiries within 24 hours.
 
 - **Malvern Manyeza**: [mmanyeza@nexura.co.zw](mailto:mmanyeza@nexura.co.zw)
-- **Nigel Manyeza**: [nmanyeza@nexura.co.zw](mailto:nmanyeza@nexura.co.zw)
-- **F Nyokanhete**: [fnyokanhete@nexura.co.zw](mailto:fnyokanhete@nexura.co.zw)
+- **Nokutenda Manyeza**: [nmanyeza@nexura.co.zw](mailto:nmanyeza@nexura.co.zw)
+- **Fortune James Nyokanhete**: [fnyokanhete@nexura.co.zw](mailto:fnyokanhete@nexura.co.zw)
 
 ---
 
