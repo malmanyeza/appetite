@@ -53,7 +53,7 @@
           ]
         }
       ],
-      "package": "com.appetite.mobile",
+      "package": "com.appetite.delivery",
       "versionCode": 1,
       "googleServicesFile": "./google-services.json",
       "config": {
@@ -84,10 +84,8 @@
     ],
     "extra": {
       "supabaseUrl": "https://ydcbycanrbdcyyabnfxn.supabase.co",
-      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkY2J5Y2FucmJkY3l5YWJuZnhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MTE5NTIsImV4cCI6MjA4Njk4Nzk1Mn0.pjJkJ8PVGa7zeppWYxbBiUhic43lpnaxuVhgsApuv7k",
-      "eas": {
-        "projectId": "009a559f-a604-47f4-b4c9-26bccb2604b2"
-      }
-    }
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkY2J5Y2FucmJkY3l5YWJuZnhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MTE5NTIsImV4cCI6MjA4Njk4Nzk1Mn0.pjJkJ8PVGa7zeppWYxbBiUhic43lpnaxuVhgsApuv7k"
+    },
+    "owner": "jueasbuilds"
   }
 }
