@@ -28,6 +28,7 @@ import * as ExpoLocation from 'expo-location';
 import { ChevronLeft, Trash2, MapPin, Smartphone, CheckCircle2, DollarSign, CreditCard, Search, X, ChevronRight, Truck, ShoppingBag, Info, Store } from 'lucide-react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { Image } from 'expo-image';
+import { getThumbnailUrl } from '../utils/storageUtils';
 import { supabase, supabaseUrl, supabaseAnonKey } from '../lib/supabase';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { reverseGeocodeGoogle } from '../services/geocodingService';
@@ -88,7 +89,7 @@ export const CartScreen = ({ navigation }: any) => {
     const animateModal = (toValue: number) => {
         Animated.timing(modalY, {
             toValue,
-            duration: 600,
+            duration: 900,
             useNativeDriver: true,
         }).start();
     };
@@ -257,11 +258,20 @@ export const CartScreen = ({ navigation }: any) => {
                     table: 'system_settings',
                     filter: "key=eq.delivery_fee_config"
                 },
-                () => {
+                (payload: any) => {
+                    // INSTANT UPDATE: Inject new values directly into the cache for zero-latency
+                    if (payload.new && payload.new.value) {
+                        queryClient.setQueryData(['delivery_config'], payload.new.value);
+                    }
+                    // Background refetch for total consistency
                     queryClient.invalidateQueries({ queryKey: ['delivery_config'] });
                 }
             )
-            .subscribe();
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    console.log('[Realtime] Listening for instant fee updates...');
+                }
+            });
 
         return () => {
             supabase.removeChannel(channel);
@@ -295,10 +305,10 @@ export const CartScreen = ({ navigation }: any) => {
                 selectedAddress.lng
             ));
 
-            const base = Number(deliveryConfig.base_fee) || 1.5;
-            const perKm = Number(deliveryConfig.per_km_fee) || 0.4;
-            const surge = Number(deliveryConfig.surge_amount) || 0;
-            const srv = Number(deliveryConfig.service_fee) || 0.5;
+            const base = (deliveryConfig.base_fee !== undefined && deliveryConfig.base_fee !== null) ? Number(deliveryConfig.base_fee) : 1.5;
+            const perKm = (deliveryConfig.per_km_fee !== undefined && deliveryConfig.per_km_fee !== null) ? Number(deliveryConfig.per_km_fee) : 0.4;
+            const surge = (deliveryConfig.surge_amount !== undefined && deliveryConfig.surge_amount !== null) ? Number(deliveryConfig.surge_amount) : 0;
+            const srv = (deliveryConfig.service_fee !== undefined && deliveryConfig.service_fee !== null) ? Number(deliveryConfig.service_fee) : 0.5;
 
             setDeliveryFee(base + (distance * perKm) + surge);
             setServiceFee(srv);
@@ -348,7 +358,7 @@ export const CartScreen = ({ navigation }: any) => {
             }
             
             // Fixed Endpoint: place_order (Workspace Standard)
-            const response = await fetch(`${supabaseUrl}/functions/v1/place_order`, {
+            const response = await fetch(`${supabaseUrl}/functions/v1/place_order_v2`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -428,7 +438,7 @@ export const CartScreen = ({ navigation }: any) => {
                 const expressFieldOrder = ['resulturl', 'returnurl', 'reference', 'amount', 'id', 'additionalinfo', 'authemail', 'status', 'method', 'phone', 'pollurl'];
 
                 // Get hash from server
-                const signResp = await fetch(`${supabaseUrl}/functions/v1/sign_paynow`, {
+                const signResp = await fetch(`${supabaseUrl}/functions/v1/sign_paynow_v2`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -573,7 +583,7 @@ export const CartScreen = ({ navigation }: any) => {
                             {items.map((item) => (
                                 <View key={item.id} style={[styles.cartItem, { borderBottomColor: theme.border }]}>
                                     <Image 
-                                        source={item.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'} 
+                                        source={getThumbnailUrl(item.image_url) || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'} 
                                         style={styles.itemImage} 
                                         contentFit="cover" 
                                         cachePolicy="disk"

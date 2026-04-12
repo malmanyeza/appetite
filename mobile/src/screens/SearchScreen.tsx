@@ -15,6 +15,7 @@ import { supabase } from '../lib/supabase';
 import { useTheme } from '../theme';
 import { Search as SearchIcon, X, Filter, ChevronRight } from 'lucide-react-native';
 import { Image } from 'expo-image';
+import { getThumbnailUrl } from '../utils/storageUtils';
 
 export const SearchScreen = ({ navigation }: any) => {
     const { theme } = useTheme();
@@ -43,7 +44,7 @@ export const SearchScreen = ({ navigation }: any) => {
             onPress={() => navigation.navigate('RestaurantDetails', { id: item.id })}
         >
             <Image
-                source={item.cover_image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'}
+                source={getThumbnailUrl(item.cover_image_url) || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'}
                 style={styles.resultImage}
                 contentFit="cover"
                 cachePolicy="disk"

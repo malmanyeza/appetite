@@ -75,6 +75,18 @@ export const ActiveDelivery = () => {
 
     const orderId = route.params?.orderId;
 
+    const [isPinModalVisible, setIsPinModalVisible] = useState(false);
+    const [pinEntry, setPinEntry] = useState('');
+    const [pinError, setPinError] = useState('');
+    const [userLocation, setUserLocation] = useState<any>(null);
+    const [routeCoords, setRouteCoords] = useState<any[]>([]);
+    const [isNavigating, setIsNavigating] = useState(false);
+    const [distance, setDistance] = useState<string>('');
+    const [duration, setDuration] = useState<string>('');
+    const [isMapReady, setIsMapReady] = useState(false);
+    const [isArrived, setIsArrived] = useState(false);
+    const [lastStatus, setLastStatus] = useState<string | null>(null);
+
     const { data: order, isLoading } = useQuery({
         queryKey: ['active-delivery', orderId],
         queryFn: async () => {
@@ -96,18 +108,6 @@ export const ActiveDelivery = () => {
         enabled: !!orderId && !isNavigating,
         refetchInterval: isNavigating ? 0 : 5000
     });
-
-    const [isPinModalVisible, setIsPinModalVisible] = useState(false);
-    const [pinEntry, setPinEntry] = useState('');
-    const [pinError, setPinError] = useState('');
-    const [userLocation, setUserLocation] = useState<any>(null);
-    const [routeCoords, setRouteCoords] = useState<any[]>([]);
-    const [isNavigating, setIsNavigating] = useState(false);
-    const [distance, setDistance] = useState<string>('');
-    const [duration, setDuration] = useState<string>('');
-    const [isMapReady, setIsMapReady] = useState(false);
-    const [isArrived, setIsArrived] = useState(false);
-    const [lastStatus, setLastStatus] = useState<string | null>(null);
 
     // Sync isArrived state with DB flags on load/update
     useEffect(() => {
@@ -228,7 +228,15 @@ export const ActiveDelivery = () => {
                 }
             );
         })();
-        return () => subscription?.remove();
+        return () => {
+            if (subscription && typeof subscription.remove === 'function') {
+                try {
+                    subscription.remove();
+                } catch (err) {
+                    console.log("[Location Cleanup] Non-critical error:", err);
+                }
+            }
+        };
     }, [user?.id, order?.id, order?.status]);
 
     // Phased road-based route logic
@@ -336,10 +344,7 @@ export const ActiveDelivery = () => {
                 queryClient.setQueryData(['active-delivery', orderId], null); 
                 queryClient.invalidateQueries({ queryKey: ['active-driver-order'] });
                 
-                navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'JobsMain' }],
-                });
+                navigation.navigate('DriverApp');
             } else {
                 // Optimistic UI for other status changes (e.g. confirming pickup)
                 queryClient.setQueryData(['active-delivery', orderId], (old: any) => {
@@ -372,10 +377,7 @@ export const ActiveDelivery = () => {
             setRouteCoords([]);
             setDistance('');
             setDuration('');
-            navigation.reset({
-                index: 0,
-                routes: [{ name: 'JobsMain' }],
-            });
+            navigation.navigate('DriverApp');
         }
     }, [order?.status]);
 
@@ -383,7 +385,7 @@ export const ActiveDelivery = () => {
     if (!order) return <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }]}><Text style={{ color: theme.text }}>Order not found</Text></View>;
 
     const callNumber = (phone: string) => {
-        Linking.openURL(`tel:${phone}`);
+        makeCall(phone);
     };
 
 

@@ -145,8 +145,17 @@
 <body>
 
     <div class="container">
+        <!-- Handoff State (Scanner-Proof Step) -->
+        <div id="handoff-state" class="card" style="display: none;">
+            <div class="logo">Appetite</div>
+            <h1>Security Check</h1>
+            <p>One more step! Please click the button below to verify your identity and securely reset your password.</p>
+            <button id="verify-btn" class="btn">Verify My Identity</button>
+            <p style="margin-top: 24px; font-size: 13px;">This extra step protects your account from being accessed by automated scanners.</p>
+        </div>
+
         <!-- Main Form State -->
-        <div id="reset-form-state" class="card">
+        <div id="reset-form-state" class="card" style="display: none;">
             <div class="logo">Appetite</div>
             <h1>Secure Reset</h1>
             <div id="email-display" class="email-badge">Verifying Identity...</div>
@@ -189,17 +198,48 @@
             }
         });
 
+        const resetForm = document.getElementById('reset-form-state');
+        const handoffState = document.getElementById('handoff-state');
+        const successState = document.getElementById('success-state');
         const submitBtn = document.getElementById('submit-btn');
+        const verifyBtn = document.getElementById('verify-btn');
         const errorMsg = document.getElementById('error-msg');
         const emailDisplay = document.getElementById('email-display');
-        const resetForm = document.getElementById('reset-form-state');
-        const successState = document.getElementById('success-state');
+
+        // Logic Entry Point
+        async function init() {
+            const hash = window.location.hash;
+            
+            // 1. Check for Scanner-Proof Handoff
+            if (hash && hash.includes('#confirm=')) {
+                const targetUrl = decodeURIComponent(hash.split('#confirm=')[1]);
+                if (targetUrl.startsWith('http')) {
+                    handoffState.style.display = 'block';
+                    verifyBtn.onclick = () => {
+                        verifyBtn.disabled = true;
+                        verifyBtn.innerText = "Redirecting...";
+                        window.location.href = targetUrl;
+                    };
+                    return;
+                }
+            }
+
+            // 2. Check for Token Response from redirected Supabase
+            if (hash && (hash.includes('access_token=') || hash.includes('error='))) {
+                resetForm.style.display = 'block';
+                // Listener below handles the session detection
+            } else {
+                // Cold visit or invalid state
+                resetForm.style.display = 'block';
+                showError("Invalid Link: No recovery token found. Please click the link in your email.");
+                submitBtn.disabled = true;
+            }
+        }
 
         submitBtn.onclick = async () => {
             const password = document.getElementById('password').value;
             const confirm = document.getElementById('confirm-password').value;
 
-            // 1. Validation
             errorMsg.style.display = 'none';
             if (password.length < 6) {
                 showError("Password must be at least 6 characters long.");
@@ -210,12 +250,10 @@
                 return;
             }
 
-            // 2. Execution
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="loading-dots">Updating</span>';
 
             try {
-                // Final Check: Re-verify identity right before update
                 const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
                 if (sessionError || !session) {
                     throw new Error("Unable to verify your identity. The reset link may be invalid or expired. Please request a new one.");
@@ -224,7 +262,6 @@
                 const { error } = await supabaseClient.auth.updateUser({ password });
                 if (error) throw error;
 
-                // Success
                 resetForm.style.display = 'none';
                 successState.style.display = 'block';
             } catch (err) {
@@ -242,39 +279,23 @@
             emailDisplay.style.background = "rgba(255, 59, 48, 0.1)";
         }
 
-        // 3. Security Initiation on Page Load
-        window.addEventListener('load', async () => {
-            // Give Supabase a moment to handle the hash if it's currently doing so
-            setTimeout(async () => {
-                try {
-                    const { data: { session }, error } = await supabaseClient.auth.getSession();
-                    
-                    if (error) {
-                        showError("Verification Error: " + error.message);
-                        submitBtn.disabled = true;
-                        return;
-                    }
-
-                    if (!session || !session.user) {
-                        const hash = window.location.hash;
-                        if (!hash || hash.length < 20) {
-                            showError("Invalid Link: No recovery token found. Please click the link in your email again.");
-                        } else {
-                            showError("Link Expired: This password reset link is no longer valid. Please request a new one from the app.");
-                        }
-                        submitBtn.disabled = true;
-                    } else {
-                        // Success: Display Identity to User
-                        emailDisplay.innerText = "Identity: " + session.user.email;
-                        submitBtn.disabled = false;
-                        submitBtn.innerHTML = "Update Password";
-                        console.log("Recovery session confirmed for:", session.user.email);
-                    }
-                } catch (err) {
-                    showError("Initialization Failed. Please refresh the page.");
+        supabaseClient.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
+                resetForm.style.display = 'block';
+                handoffState.style.display = 'none';
+                emailDisplay.innerText = "Identity: " + session.user.email;
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = "Update Password";
+            } else if (event === 'SIGNED_OUT') {
+                const hash = window.location.hash;
+                if (hash && hash.includes('error=access_denied')) {
+                    showError("Link Expired: This link has already been used or is too old. Please request a new one.");
                 }
-            }, 800); // 800ms delay for stability
+            }
         });
+
+        init();
+
     </script>
 </body>
 </html>

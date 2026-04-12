@@ -37,6 +37,7 @@ import { Image } from 'expo-image';
 import { useLocationStore } from '../store/locationStore';
 import { useAuthStore } from '../store/authStore';
 import { useNavigation } from '@react-navigation/native';
+import { getThumbnailUrl } from '../utils/storageUtils';
 
 const INITIAL_REGION = {
     latitude: -17.8248, // Harare
@@ -371,9 +372,9 @@ export const CustomerHome = () => {
             }
 
             // Super smooth decelerating animation
-            // Speed logic: Auto-start is slow (2.5s), Manual is snappy (400ms)
+            // Speed logic: Auto-start is very slow (2.5s) for premium feel, Manual is elegant (800ms)
             modalEntryAnim.stopAnimation((value) => {
-                const targetDuration = isAutoTrigger ? 800 : 400;
+                const targetDuration = isAutoTrigger ? 2500 : 800;
                 if (value > 0) {
                     Animated.timing(modalEntryAnim, {
                         toValue: 0,
@@ -626,7 +627,7 @@ export const CustomerHome = () => {
                             onPressIn={() => prefetchRestaurant(item.id, item.restaurant_id)}
                         >
                             <Image
-                                source={item.cover_image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'}
+                                source={getThumbnailUrl(item.cover_image_url) || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'}
                                 style={styles.restaurantImage}
                                 contentFit="cover"
                                 cachePolicy="disk"
@@ -692,27 +693,17 @@ export const CustomerHome = () => {
                                 // isGesture is supplied by react-native-maps (mostly reliable on iOS)
                                 const isHumanGesture = details ? details.isGesture : !isProgrammaticChange.current;
                                 
-                                // Only raise pin for manual gestures, not automated ones
+                                // We no longer auto-hide the sheet when the map is moved. 
+                                // The user can pull it down manually if they want to see more map.
                                 if (isHumanGesture) {
                                     Animated.spring(pinAnim, { toValue: -15, useNativeDriver: true }).start();
-                                    // Manual gesture cancels any pending programmatic GPS snaps
                                     gpsRequestCounter.current += 1;
-                                
-                                    // Internal state for 'Locating...' text, doesn't spin the main button
                                     setIsFetchingLocation(true);
-                                    // Prevent any auto-panning from fighting with this manual gesture
                                     setHasAnimatedInitialLocation(true);
-                                    
-                                    // Only slide sheet down if we haven't locked a selection AND it's not a programmatic move
-                                    if (!isLocationSelected && !isModalDown) {
-                                        animateModal(DOWN_VALUE);
-                                        setIsModalDown(true);
-                                    }
                                 }
                             }}
                             onRegionChangeComplete={async (region, details) => {
-                                const isHumanGesture = details ? details.isGesture : !isProgrammaticChange.current;
-                                
+                                // We stay in whatever state the user has left the sheet (usually UP)
                                 if (!isHumanGesture || isProgrammaticChange.current) {
                                     isProgrammaticChange.current = false;
                                     Animated.spring(pinAnim, { toValue: 0, useNativeDriver: true }).start();

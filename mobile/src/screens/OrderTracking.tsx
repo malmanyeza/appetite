@@ -366,7 +366,7 @@ export const OrderTracking = ({ route, navigation }: any) => {
     const handleCall = async (type: 'direct' | 'in-app') => {
         setIsCallModalVisible(false);
         if (type === 'direct' && order?.profiles?.phone) {
-            Linking.openURL(`tel:${order.profiles.phone}`);
+            makeCall(order.profiles.phone);
         } else if (type === 'in-app') {
             if (!order?.driver_id) return;
             

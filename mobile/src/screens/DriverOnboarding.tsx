@@ -11,6 +11,7 @@ import {
     ActivityIndicator,
     Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
 import { useTheme } from '../theme';
 import { useAuthStore } from '../store/authStore';
@@ -51,6 +52,7 @@ const decodeBase64 = (base64String: string) => {
 
 export const DriverOnboarding = ({ navigation }: any) => {
     const { theme } = useTheme();
+    const insets = useSafeAreaInsets();
     const { user, profile } = useAuthStore();
     const queryClient = useQueryClient();
     const [step, setStep] = useState(0); // 0: Gate, 1: Basic, 2: Vehicle, 3: Docs, 4: Payout
@@ -225,7 +227,10 @@ export const DriverOnboarding = ({ navigation }: any) => {
     );
 
     const renderGate = () => (
-        <View style={styles.fullCenter}>
+        <ScrollView 
+            contentContainerStyle={[styles.fullCenter, { paddingBottom: insets.bottom + 40 }]}
+            showsVerticalScrollIndicator={false}
+        >
             <View style={[styles.iconCircle, { backgroundColor: `${theme.accent}15` }]}>
                 <Briefcase size={48} color={theme.accent} />
             </View>
@@ -239,11 +244,15 @@ export const DriverOnboarding = ({ navigation }: any) => {
             <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.goBack()}>
                 <Text style={[styles.secondaryText, { color: theme.textMuted }]}>Not now</Text>
             </TouchableOpacity>
-        </View>
+        </ScrollView>
     );
 
     const renderBasicInfo = () => (
-        <ScrollView style={styles.formContent} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+            style={styles.formContent} 
+            contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+            showsVerticalScrollIndicator={false}
+        >
             {renderHeader('Basic Details', 'Step 1 of 4: Personal Information')}
 
             <View style={[styles.inputGroup, { backgroundColor: theme.surface }]}>
@@ -296,7 +305,11 @@ export const DriverOnboarding = ({ navigation }: any) => {
     );
 
     const renderVehicle = () => (
-        <ScrollView style={styles.formContent} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+            style={styles.formContent} 
+            contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+            showsVerticalScrollIndicator={false}
+        >
             {renderHeader('Vehicle Details', 'Step 2 of 4: Delivery Options')}
 
             <Text style={[styles.label, { color: theme.text }]}>Vehicle Type</Text>
@@ -350,7 +363,11 @@ export const DriverOnboarding = ({ navigation }: any) => {
     );
 
     const renderDocuments = () => (
-        <ScrollView style={styles.formContent} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+            style={styles.formContent} 
+            contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+            showsVerticalScrollIndicator={false}
+        >
             {renderHeader('Documents', 'Step 3 of 4: Verification (Optional for MVP)')}
 
             <TouchableOpacity style={[styles.uploadBox, { backgroundColor: theme.surface }]} onPress={() => pickImage('id')}>
@@ -453,7 +470,11 @@ export const DriverOnboarding = ({ navigation }: any) => {
     );
 
     const renderPayout = () => (
-        <ScrollView style={styles.formContent} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+            style={styles.formContent} 
+            contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+            showsVerticalScrollIndicator={false}
+        >
             {renderHeader('Payout Details', 'Step 4 of 4: How you get paid')}
 
             <View style={[styles.infoBanner, { backgroundColor: `${theme.accent}10`, marginBottom: 24 }]}>
@@ -501,7 +522,10 @@ export const DriverOnboarding = ({ navigation }: any) => {
     );
 
     const renderSuccess = () => (
-        <View style={styles.fullCenter}>
+        <ScrollView 
+            contentContainerStyle={[styles.fullCenter, { paddingBottom: insets.bottom + 40 }]} 
+            showsVerticalScrollIndicator={false}
+        >
             <View style={[styles.iconCircle, { backgroundColor: '#10B98115' }]}>
                 <CheckCircle2 size={48} color="#10B981" />
             </View>
@@ -512,11 +536,14 @@ export const DriverOnboarding = ({ navigation }: any) => {
             <TouchableOpacity style={[styles.primaryButton, { backgroundColor: theme.accent }]} onPress={() => navigation.navigate('AccountMain')}>
                 <Text style={styles.buttonText}>Back to Profile</Text>
             </TouchableOpacity>
-        </View>
+        </ScrollView>
     );
 
     const renderError = () => (
-        <View style={styles.fullCenter}>
+        <ScrollView 
+            contentContainerStyle={[styles.fullCenter, { paddingBottom: insets.bottom + 40 }]}
+            showsVerticalScrollIndicator={false}
+        >
             <View style={[styles.iconCircle, { backgroundColor: '#EF444415' }]}>
                 <FileText size={48} color="#EF4444" />
             </View>
@@ -530,7 +557,7 @@ export const DriverOnboarding = ({ navigation }: any) => {
             <TouchableOpacity style={styles.secondaryButton} onPress={() => setError(null)}>
                 <Text style={[styles.secondaryText, { color: theme.textMuted }]}>Edit Details</Text>
             </TouchableOpacity>
-        </View>
+        </ScrollView>
     );
 
     return (

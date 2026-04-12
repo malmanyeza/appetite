@@ -3,7 +3,7 @@
     "name": "Appetite",
     "slug": "appetite-mobile",
     "scheme": "appetite",
-    "version": "1.3.5",
+    "version": "1.3.7",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -54,7 +54,7 @@
         }
       ],
       "package": "com.appetite.delivery",
-      "versionCode": 1,
+      "versionCode": 2,
       "googleServicesFile": "./google-services.json",
       "config": {
         "googleMaps": {
@@ -83,8 +83,11 @@
       ]
     ],
     "extra": {
-      "supabaseUrl": "https://ydcbycanrbdcyyabnfxn.supabase.co",
-      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkY2J5Y2FucmJkY3l5YWJuZnhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MTE5NTIsImV4cCI6MjA4Njk4Nzk1Mn0.pjJkJ8PVGa7zeppWYxbBiUhic43lpnaxuVhgsApuv7k"
+      "supabaseUrl": "https://zmsactoninhdtngtlyep.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inptc2FjdG9uaW5oZHRuZ3RseWVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NTk2ODksImV4cCI6MjA5MTMzNTY4OX0.FDgdXuVaDJe_yM5S9UhVB-Y-PEcbBQOm5M-ndAeJMWQ",
+      "eas": {
+        "projectId": "009a559f-a604-47f4-b4c9-26bccb2604b2"
+      }
     },
     "owner": "jueasbuilds"
   }

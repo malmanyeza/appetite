@@ -22,6 +22,7 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { useTheme } from '../theme';
 import { MapPin, Package, Phone, CheckCircle2, Navigation, Store } from 'lucide-react-native';
+import { makeCall } from '../utils/callUtils';
 
 export const DriverJobs = () => {
     const { theme } = useTheme();
@@ -222,6 +223,19 @@ export const DriverJobs = () => {
                     queryClient.invalidateQueries({ queryKey: ['driver-jobs'] });
                 }
             )
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'orders',
+                    filter: `driver_id=eq.${user.id}`
+                },
+                () => {
+                    queryClient.invalidateQueries({ queryKey: ['driver-jobs'] });
+                    queryClient.invalidateQueries({ queryKey: ['active-driver-order'] });
+                }
+            )
             .subscribe();
 
         return () => {
@@ -251,7 +265,8 @@ export const DriverJobs = () => {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('targeted_driver_jobs')
-                .select('id, offer_id, status, delivery_address_snapshot, driver_id, customer_id, restaurant_id, pricing, restaurant_name, restaurant_suburb, restaurant_city, restaurant_landmark_notes, customer_name, customer_phone')
+                .select('id, offer_id, status, delivery_address_snapshot, offer_assigned_driver_id, driver_id, customer_id, restaurant_id, pricing, restaurant_name, restaurant_suburb, restaurant_city, restaurant_landmark_notes, customer_name, customer_phone')
+                .eq('offer_assigned_driver_id', user?.id);
 
             if (error) {
                 console.error("Fetch Error:", error);
@@ -269,6 +284,7 @@ export const DriverJobs = () => {
                     delivery_address_snapshot: offer.delivery_address_snapshot,
                     delivery_pin: offer.delivery_pin,
                     driver_id: offer.driver_id,
+                    offer_assigned_driver_id: offer.offer_assigned_driver_id,
                     customer_id: offer.customer_id,
                     restaurant_id: offer.restaurant_id,
                     pricing: offer.pricing,
@@ -332,11 +348,7 @@ export const DriverJobs = () => {
     });
 
     const handleCall = (phone: string) => {
-        if (!phone) {
-            Alert.alert('Error', 'Customer phone number not available.');
-            return;
-        }
-        Linking.openURL(`tel:${phone}`);
+        makeCall(phone);
     };
 
     const handleNavigate = (lat: number, lng: number, addressText: string) => {

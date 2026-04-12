@@ -17,6 +17,7 @@ import { ChevronLeft, Share2, Info, Plus, Minus, X, Check, MapPin, Clock, Search
 import { Image } from 'expo-image';
 import { useCartStore } from '../store/cartStore';
 import { restaurantService } from '../services/restaurantService';
+import { getThumbnailUrl, getOriginalUrl } from '../utils/storageUtils';
 
 export const RestaurantDetails = ({ route, navigation }: any) => {
     const { id } = route.params;
@@ -228,7 +229,7 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
                 {/* Hero Image */}
                 <View style={styles.imageContainer}>
                     <Image
-                        source={restaurant?.cover_image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'}
+                        source={getOriginalUrl(restaurant?.cover_image_url) || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'}
                         style={styles.heroImage}
                         contentFit="cover"
                         cachePolicy="disk"
@@ -334,7 +335,7 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
                                         <View style={styles.itemAction}>
                                             {item.image_url && (
                                                 <Image
-                                                    source={item.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'}
+                                                    source={getThumbnailUrl(item.image_url) || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'}
                                                     style={styles.itemImage}
                                                     contentFit="cover"
                                                     cachePolicy="disk"
