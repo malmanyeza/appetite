@@ -128,10 +128,10 @@ Deno.serve(async (req: Request) => {
     const distance = Math.round(Number(distanceKm) || 0);
     
     // 1. Customer Pricing
-    const baseFee = Number(config.base_fee || 1.5);
-    const perKmFee = Number(config.per_km_fee || 0.4);
-    const surge = Number(config.surge_amount || 0);
-    const serviceFee = Number(config.service_fee || 0.5);
+    const baseFee = (config.base_fee !== undefined && config.base_fee !== null) ? Number(config.base_fee) : 1.5;
+    const perKmFee = (config.per_km_fee !== undefined && config.per_km_fee !== null) ? Number(config.per_km_fee) : 0.4;
+    const surge = (config.surge_amount !== undefined && config.surge_amount !== null) ? Number(config.surge_amount) : 0;
+    const serviceFee = (config.service_fee !== undefined && config.service_fee !== null) ? Number(config.service_fee) : 0.5;
     
     // Formula: Base + (PerKm * Distance) + Surge
     const deliveryFee = fulfillmentType === 'pickup' ? 0 : (baseFee + (perKmFee * distance) + surge);

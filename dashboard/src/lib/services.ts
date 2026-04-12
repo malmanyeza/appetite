@@ -354,29 +354,11 @@ export const adminService = {
         }));
     },
 
-    async sendPushNotification(pushToken: string, title: string, body: string, data?: any) {
-        if (!pushToken) return;
-        const message = {
-            to: pushToken,
-            sound: 'default',
-            title,
-            body,
-            data,
-        };
-
-        try {
-            await fetch('https://exp.host/--/api/v2/push/send', {
-                method: 'POST',
-                headers: {
-                    Accept: 'application/json',
-                    'Accept-encoding': 'gzip, deflate',
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(message),
-            });
-        } catch (error) {
-            console.error('Error sending push notification', error);
-        }
+    async sendPushNotification(userId: string, title: string, body: string, data?: any) {
+        const { error } = await supabase.functions.invoke('notify_user', {
+            body: { userId, title, body, data }
+        });
+        if (error) console.error('Error invoking notify_user function:', error);
     },
 
     async updateDriverStatus(userId: string, status: string) {
@@ -411,9 +393,7 @@ export const adminService = {
         // Also ensure user_roles has 'driver' if approved
         if (status === 'approved') {
             await supabase.from('user_roles').upsert({ user_id: userId, role: 'driver' }, { onConflict: 'user_id, role' });
-            if (pushToken) {
-                await this.sendPushNotification(pushToken, 'Application Approved!', 'Welcome to the fleet! You are now officially approved to start accepting delivery orders.');
-            }
+            await this.sendPushNotification(userId, 'Application Approved!', 'Welcome to the fleet! You are now officially approved to start accepting delivery orders.');
         }
     },
 
@@ -425,15 +405,12 @@ export const adminService = {
 
         if (error) throw error;
 
-        // Automatically dispatch a Push Notification to the target driver
-        const { data: profile } = await supabase.from('profiles').select('expo_push_token').eq('id', driverId).single();
-        if (profile?.expo_push_token) {
-            await this.sendPushNotification(
-                profile.expo_push_token,
-                'New Delivery Assigned!',
-                'You have a new active order securely routed to your device for pickup.'
-            );
-        }
+        // Automatically dispatch a Push Notification to the target driver via server-side function
+        await this.sendPushNotification(
+            driverId,
+            'New Delivery Assigned!',
+            'You have a new active order securely routed to your device for pickup.'
+        );
     },
 
     async getGlobalAnalytics() {

@@ -111,7 +111,6 @@
             font-size: 14px;
             display: none;
         }
-        .message.error { display: block; background: rgba(255, 59, 48, 0.1); color: var(--error); border: 1px solid rgba(255, 59, 48, 0.2); }
         .message.success { display: block; background: rgba(52, 199, 89, 0.1); color: var(--success); border: 1px solid rgba(52, 199, 89, 0.2); }
 
         .email-badge {
@@ -172,7 +171,6 @@
             </div>
 
             <button id="submit-btn" class="btn" disabled>Wait for Verification...</button>
-            <div id="error-msg" class="message error"></div>
         </div>
 
         <!-- Success State -->
@@ -272,8 +270,7 @@
         };
 
         function showError(msg) {
-            errorMsg.innerText = msg;
-            errorMsg.style.display = 'block';
+            console.error(msg); // Log to console instead of showing red box
             emailDisplay.innerText = "Verification Failed";
             emailDisplay.style.color = "#FF3B30";
             emailDisplay.style.background = "rgba(255, 59, 48, 0.1)";
