@@ -187,110 +187,103 @@
         const SUPABASE_URL = 'https://zmsactoninhdtngtlyep.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inptc2FjdG9uaW5oZHRuZ3RseWVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NTk2ODksImV4cCI6MjA5MTMzNTY4OX0.FDgdXuVaDJe_yM5S9UhVB-Y-PEcbBQOm5M-ndAeJMWQ';
         
-        // Security: Disable session persistence for the reset portal to prevent session leakage
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-            auth: {
-                persistSession: false,
-                autoRefreshToken: false,
-                detectSessionInUrl: true
-            }
+            auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: true }
         });
 
-        const resetForm = document.getElementById('reset-form-state');
-        const handoffState = document.getElementById('handoff-state');
-        const successState = document.getElementById('success-state');
-        const submitBtn = document.getElementById('submit-btn');
-        const verifyBtn = document.getElementById('verify-btn');
-        const emailDisplay = document.getElementById('email-display');
+        // Robust UI Helpers (to prevent "Cannot read property of null" errors)
+        const ui = {
+            el: (id) => document.getElementById(id),
+            show: (id) => { const e = document.getElementById(id); if(e) e.style.display = 'block'; },
+            hide: (id) => { const e = document.getElementById(id); if(e) e.style.display = 'none'; },
+            text: (id, txt) => { const e = document.getElementById(id); if(e) e.innerText = txt; },
+            html: (id, h) => { const e = document.getElementById(id); if(e) e.innerHTML = h; },
+            style: (id, prop, val) => { const e = document.getElementById(id); if(e && e.style) e.style[prop] = val; }
+        };
 
-        // Logic Entry Point
+        function showError(msg) {
+            console.error(msg);
+            ui.text('email-display', "Verification Failed");
+            ui.style('email-display', 'color', "#FF3B30");
+            ui.style('email-display', 'background', "rgba(255, 59, 48, 0.1)");
+        }
+
         async function init() {
             const hash = window.location.hash;
             
-            // 1. Check for Scanner-Proof Handoff
             if (hash && hash.includes('#confirm=')) {
                 const targetUrl = decodeURIComponent(hash.split('#confirm=')[1]);
                 if (targetUrl.startsWith('http')) {
-                    handoffState.style.display = 'block';
-                    verifyBtn.onclick = () => {
-                        verifyBtn.disabled = true;
-                        verifyBtn.innerText = "Redirecting...";
+                    ui.show('handoff-state');
+                    const vBtn = ui.el('verify-btn');
+                    if (vBtn) vBtn.onclick = () => {
+                        vBtn.disabled = true;
+                        vBtn.innerText = "Redirecting...";
                         window.location.href = targetUrl;
                     };
                     return;
                 }
             }
 
-            // 2. Check for Token Response from redirected Supabase
             if (hash && (hash.includes('access_token=') || hash.includes('error='))) {
-                resetForm.style.display = 'block';
-                // Listener below handles the session detection
+                ui.show('reset-form-state');
             } else {
-                // Cold visit or invalid state
-                resetForm.style.display = 'block';
-                showError("Invalid Link: No recovery token found. Please click the link in your email.");
-                submitBtn.disabled = true;
+                ui.show('reset-form-state');
+                showError("Invalid Link: No recovery token found.");
+                const sBtn = ui.el('submit-btn');
+                if (sBtn) sBtn.disabled = true;
             }
         }
 
-        submitBtn.onclick = async () => {
-            const password = document.getElementById('password').value;
-            const confirm = document.getElementById('confirm-password').value;
+        const sBtn = ui.el('submit-btn');
+        if (sBtn) {
+            sBtn.onclick = async () => {
+                const p1 = ui.el('password');
+                const p2 = ui.el('confirm-password');
+                if (!p1 || !p2) return;
 
-            if (password.length < 6) {
-                showError("Password must be at least 6 characters long.");
-                return;
-            }
-            if (password !== confirm) {
-                showError("Passwords do not match.");
-                return;
-            }
+                const password = p1.value;
+                const confirm = p2.value;
 
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="loading-dots">Updating</span>';
+                if (password.length < 6) return showError("Password must be at least 6 characters long.");
+                if (password !== confirm) return showError("Passwords do not match.");
 
-            try {
-                const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
-                if (sessionError || !session) {
-                    throw new Error("Unable to verify your identity. The reset link may be invalid or expired. Please request a new one.");
+                sBtn.disabled = true;
+                ui.html('submit-btn', '<span class="loading-dots">Updating</span>');
+
+                try {
+                    const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+                    if (sessionError || !session) throw new Error("Unable to verify identity. Link may be expired.");
+
+                    const { error } = await supabaseClient.auth.updateUser({ password });
+                    if (error) throw error;
+
+                    ui.hide('reset-form-state');
+                    ui.show('success-state');
+                } catch (err) {
+                    showError(err.message || "Failed to update password.");
+                    sBtn.disabled = false;
+                    ui.text('submit-btn', "Update Password");
                 }
-
-                const { error } = await supabaseClient.auth.updateUser({ password });
-                if (error) throw error;
-
-                resetForm.style.display = 'none';
-                successState.style.display = 'block';
-            } catch (err) {
-                showError(err.message || "Failed to update password. Please try again.");
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = "Update Password";
-            }
-        };
-
-        function showError(msg) {
-            console.error(msg); // Log to console instead of showing red box
-            emailDisplay.innerText = "Verification Failed";
-            emailDisplay.style.color = "#FF3B30";
-            emailDisplay.style.background = "rgba(255, 59, 48, 0.1)";
+            };
         }
 
         supabaseClient.auth.onAuthStateChange(async (event, session) => {
             if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
-                resetForm.style.display = 'block';
-                handoffState.style.display = 'none';
-                emailDisplay.innerText = "Identity: " + session.user.email;
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = "Update Password";
+                ui.show('reset-form-state');
+                ui.hide('handoff-state');
+                ui.text('email-display', "Identity: " + session.user.email);
+                const b = ui.el('submit-btn');
+                if (b) { b.disabled = false; b.innerText = "Update Password"; }
             } else if (event === 'SIGNED_OUT') {
-                const hash = window.location.hash;
-                if (hash && hash.includes('error=access_denied')) {
-                    showError("Link Expired: This link has already been used or is too old. Please request a new one.");
+                const h = window.location.hash;
+                if (h && h.includes('error=access_denied')) {
+                    showError("Link Expired: Please request a new one.");
                 }
             }
         });
 
         init();
-
     </script>
 </body>
 </html>
