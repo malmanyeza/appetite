@@ -201,7 +201,6 @@
         const successState = document.getElementById('success-state');
         const submitBtn = document.getElementById('submit-btn');
         const verifyBtn = document.getElementById('verify-btn');
-        const errorMsg = document.getElementById('error-msg');
         const emailDisplay = document.getElementById('email-display');
 
         // Logic Entry Point
@@ -238,7 +237,6 @@
             const password = document.getElementById('password').value;
             const confirm = document.getElementById('confirm-password').value;
 
-            errorMsg.style.display = 'none';
             if (password.length < 6) {
                 showError("Password must be at least 6 characters long.");
                 return;
