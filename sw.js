@@ -7,19 +7,28 @@ self.addEventListener('push', (event) => {
         const title = data.title || 'New Order!';
         const options = {
             body: data.body || 'You have received a new order on Appetite.',
-            icon: '/icon.png', // Ensure this exists in public or use a default
+            icon: '/icon.png',
             badge: '/icon.png',
             data: data.data || {},
             vibrate: [200, 100, 200],
             actions: [
                 { action: 'open', title: 'View Order' }
             ],
-            tag: 'new-order', // Group similar notifications
+            tag: data.data?.type === 'NEW_ORDER' ? 'new-order' : 'system-alert',
             renotify: true
         };
 
         event.waitUntil(
-            self.registration.showNotification(title, options)
+            self.registration.showNotification(title, options).then(() => {
+                return clients.matchAll({ type: 'window', includeUncontrolled: true });
+            }).then((windowClients) => {
+                windowClients.forEach((client) => {
+                    client.postMessage({
+                        type: 'PUSH_RECEIVED',
+                        payload: data
+                    });
+                });
+            })
         );
     } catch (err) {
         console.error('[SW] Error handling push event:', err);
