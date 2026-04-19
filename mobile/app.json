@@ -3,7 +3,7 @@
     "name": "Appetite",
     "slug": "appetite-mobile",
     "scheme": "appetite",
-    "version": "1.4.2",
+    "version": "1.4.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",

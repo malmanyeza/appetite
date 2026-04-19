@@ -16,8 +16,9 @@ import { useTheme } from '../theme';
 import { useAuthStore } from '../store/authStore';
 import { ArrowLeft, Mail, Lock, User, UserCircle, Car, Phone } from 'lucide-react-native';
 
-export const SignUpScreen = ({ navigation }: any) => {
+export const SignUpScreen = ({ navigation, route }: any) => {
     const { theme } = useTheme();
+    const returnToCart = route?.params?.returnToCart ?? false;
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [email, setEmail] = useState('');
@@ -26,7 +27,7 @@ export const SignUpScreen = ({ navigation }: any) => {
     const [loading, setLoading] = useState(false);
 
     const setSigningUp = useAuthStore(state => state.setSigningUp);
-    const refreshSession = useAuthStore(state => state.refreshSession);
+    const setPendingRedirect = useAuthStore(state => state.setPendingRedirect);
 
     const validateEmail = (email: string) => {
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -90,18 +91,26 @@ export const SignUpScreen = ({ navigation }: any) => {
             }
             if (!user) throw new Error('Sign up failed. Please try again.');
 
-            // 2. The profile and roles are now created automatically on the server
-            // via a database trigger inside the 'auth.users' table to avoid RLS issues.
+            // 2. Profile & roles are auto-created on the server via DB trigger.
 
-            // 3. Force session refresh to accurately load the new role
-            await refreshSession();
-
-            // If Supabase didn't auto-login (e.g. email verification required)
+            // 3. Check if email verification is required.
+            //    NOTE: Do NOT call refreshSession() manually here.
+            //    onAuthStateChange already handles the session update, and calling
+            //    refreshSession() concurrently is what caused the crash.
             const { data: { session } } = await supabase.auth.getSession();
+
             if (!session) {
+                // Email verification required — navigate before auth state change remounts navigator
                 navigation.navigate('EmailVerification', { email: email.trim() });
+            } else {
+                // Auto-signed-in — set pendingRedirect if user came from cart.
+                // The authStore/navigator will handle the transition automatically.
+                if (returnToCart) {
+                    setPendingRedirect('Cart');
+                }
+                // No manual navigation needed — onAuthStateChange triggered refreshSession
+                // which sets user + activeRole, causing RootNavigator to show CustomerApp.
             }
-            // If they are auto-logged in, they will be seamlessly routed once we release the lock below.
 
         } catch (error: any) {
             Alert.alert('Sign Up Failed', error.message);
@@ -133,8 +142,10 @@ export const SignUpScreen = ({ navigation }: any) => {
                 <View style={styles.header}>
                     <Text style={[styles.title, { color: theme.text }]}>Create Account</Text>
                     <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-                        Join Appetite and start your journey
-                    </Text>
+                            {returnToCart
+                                ? 'Create an account to complete your order'
+                                : 'Join Appetite and start your journey'}
+                        </Text>
                 </View>
                 <View style={styles.form}>
                     <View style={[styles.inputContainer, { backgroundColor: theme.surface }]}>

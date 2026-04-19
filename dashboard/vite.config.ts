@@ -4,7 +4,7 @@ import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-    base: '/appetite/',
+    base: '/appetite/dashboard/',
     plugins: [react()],
     resolve: {
         alias: {

@@ -21,10 +21,8 @@ import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ErrorBoundary } from 'react-error-boundary';
 import { GlobalError } from './src/components/GlobalError';
-import { createNavigationContainerRef } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-export const navigationRef = createNavigationContainerRef();
+import { navigationRef } from './src/lib/navigationRef';
 
 
 const queryClient = new QueryClient({

@@ -14,7 +14,10 @@ interface CartItem {
 
 interface CartState {
     items: CartItem[];
+    fulfillmentType: 'delivery' | 'pickup' | null;
+    hasChosenFulfillment: boolean;
     addItem: (item: any, restaurantId: string, locationId: string, selectedAddOns?: { name: string, price: number }[]) => void;
+    setFulfillmentType: (type: 'delivery' | 'pickup') => void;
     removeItem: (id: string) => void;
     updateQty: (id: string, delta: number) => void;
     clearCart: () => void;
@@ -24,6 +27,10 @@ interface CartState {
 export const useCartStore = create<CartState>((set, get) => ({
     items: [],
     total: 0,
+    fulfillmentType: null,
+    hasChosenFulfillment: false,
+
+    setFulfillmentType: (type) => set({ fulfillmentType: type, hasChosenFulfillment: true }),
 
     addItem: (item, restaurantId, locationId, selectedAddOns = []) => {
         const currentItems = get().items;
@@ -101,5 +108,5 @@ export const useCartStore = create<CartState>((set, get) => ({
         set({ items: newItems, total: calculateTotal(newItems) });
     },
 
-    clearCart: () => set({ items: [], total: 0 }),
+    clearCart: () => set({ items: [], total: 0, fulfillmentType: null, hasChosenFulfillment: false }),
 }));

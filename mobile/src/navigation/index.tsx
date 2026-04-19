@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuthStore } from '../store/authStore';
 import { useTheme } from '../theme';
+import { navigationRef } from '../lib/navigationRef';
 import { Home, ClipboardList, User, Briefcase, DollarSign, MapPin } from 'lucide-react-native';
 
 import { CustomerHome } from '../screens/CustomerHome';
@@ -127,7 +128,28 @@ const DriverTabs = () => {
 };
 
 export const RootNavigator = () => {
-    const { user, activeRole, isSigningUp } = useAuthStore();
+    const { user, activeRole, isSigningUp, pendingRedirect, setPendingRedirect } = useAuthStore();
+
+    // Track the previous user ID so we can detect a fresh login (guest → authenticated)
+    const prevUserIdRef = React.useRef<string | null>(null);
+
+    React.useEffect(() => {
+        const prevUserId = prevUserIdRef.current;
+        const currentUserId = user?.id ?? null;
+        prevUserIdRef.current = currentUserId;
+
+        // A fresh login just happened and there is a pending screen to redirect to
+        if (!prevUserId && currentUserId && pendingRedirect) {
+            // Wait for the remounted navigator to fully settle before navigating
+            const timer = setTimeout(() => {
+                if (navigationRef.isReady()) {
+                    (navigationRef as any).navigate(pendingRedirect);
+                    setPendingRedirect(null);
+                }
+            }, 300);
+            return () => clearTimeout(timer);
+        }
+    }, [user?.id, pendingRedirect]);
 
     return (
         <Stack.Navigator 

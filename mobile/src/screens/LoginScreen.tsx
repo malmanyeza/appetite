@@ -17,8 +17,9 @@ import { useTheme } from '../theme';
 import { Branding } from '../components/Branding';
 import { Mail, Lock, LogIn, UserPlus } from 'lucide-react-native';
 
-export const LoginScreen = ({ navigation }: any) => {
+export const LoginScreen = ({ navigation, route }: any) => {
     const { theme } = useTheme();
+    const returnToCart = route?.params?.returnToCart ?? false;
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -85,7 +86,9 @@ export const LoginScreen = ({ navigation }: any) => {
                         </View>
                         <Text style={[styles.title, { color: theme.text }]}>Welcome Back</Text>
                         <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-                            Sign in to continue ordering delicious food
+                            {returnToCart
+                                ? 'Sign in to complete your order'
+                                : 'Sign in to continue ordering delicious food'}
                         </Text>
                     </View>
 

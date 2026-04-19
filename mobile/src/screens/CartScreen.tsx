@@ -41,8 +41,8 @@ const INITIAL_REGION = {
 };
 
 export const CartScreen = ({ navigation }: any) => {
-    const { items, total, updateQty, removeItem, clearCart } = useCartStore();
-    const { profile } = useAuthStore();
+    const { items, total, updateQty, removeItem, clearCart, fulfillmentType, hasChosenFulfillment, setFulfillmentType } = useCartStore();
+    const { profile, setPendingRedirect } = useAuthStore();
     const { selectedLocation, setSelectedLocation } = useLocationStore();
     const { theme, isDark } = useTheme();
     const [loading, setLoading] = React.useState(false);
@@ -62,7 +62,6 @@ export const CartScreen = ({ navigation }: any) => {
         enabled: !!profile?.id
     });
 
-    const [fulfillmentType, setFulfillmentType] = React.useState<'delivery' | 'pickup' | null>('delivery');
     const [selectedAddress, setSelectedAddress] = React.useState<any>(selectedLocation);
     const [paymentMethod, setPaymentMethod] = React.useState<'cod' | 'ecocash' | 'card'>('ecocash');
     const [ecocashPhone, setEcocashPhone] = React.useState('');
@@ -71,8 +70,6 @@ export const CartScreen = ({ navigation }: any) => {
 
     const [showEcocashModal, setShowEcocashModal] = React.useState(false);
     const [addressModalVisible, setAddressModalVisible] = React.useState(false);
-    const [fulfillmentPromptVisible, setFulfillmentPromptVisible] = React.useState(true);
-    const [hasPrompted, setHasPrompted] = React.useState(false); // Changed to false initially
     const [isFetchingLocation, setIsFetchingLocation] = React.useState(false);
     const [isGpsButtonLoading, setIsGpsButtonLoading] = React.useState(false);
     const [gpsLocation, setGpsLocation] = React.useState<{ lat: number; lng: number } | null>(null);
@@ -285,7 +282,10 @@ export const CartScreen = ({ navigation }: any) => {
             return;
         }
 
-        if (selectedAddress && restaurant && deliveryConfig) {
+        // Priority: saved/selected address → location store (post-hydration) → live GPS
+        const addressForCalc = selectedAddress || selectedLocation || gpsLocation;
+
+        if (addressForCalc && restaurant && deliveryConfig) {
             const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
                 const R = 6371; // km
                 const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -301,8 +301,8 @@ export const CartScreen = ({ navigation }: any) => {
             const distance = Math.round(getDistance(
                 restaurant.lat,
                 restaurant.lng,
-                selectedAddress.lat,
-                selectedAddress.lng
+                addressForCalc.lat,
+                addressForCalc.lng
             ));
 
             const base = (deliveryConfig.base_fee !== undefined && deliveryConfig.base_fee !== null) ? Number(deliveryConfig.base_fee) : 1.5;
@@ -313,7 +313,17 @@ export const CartScreen = ({ navigation }: any) => {
             setDeliveryFee(base + (distance * perKm) + surge);
             setServiceFee(srv);
         }
-    }, [selectedAddress, restaurant, deliveryConfig, fulfillmentType]);
+    }, [selectedAddress, selectedLocation, gpsLocation, restaurant, deliveryConfig, fulfillmentType]);
+
+    // Sync when Zustand store finishes hydrating from SecureStore.
+    // useState(selectedLocation) only captures the value at mount time.
+    // If the store was still loading, selectedAddress starts as null and
+    // never updates. This effect corrects that the moment the store settles.
+    React.useEffect(() => {
+        if (selectedLocation && !selectedAddress) {
+            setSelectedAddress(selectedLocation);
+        }
+    }, [selectedLocation]);
 
     React.useEffect(() => {
         if (!selectedAddress && addresses && addresses.length > 0) {
@@ -324,21 +334,15 @@ export const CartScreen = ({ navigation }: any) => {
     const handleCheckout = () => {
         if (items.length === 0) return;
 
-        // AUTH GATE: Prevent guests from checking out without an account
+        // AUTH GATE: Guest users are redirected to Login; cart is preserved via pendingRedirect
         if (!profile) {
-            Alert.alert(
-                'Sign In Required',
-                'Please sign in or create an account to place an order.',
-                [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Sign In', onPress: () => navigation.navigate('Login') }
-                ]
-            );
+            setPendingRedirect('Cart');
+            navigation.navigate('Login', { returnToCart: true });
             return;
         }
 
-        if (!fulfillmentType) {
-            setFulfillmentPromptVisible(true);
+        if (!hasChosenFulfillment || !fulfillmentType) {
+            // Modal is already visible (visible={!hasChosenFulfillment}), just return
             return;
         }
         if (fulfillmentType === 'delivery' && !selectedAddress) {
@@ -1036,9 +1040,14 @@ export const CartScreen = ({ navigation }: any) => {
                                                 if (status === 'granted') {
                                                     if (currentRequestId !== gpsRequestCounter.current) return;
 
-                                                    // DEEP LOCK: Skip lastKnown because it often contains neighbors' houses.
-                                                    // Go STRAIGHT to fresh high-accuracy satellite fix.
-                                                    const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Highest });
+                                                    // FAST GPS: Try the OS-cached last-known position first (returns instantly).
+                                                    // If it's stale (>2 min old) or unavailable, fall back to Accuracy.Balanced
+                                                    // which uses WiFi/cell triangulation and resolves in 1–2 seconds.
+                                                    // Accuracy.Highest is avoided — it forces a full satellite lock (10–30s wait).
+                                                    let loc = await ExpoLocation.getLastKnownPositionAsync({ maxAge: 120000, requiredAccuracy: 200 });
+                                                    if (!loc) {
+                                                        loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
+                                                    }
                                                     if (currentRequestId !== gpsRequestCounter.current) return;
 
                                                     const region = {
@@ -1164,8 +1173,7 @@ export const CartScreen = ({ navigation }: any) => {
                 </View>
             </Modal>
 
-            {/* Fulfillment Selection Prompt */}
-            <Modal transparent visible={fulfillmentPromptVisible} animationType="fade">
+            <Modal transparent visible={!hasChosenFulfillment} animationType="fade">
                 <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: 24 }]}>
                     <View style={{ backgroundColor: theme.background, width: '100%', borderRadius: 32, padding: 24, paddingBottom: 32 }}>
                         <Text style={{ fontSize: 24, fontWeight: '900', color: theme.text, textAlign: 'center', marginBottom: 8 }}>How would you like your order?</Text>
@@ -1182,11 +1190,7 @@ export const CartScreen = ({ navigation }: any) => {
                                     borderWidth: 2,
                                     borderColor: fulfillmentType === 'delivery' ? theme.accent : 'transparent'
                                 }}
-                                onPress={() => {
-                                    setFulfillmentType('delivery');
-                                    setHasPrompted(true);
-                                    setFulfillmentPromptVisible(false);
-                                }}
+                                onPress={() => setFulfillmentType('delivery')}
                             >
                                 <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: '#3B82F620', justifyContent: 'center', alignItems: 'center', marginRight: 16 }}>
                                     <Truck size={32} color="#3B82F6" />
@@ -1208,11 +1212,7 @@ export const CartScreen = ({ navigation }: any) => {
                                     borderWidth: 2,
                                     borderColor: fulfillmentType === 'pickup' ? theme.accent : 'transparent'
                                 }}
-                                onPress={() => {
-                                    setFulfillmentType('pickup');
-                                    setHasPrompted(true);
-                                    setFulfillmentPromptVisible(false);
-                                }}
+                                onPress={() => setFulfillmentType('pickup')}
                             >
                                 <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: '#10B98120', justifyContent: 'center', alignItems: 'center', marginRight: 16 }}>
                                     <ShoppingBag size={32} color="#10B981" />

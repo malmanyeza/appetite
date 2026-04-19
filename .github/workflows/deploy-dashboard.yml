@@ -20,13 +20,24 @@ jobs:
           npm install --legacy-peer-deps
           cd dashboard
           npm run build
-          # Manually copy the root files into the build folder
-          cp ../index.html ./dist/
-          cp ../privacy_policy.html ./dist/
-          cp ../terms_of_service.html ./dist/
-          cp ../support.html ./dist/
-          cp -r ../reset-password ./dist/
-          cp -r ../signup-callback ./dist/
+          cd ..
+          
+          # Create a structured deployment folder
+          mkdir -p final_dist
+          
+          # 1. Landing Page at Root
+          cp index.html final_dist/
+          cp privacy_policy.html final_dist/
+          cp terms_of_service.html final_dist/
+          cp support.html final_dist/
+          cp delete-account.html final_dist/
+          cp -r reset-password final_dist/
+          cp -r signup-callback final_dist/
+          cp .nojekyll final_dist/
+          
+          # 2. Dashboard App at /dashboard/ subdirectory
+          mkdir -p final_dist/dashboard
+          cp -r dashboard/dist/* final_dist/dashboard/
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
@@ -34,5 +45,5 @@ jobs:
       - name: Deploy 🚀
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          folder: dashboard/dist # The folder the action should deploy.
-          branch: gh-pages # The branch the action should deploy to.
+          folder: final_dist # The root folder containing both landing and dashboard.
+          branch: gh-pages

@@ -100,7 +100,9 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
     // Integrated Image Prefetching for the entire visible menu
     React.useEffect(() => {
         if (menu && menu.length > 0) {
-            const urls = menu.map(m => m.image_url).filter(url => !!url);
+            const urls = menu
+                .map((m: any) => getThumbnailUrl(m.image_url, m.updated_at))
+                .filter((url): url is string => !!url);
             if (urls.length > 0) {
                 Image.prefetch(urls);
             }
@@ -229,10 +231,10 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
                 {/* Hero Image */}
                 <View style={styles.imageContainer}>
                     <Image
-                        source={getOriginalUrl(restaurant?.cover_image_url) || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'}
+                        source={getOriginalUrl(restaurant?.cover_image_url, restaurant?.updated_at) || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'}
                         style={styles.heroImage}
-                        contentFit="cover"
-                        cachePolicy="disk"
+                        contentFit="contain"
+                        cachePolicy="memory-disk"
                         priority="high"
                         transition={300}
                         placeholder="L6PZf-S4.AyD_NbH9G_dyD%MwvVs"
@@ -335,10 +337,10 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
                                         <View style={styles.itemAction}>
                                             {item.image_url && (
                                                 <Image
-                                                    source={getThumbnailUrl(item.image_url) || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'}
+                                                    source={getThumbnailUrl(item.image_url, item.updated_at) || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'}
                                                     style={styles.itemImage}
                                                     contentFit="cover"
-                                                    cachePolicy="disk"
+                                                    cachePolicy="memory-disk"
                                                     transition={300}
                                                     placeholder="L6PZf-S4.AyD_NbH9G_dyD%MwvVs"
                                                 />

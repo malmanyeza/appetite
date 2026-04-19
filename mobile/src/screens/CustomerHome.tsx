@@ -188,13 +188,16 @@ export const CustomerHome = () => {
                 return;
             }
 
-            // 2. Fallback: Live GPS Auto-Snap
+            // 2. Fallback: Live GPS Auto-Snap — use lastKnown for instant snap
             try {
                 const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
                 if (status === 'granted') {
-                    // SECURE FIX: We now IGNORE lastKnown to prevent "neighbor house" jumping.
-                    // We force a brand-new, high-precision satellite lock.
-                    const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Highest });
+                    // Fast path: OS-cached position resolves instantly
+                    let loc = await ExpoLocation.getLastKnownPositionAsync({ maxAge: 120000, requiredAccuracy: 500 });
+                    if (!loc) {
+                        // Slow path: only if no cached position exists
+                        loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
+                    }
 
                     setGpsLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
 
@@ -209,7 +212,6 @@ export const CustomerHome = () => {
                 }
             } catch (err) {
                 console.warn('[Home] Auto-snap GPS failed:', err);
-                // Stays at default Harare (INITIAL_REGION) already in state
                 setHasAnimatedInitialLocation(true);
             }
         })();
@@ -221,7 +223,8 @@ export const CustomerHome = () => {
             try {
                 const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
                 if (status === 'granted') {
-                    const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.High });
+                    const loc = await ExpoLocation.getLastKnownPositionAsync({ maxAge: 300000, requiredAccuracy: 1000 })
+                        || await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
                     setGpsLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
                 }
             } catch (err) {
@@ -258,9 +261,9 @@ export const CustomerHome = () => {
                 try {
                     const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
                     if (status === 'granted') {
-                        const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.High });
+                        let loc = await ExpoLocation.getLastKnownPositionAsync({ maxAge: 300000, requiredAccuracy: 1000 });
+                        if (!loc) loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
 
-                        // Try to reverse geocode for a better label using Google API
                         const rev = await reverseGeocodeGoogle(loc.coords.latitude, loc.coords.longitude);
 
                         setSelectedLocation({
@@ -328,7 +331,10 @@ export const CustomerHome = () => {
     // Integrated Smart Prefetching for the home feed
     React.useEffect(() => {
         if (restaurants && Array.isArray(restaurants) && restaurants.length > 0) {
-            const urls = restaurants.slice(0, 10).map((r: any) => r.cover_image_url).filter(u => !!u);
+            const urls = restaurants
+                .slice(0, 10)
+                .map((r: any) => getThumbnailUrl(r.cover_image_url, r.updated_at))
+                .filter((u): u is string => !!u);
             if (urls.length > 0) {
                 Image.prefetch(urls);
             }
@@ -630,10 +636,10 @@ export const CustomerHome = () => {
                             onPressIn={() => prefetchRestaurant(item.id, item.restaurant_id)}
                         >
                             <Image
-                                source={getThumbnailUrl(item.cover_image_url) || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'}
+                                source={getThumbnailUrl(item.cover_image_url, item.updated_at) || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'}
                                 style={styles.restaurantImage}
                                 contentFit="cover"
-                                cachePolicy="disk"
+                                cachePolicy="memory-disk"
                                 priority="high"
                                 transition={300}
                                 placeholder="L6PZf-S4.AyD_NbH9G_dyD%MwvVs"
@@ -974,58 +980,65 @@ export const CustomerHome = () => {
                                                 try {
                                                     const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
                                                     if (status === 'granted') {
-                                                        // 1. FAST INITIAL JUMP (Visual UI feedback only)
+                                                        // Get coordinates — lastKnown is instant, Balanced is 1-2s fallback
                                                         const lastKnown = await ExpoLocation.getLastKnownPositionAsync();
-                                                        if (lastKnown && currentRequestId === gpsRequestCounter.current) {
-                                                            isProgrammaticChange.current = true;
-                                                            mapRef.current?.animateToRegion({
-                                                                latitude: lastKnown.coords.latitude,
-                                                                longitude: lastKnown.coords.longitude,
-                                                                latitudeDelta: 0.005,
-                                                                longitudeDelta: 0.005,
-                                                            }, 300);
-                                                        }
-
-                                                        // 2. FORCED HIGH-PRECISION LOCK (The actual source of truth)
-                                                        const loc = await ExpoLocation.getCurrentPositionAsync({ 
-                                                            accuracy: ExpoLocation.Accuracy.Highest 
-                                                        });
+                                                        const loc = lastKnown && (Date.now() - lastKnown.timestamp) < 120000
+                                                            ? lastKnown
+                                                            : await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
 
                                                         if (currentRequestId !== gpsRequestCounter.current) return;
 
+                                                        // Snap map immediately
                                                         isProgrammaticChange.current = true;
                                                         mapRef.current?.animateToRegion({
                                                             latitude: loc.coords.latitude,
                                                             longitude: loc.coords.longitude,
                                                             latitudeDelta: 0.005,
                                                             longitudeDelta: 0.005,
-                                                        }, 500);
+                                                        }, 300);
 
-                                                        const revRefined = await reverseGeocodeGoogle(loc.coords.latitude, loc.coords.longitude);
+                                                        // Set a placeholder location instantly so the button restores NOW
+                                                        setSelectedLocation({
+                                                            label: 'Current Spot',
+                                                            city: 'Locating...',
+                                                            suburb: 'Your location',
+                                                            street: '',
+                                                            lat: loc.coords.latitude,
+                                                            lng: loc.coords.longitude
+                                                        });
+                                                        showDoneButton();
 
-                                                        if (currentRequestId !== gpsRequestCounter.current) return;
+                                                        // ✅ Button loading stops HERE — user sees instant response
+                                                        setIsGpsButtonLoading(false);
+                                                        setIsFetchingLocation(false);
 
-                                                        if (revRefined) {
-                                                            setSelectedLocation({
-                                                                label: 'Current Spot',
-                                                                city: revRefined.city || 'Harare',
-                                                                suburb: revRefined.suburb || 'Nearby',
-                                                                street: revRefined.physical_address || '',
-                                                                lat: loc.coords.latitude,
-                                                                lng: loc.coords.longitude
-                                                            });
-                                                            showDoneButton();
-                                                        }
+                                                        // Reverse geocode runs silently in the background
+                                                        reverseGeocodeGoogle(loc.coords.latitude, loc.coords.longitude)
+                                                            .then(rev => {
+                                                                if (rev && currentRequestId === gpsRequestCounter.current) {
+                                                                    setSelectedLocation({
+                                                                        label: 'Current Spot',
+                                                                        city: rev.city || 'Harare',
+                                                                        suburb: rev.suburb || 'Nearby',
+                                                                        street: rev.physical_address || '',
+                                                                        lat: loc.coords.latitude,
+                                                                        lng: loc.coords.longitude
+                                                                    });
+                                                                }
+                                                            })
+                                                            .catch(() => { /* silent — placeholder label stays */ });
                                                     } else {
                                                         Alert.alert('Permission Denied', 'Location permission is required.');
+                                                        setIsGpsButtonLoading(false);
+                                                        setIsFetchingLocation(false);
                                                     }
                                                 } catch (error) {
                                                     console.error('GPS Error:', error);
-                                                } finally {
                                                     setIsGpsButtonLoading(false);
                                                     setIsFetchingLocation(false);
                                                 }
                                             }}
+
                                         >
                                             <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: theme.accent + '20', justifyContent: 'center', alignItems: 'center' }}>
                                                 {isGpsButtonLoading ? (

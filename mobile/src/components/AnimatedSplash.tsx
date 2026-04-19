@@ -1,98 +1,74 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet, Dimensions, Easing, View, Platform, ImageBackground } from 'react-native';
-import { useLocationStore } from '../store/locationStore';
+import { Animated, StyleSheet, Easing, View, Platform } from 'react-native';
 import { Branding } from './Branding';
+import { useLocationStore } from '../store/locationStore';
 
-const { width, height } = Dimensions.get('window');
+const word = 'appetite';
 
 interface AnimatedSplashProps {
     onReady: () => void;
     isAppReady: boolean;
-    isFirstLaunch: boolean | null;
+    isFirstLaunch?: boolean | null;
 }
 
-export const AnimatedSplash: React.FC<AnimatedSplashProps> = ({ onReady, isAppReady, isFirstLaunch }) => {
+export const AnimatedSplash: React.FC<AnimatedSplashProps> = ({ onReady, isAppReady }) => {
     const [animationDone, setAnimationDone] = useState(false);
     const [isFading, setIsFading] = useState(false);
-    const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+    const [waveComplete, setWaveComplete] = useState(false);
     const opacityAnim = useRef(new Animated.Value(1)).current;
-
-    // Split the word for wave animation
-    const word = 'appetite';
     const letterAnims = useRef(word.split('').map(() => new Animated.Value(0))).current;
-    const [imageLoaded, setImageLoaded] = useState(false);
     const setSplashHasFinished = useLocationStore(state => state.setSplashHasFinished);
 
+    // Hide the native splash screen immediately so there is no duplicate
     useEffect(() => {
-        // HIDE THE NATIVE SPLASH: Doing it here ensures there is zero gap
-        // between the static image and our animation.
-        import('expo-splash-screen').then(pkg => pkg.hideAsync().catch(() => { }));
-
-        // Fail-safe: If for any reason the image doesn't fire onLoad in 2s,
-        // we start the animation anyway so the user isn't stuck.
-        const failSafe = setTimeout(() => {
-            setImageLoaded(true);
-        }, 2000);
-
-        return () => clearTimeout(failSafe);
+        import('expo-splash-screen').then(pkg => pkg.hideAsync().catch(() => {}));
     }, []);
 
+    // Start the letter wave animation immediately on mount — no image to wait for
     useEffect(() => {
-        if (!imageLoaded) return;
-
-        // Start the typography wave animation ONLY after image is ready
-        const animations = letterAnims.map((anim, index) => {
-            return Animated.sequence([
+        const animations = letterAnims.map((anim, index) =>
+            Animated.sequence([
                 Animated.timing(anim, {
-                    toValue: -15, // Move up
-                    duration: 300,
-                    delay: index * 100,
+                    toValue: -15,
+                    duration: 280,
+                    delay: index * 80,
                     easing: Easing.out(Easing.ease),
                     useNativeDriver: true,
                 }),
                 Animated.timing(anim, {
-                    toValue: 0, // Move back down
-                    duration: 300,
+                    toValue: 0,
+                    duration: 280,
                     easing: Easing.bounce,
                     useNativeDriver: true,
-                })
-            ]);
-        });
+                }),
+            ])
+        );
 
-        Animated.stagger(100, animations).start(() => {
-            // Once the wave is complete, wait for the app to be ready
-            if (isAppReady) {
-                beginFadeOut();
-            }
+        Animated.stagger(80, animations).start(() => {
+            setWaveComplete(true);
         });
-    }, [imageLoaded]);
-
-    useEffect(() => {
-        // Force a 2.5s minimum stay for a premium intro every time
-        const timer = setTimeout(() => setMinTimeElapsed(true), 3500);
-        return () => clearTimeout(timer);
     }, []);
 
+    // Fade out as soon as BOTH the wave has finished AND app data is ready.
+    // - If data loads before wave ends  → fades immediately after wave (~1.2s total)
+    // - If data takes longer than wave  → fades the moment data arrives
     useEffect(() => {
-        // Trigger fade out ONLY when BOTH conditions are met:
-        // 1. Core data/auth is ready (isAppReady)
-        // 2. Minimum display time reached (minTimeElapsed)
-        if (isAppReady && minTimeElapsed && !animationDone && !isFading) {
+        if (isAppReady && waveComplete && !isFading && !animationDone) {
             beginFadeOut();
         }
-    }, [isAppReady, minTimeElapsed]);
+    }, [isAppReady, waveComplete]);
 
     const beginFadeOut = () => {
         if (isFading) return;
         setIsFading(true);
         Animated.timing(opacityAnim, {
             toValue: 0,
-            duration: 600,
+            duration: 400,
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
         }).start(() => {
             setAnimationDone(true);
-            setSplashHasFinished(true); // Signal to the app that the reveal is complete
+            setSplashHasFinished(true);
             onReady();
         });
     };
@@ -100,40 +76,25 @@ export const AnimatedSplash: React.FC<AnimatedSplashProps> = ({ onReady, isAppRe
     if (animationDone) return null;
 
     return (
-        <Animated.View 
-            pointerEvents={isFading ? "none" : "auto"}
-            style={[
-                styles.container, 
-                { opacity: opacityAnim },
-                isFading && { elevation: 0, zIndex: 0 }
-            ]}
+        <Animated.View
+            pointerEvents={isFading ? 'none' : 'auto'}
+            style={[styles.container, { opacity: opacityAnim }]}
         >
-            <ImageBackground
-                source={require('../../assets/images/splash_bg.png')}
-                style={styles.backgroundImage}
-                resizeMode="cover"
-                onLoad={() => setImageLoaded(true)}
-            >
-                <View style={styles.overlay}>
-                    <View style={styles.textContainer}>
-                        {word.split('').map((letter, index) => (
-                            <Animated.Text
-                                key={index}
-                                style={[
-                                    styles.logoText,
-                                    { transform: [{ translateY: letterAnims[index] }] }
-                                ]}
-                            >
-                                {letter}
-                            </Animated.Text>
-                        ))}
-                    </View>
+            <View style={styles.textContainer}>
+                {word.split('').map((letter, index) => (
+                    <Animated.Text
+                        key={index}
+                        style={[
+                            styles.logoText,
+                            { transform: [{ translateY: letterAnims[index] }] },
+                        ]}
+                    >
+                        {letter}
+                    </Animated.Text>
+                ))}
+            </View>
 
-                    <Branding 
-                        style={{ position: 'absolute', bottom: 60 }} 
-                    />
-                </View>
-            </ImageBackground>
+            <Branding style={{ position: 'absolute', bottom: 60 }} withBackground={false} color="#FFFFFF" />
         </Animated.View>
     );
 };
@@ -150,27 +111,11 @@ const styles = StyleSheet.create({
     textContainer: {
         flexDirection: 'row',
     },
-    backgroundImage: {
-        width: '100%',
-        height: '100%',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    overlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.1)', // Subtle 10% dark overlay for readability
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
     logoText: {
         color: '#FFFFFF',
-        fontSize: 56, // Slightly larger for impact over the background
+        fontSize: 44,
         fontWeight: 'bold',
         letterSpacing: -1,
-        // Platform-agnostic system font approach
         fontFamily: Platform.OS === 'android' ? 'sans-serif-medium' : 'System',
-        textShadowColor: 'rgba(0, 0, 0, 0.4)', // Adds readability over the image
-        textShadowOffset: { width: 0, height: 2 },
-        textShadowRadius: 10
-    }
+    },
 });

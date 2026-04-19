@@ -11,13 +11,14 @@ interface BrandingProps {
 export const Branding = ({ 
     showFromText = true, 
     style,
+    color,
     withBackground = true 
 }: BrandingProps) => {
     
     const content = (
         <>
             {showFromText && (
-                <Text style={styles.fromText}>from</Text>
+                <Text style={[styles.fromText, color ? { color } : undefined]}>from</Text>
             )}
             <Image 
                 source={require('../../assets/images/nexura_logo.png')}
@@ -51,8 +52,8 @@ const styles = StyleSheet.create({
     container: {
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 24,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
         borderRadius: 20,
     },
     glassEffect: {
@@ -82,7 +83,7 @@ const styles = StyleSheet.create({
         color: '#444444', 
     },
     logo: {
-        width: 110,
-        height: 26,
+        width: 88,
+        height: 20,
     },
 });

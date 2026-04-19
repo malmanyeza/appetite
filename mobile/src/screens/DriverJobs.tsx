@@ -24,6 +24,11 @@ import { useTheme } from '../theme';
 import { MapPin, Package, Phone, CheckCircle2, Navigation, Store } from 'lucide-react-native';
 import { makeCall } from '../utils/callUtils';
 
+// Module-level guard — survives component remounts within the same app session.
+// Prevents the welcome modal from firing more than once even if DriverJobs
+// remounts multiple times due to navigator key changes during session restore.
+const welcomeShownThisSession = new Set<string>();
+
 export const DriverJobs = () => {
     const { theme } = useTheme();
     const { user } = useAuthStore();
@@ -40,9 +45,17 @@ export const DriverJobs = () => {
 
     useEffect(() => {
         const checkFirstVisit = async () => {
-            if (user?.id) {
-                const key = `@driver_welcome_v1_${user.id}`;
+            if (!user?.id) return;
+            const key = `@driver_welcome_v1_${user.id}`;
+
+            // Session guard: if already shown this app session, skip entirely
+            if (welcomeShownThisSession.has(key)) return;
+
+            try {
                 const hasSeen = await AsyncStorage.getItem(key);
+                // Mark seen in session regardless of result so remounts don't re-trigger
+                welcomeShownThisSession.add(key);
+
                 if (!hasSeen) {
                     setShowWelcome(true);
                     Animated.parallel([
@@ -59,6 +72,8 @@ export const DriverJobs = () => {
                     ]).start();
                     await AsyncStorage.setItem(key, 'true');
                 }
+            } catch (e) {
+                console.warn('[DriverJobs] Welcome check failed:', e);
             }
         };
         checkFirstVisit();
@@ -265,8 +280,9 @@ export const DriverJobs = () => {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('targeted_driver_jobs')
-                .select('id, offer_id, status, delivery_address_snapshot, offer_assigned_driver_id, driver_id, customer_id, restaurant_id, pricing, restaurant_name, restaurant_suburb, restaurant_city, restaurant_landmark_notes, customer_name, customer_phone')
-                .eq('offer_assigned_driver_id', user?.id);
+                .select('id, offer_id, status, created_at, delivery_address_snapshot, offer_assigned_driver_id, driver_id, customer_id, restaurant_id, pricing, restaurant_name, restaurant_suburb, restaurant_city, restaurant_landmark_notes, customer_name, customer_phone')
+                .eq('offer_assigned_driver_id', user?.id)
+                .order('created_at', { ascending: false });
 
             if (error) {
                 console.error("Fetch Error:", error);

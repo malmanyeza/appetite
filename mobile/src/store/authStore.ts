@@ -55,11 +55,13 @@ interface AuthState {
     loading: boolean;
     isSigningUp: boolean;
     isRefreshing: boolean;
+    pendingRedirect: string | null;
 
     refreshSession: (providedSession?: any) => Promise<void>;
     refreshProfile: () => Promise<void>;
     setActiveRole: (role: 'customer' | 'driver') => Promise<void>;
     setSigningUp: (status: boolean) => void;
+    setPendingRedirect: (screen: string | null) => void;
     signOut: () => Promise<void>;
     resetPasswordForEmail: (email: string) => Promise<void>;
     updatePassword: (password: string) => Promise<void>;
@@ -73,6 +75,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     loading: true,
     isSigningUp: false,
     isRefreshing: false,
+    pendingRedirect: null,
 
     refreshSession: async (providedSession?: any) => {
         // 1. Instant Transition: If a session is provided, set the user state immediately
@@ -182,15 +185,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             
             let defaultRole: Role | null = null;
             
-            // Priority: 1. Current in-memory role (if still valid) | 2. Saved role | 3. Default
-            if (currentRole && availableRoles.includes(currentRole as Role)) {
-                defaultRole = currentRole as any;
-            } else if (savedRole && availableRoles.includes(savedRole as Role)) {
+            // Priority:
+            // 1. Saved role in SecureStore — always written by setActiveRole(), always current
+            // 2. Current in-memory role  — may be from a stale cache read, checked as backup
+            // 3. Fallback: driver before customer so drivers land on their dashboard by default
+            if (savedRole && availableRoles.includes(savedRole as Role)) {
                 defaultRole = savedRole as any;
-            } else if (availableRoles.includes('customer' as Role)) {
-                defaultRole = 'customer';
+            } else if (currentRole && availableRoles.includes(currentRole as Role)) {
+                defaultRole = currentRole as any;
             } else if (availableRoles.includes('driver' as Role)) {
                 defaultRole = 'driver';
+            } else if (availableRoles.includes('customer' as Role)) {
+                defaultRole = 'customer';
             }
 
             const finalRoles = Array.from(new Set([...availableRoles, 'customer' as Role]));
@@ -265,6 +271,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     setSigningUp: (status) => {
         set({ isSigningUp: status });
+    },
+
+    setPendingRedirect: (screen) => {
+        set({ pendingRedirect: screen });
     },
 
     signOut: async () => {
