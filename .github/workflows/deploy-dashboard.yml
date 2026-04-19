@@ -19,6 +19,15 @@ jobs:
           rm -f package-lock.json
           npm install --legacy-peer-deps
           cd dashboard
+          
+          # Force sync secrets to .env.production to bypass any caching or hidden files
+          echo "VITE_SUPABASE_URL=${VITE_SUPABASE_URL}" > .env.production
+          echo "VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}" >> .env.production
+          
+          # Diagnostic: Show prefix of URL being used (masked)
+          URL_PREFIX=$(echo $VITE_SUPABASE_URL | cut -c1-15)
+          echo "🛠️ DEBUG: Building with Supabase URL starting with: ${URL_PREFIX}..."
+          
           npm run build
           cd ..
           
