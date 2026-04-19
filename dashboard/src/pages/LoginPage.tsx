@@ -22,9 +22,13 @@ export const LoginPage = () => {
             await signIn(email, password);
             navigate('/');
         } catch (err: any) {
-            // Provide exact user feedback for incorrect credentials
-            if (err.message === 'Invalid login credentials') {
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
+                setError('⚠️ Configuration Error: Supabase credentials are missing in this build. Please set the GitHub Secrets and redeploy.');
+            } else if (err.message === 'Invalid login credentials') {
                 setError('Incorrect email or password. Please try again.');
+            } else if (err.message?.toLowerCase().includes('fetch') || err.message?.toLowerCase().includes('network')) {
+                setError('🌐 Connection Error: Could not reach Supabase. Check your internet or if the project URL is correct.');
             } else {
                 setError(err.message || 'An error occurred during sign in.');
             }

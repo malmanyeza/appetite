@@ -3,8 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn('Supabase credentials missing. Ensure .env file is configured.');
+if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('placeholder')) {
+    console.error('⚠️ SUPABASE CONFIGURATION ERROR:', {
+        url: supabaseUrl ? 'Set (masked)' : 'MISSING',
+        key: supabaseAnonKey ? 'Set (masked)' : 'MISSING'
+    });
+} else {
+    console.log('✅ Supabase initialized for project:', supabaseUrl.split('.')[0].replace('https://', ''));
 }
 
 // Regular client for normal operations (uses anon key + RLS)
