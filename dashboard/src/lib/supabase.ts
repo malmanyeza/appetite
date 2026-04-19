@@ -9,7 +9,8 @@ if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('placeholder')) {
         key: supabaseAnonKey ? 'Set (masked)' : 'MISSING'
     });
 } else {
-    console.log('✅ Supabase initialized for project:', supabaseUrl.split('.')[0].replace('https://', ''));
+    const maskedUrl = supabaseUrl.substring(0, 15) + '...';
+    console.log('✅ Supabase initialized for project starts with:', maskedUrl);
 }
 
 // Regular client for normal operations (uses anon key + RLS)
