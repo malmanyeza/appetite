@@ -24,7 +24,9 @@ import {
     UploadCloud,
     Wand2,
     ImageIcon,
-    Search
+    Search,
+    Eye,
+    EyeOff
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { clsx, type ClassValue } from 'clsx';
@@ -55,6 +57,7 @@ export const RestaurantSettings = () => {
 
     // Credentials state for admin-created restaurant accounts
     const [credentials, setCredentials] = useState({ email: '', password: '', fullName: '', phone: '' });
+    const [showPassword, setShowPassword] = useState(false);
 
     // New menu items state for onboarding
     const [onboardingMenu, setOnboardingMenu] = useState<any[]>([]);
@@ -1051,13 +1054,20 @@ export const RestaurantSettings = () => {
                                 <div className="relative">
                                     <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#555]" />
                                     <input
-                                        type="password"
+                                        type={showPassword ? 'text' : 'password'}
                                         required
                                         value={credentials.password}
                                         onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
-                                        className="input-field py-3 pl-11"
+                                        className="input-field py-3 pl-11 pr-11"
                                         placeholder="Min 6 characters"
                                     />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-[#A3A3A3] hover:text-white transition-colors"
+                                    >
+                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
                                 </div>
                                 {validationErrors.password && <p className="text-xs text-red-400 ml-1">{validationErrors.password}</p>}
                             </div>

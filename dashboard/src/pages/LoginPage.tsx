@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { Eye, EyeOff } from 'lucide-react';
 
 export const LoginPage = () => {
     const [email, setEmail] = React.useState('');
@@ -8,6 +9,7 @@ export const LoginPage = () => {
     const [error, setError] = React.useState('');
     const [success, setSuccess] = React.useState('');
     const [loading, setLoading] = React.useState(false);
+    const [showPassword, setShowPassword] = React.useState(false);
     const { signIn, resetPasswordForEmail } = useAuthStore();
     const navigate = useNavigate();
 
@@ -68,14 +70,23 @@ export const LoginPage = () => {
                         <div className="flex justify-between items-center ml-1">
                             <label className="text-sm font-medium text-[#A3A3A3]">Password</label>
                         </div>
-                        <input
-                            type="password"
-                            required
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#FF4D00]/50 focus:border-[#FF4D00] transition-all text-white"
-                            placeholder="••••••••"
-                        />
+                        <div className="relative">
+                            <input
+                                type={showPassword ? 'text' : 'password'}
+                                required
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-[#FF4D00]/50 focus:border-[#FF4D00] transition-all text-white"
+                                placeholder="••••••••"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-[#A3A3A3] hover:text-white transition-colors p-1"
+                            >
+                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                            </button>
+                        </div>
                     </div>
                     <button type="submit" className="btn-primary w-full py-4 text-lg font-bold" disabled={loading}>
                         {loading ? 'Signing In...' : 'Sign In'}
