@@ -5,63 +5,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Account Deletion - Appetite</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
         h1, h2, h3 { color: #FF4D00; }
-        h1 { border-bottom: 2px solid #FF4D00; padding-bottom: 10px; margin-bottom: 20px; }
-        .alert { background-color: #FAFAFA; border-left: 4px solid #FF4D00; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        h1 { border-bottom: 2px solid #FF4D00; padding-bottom: 10px; }
+        .btn-delete { display: inline-block; background-color: #EF4444; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; margin: 20px 0; }
+        .btn-delete:hover { background-color: #DC2626; }
+        .warning-box { background-color: #FEF2F2; border: 1px solid #FECACA; padding: 15px; border-radius: 8px; margin: 20px 0; color: #991B1B; }
         a { color: #0066cc; text-decoration: none; }
         a:hover { text-decoration: underline; }
-        ol, ul { margin-bottom: 25px; }
-        li { margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
-    <h1>Request Account Deletion</h1>
-    <p>At <strong>Appetite</strong>, we strictly respect your privacy and provide a clear, easy way for you to permanently delete your account and associated personal data.</p>
+    <h1>Account & Data Deletion</h1>
+    <p>At Appetite, we respect your privacy and give you full control over your personal data. If you wish to permanently delete your account and all associated information, please follow the instructions below.</p>
 
-    <h2>How to Delete Your Account</h2>
-    <p>You can delete your account using either of the following methods:</p>
-
-    <h3>Method 1: In-App Deletion (Recommended & Instant)</h3>
-    <ol>
-        <li>Open the <strong>Appetite</strong> app on your device.</li>
-        <li>Log in to your account.</li>
-        <li>Navigate to your <strong>Profile Settings</strong> (or tapping your avatar icon).</li>
-        <li>Tap on <strong>Delete Account</strong>.</li>
-        <li>Confirm your decision. <em>Note: This action is permanent and cannot be undone.</em></li>
-    </ol>
-
-    <h3>Method 2: Email Request</h3>
-    <p>If you no longer have access to the app, you can request account deletion by emailing us directly:</p>
-    <div class="alert">
-        <strong>Send an email to:</strong> <a href="mailto:malmanyeza@gmail.com">malmanyeza@gmail.com</a><br>
-        <strong>Subject Line:</strong> "Account Deletion Request"<br>
-        <strong>Body:</strong> Please include the email address or phone number associated with your Appetite account so we can verify and delete it.
+    <div class="warning-box">
+        <strong>Warning:</strong> Deleting your account is permanent and cannot be undone. You will lose access to your order history, delivery addresses, and driver records (if applicable).
     </div>
-    <p>Email requests are typically processed within 3 to 5 business days.</p>
 
-    <h2>What Happens to Your Data?</h2>
+    <h2>How to request deletion</h2>
+    <p>You can request account deletion by sending an email from the address associated with your account to our privacy team. We will process your request and delete your information from our active databases within 30 days.</p>
+    
+    <a href="mailto:appetite@nexura.co.zw?subject=Account%20Deletion%20Request&body=Hello%20Appetite%20Privacy%20Team,%0A%0AI%20am%20requesting%20the%20permanent%20deletion%20of%20my%20account%20associated%20with%20this%20email%20address.%20Please%20delete%20all%20my%20personal%20data,%20order%20history,%20and%20profile%20information.%0A%0AThank%20you." class="btn-delete">
+        Send Deletion Request Email
+    </a>
 
-    <h3>Data That Will Be Deleted</h3>
-    <p>Upon account deletion, the following personal data is permanently wiped from our active databases (Supabase) and cannot be recovered:</p>
+    <h3>What data will be deleted?</h3>
     <ul>
-        <li>Your Name, Email Address, and Phone Number.</li>
-        <li>Saved Delivery Addresses and saved location coordinates.</li>
-        <li>Your profile picture (if you are a driver).</li>
-        <li>Active notifications and session tokens.</li>
+        <li>Profile information (Name, Email, Phone Number).</li>
+        <li>Saved delivery addresses.</li>
+        <li>Order history and receipts.</li>
+        <li>Driver profile and verification documents (if applicable).</li>
     </ul>
 
-    <h3>Data That Is Retained</h3>
-    <p>For legal, fraud-prevention, and accounting purposes, we are required by law to retain certain transactional data:</p>
-    <ul>
-        <li><strong>Financial Records:</strong> Anonymous receipts and payment transaction logs associated with completed orders will be retained for up to <strong>7 years</strong> to comply with tax and accounting laws.</li>
-        <li>This retained data is completely anonymized or unlinked from your personal identity whenever legally possible.</li>
-    </ul>
+    <h3>Data Retention</h3>
+    <p>Please note that some transaction records may be retained for a limited period where required by law (e.g., for tax or accounting purposes) or to prevent fraud. This data will be securely archived and will not be used for any other purpose.</p>
 
-    <p style="margin-top: 40px; text-align: center; color: #888; font-size: 14px;">
-        Return to the <a href="./privacy-policy">Appetite Privacy Policy</a>.
-    </p>
+    <p><a href="support.html">← Back to Support</a> | <a href="privacy_policy.html">Privacy Policy</a></p>
 
 </body>
 </html>
