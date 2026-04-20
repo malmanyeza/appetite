@@ -3,7 +3,7 @@
     "name": "Appetite",
     "slug": "appetite-mobile",
     "scheme": "appetite",
-    "version": "1.4.5",
+    "version": "1.4.6",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -17,6 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.appetite.mobile",
+      "buildNumber": "3",
       "config": {
         "googleMapsApiKey": "AIzaSyAfW8js09sB0cfQzz19aRBkSE7sDMy5cu0"
       },
@@ -54,7 +55,7 @@
         }
       ],
       "package": "com.appetite.delivery",
-      "versionCode": 2,
+      "versionCode": 3,
       "googleServicesFile": "./google-services.json",
       "config": {
         "googleMaps": {
