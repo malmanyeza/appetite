@@ -55,7 +55,7 @@
         }
       ],
       "package": "com.appetite.delivery",
-      "versionCode": 3,
+      "versionCode": 4,
       "googleServicesFile": "./google-services.json",
       "config": {
         "googleMaps": {
