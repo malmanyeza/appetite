@@ -42,7 +42,7 @@ const INITIAL_REGION = {
 
 export const CartScreen = ({ navigation }: any) => {
     const { items, total, updateQty, removeItem, clearCart, fulfillmentType, hasChosenFulfillment, setFulfillmentType } = useCartStore();
-    const { profile, setPendingRedirect } = useAuthStore();
+    const { user, profile, setPendingRedirect } = useAuthStore();
     const { selectedLocation, setSelectedLocation } = useLocationStore();
     const { theme, isDark } = useTheme();
     const [loading, setLoading] = React.useState(false);
@@ -72,6 +72,8 @@ export const CartScreen = ({ navigation }: any) => {
     const [addressModalVisible, setAddressModalVisible] = React.useState(false);
     const [isFetchingLocation, setIsFetchingLocation] = React.useState(false);
     const [isGpsButtonLoading, setIsGpsButtonLoading] = React.useState(false);
+    const [isSuccess, setIsSuccess] = React.useState(false);
+    const [orderIdForNav, setOrderIdForNav] = React.useState<string | null>(null);
     const [gpsLocation, setGpsLocation] = React.useState<{ lat: number; lng: number } | null>(null);
     const [mapRegion, setMapRegion] = React.useState<any>(selectedLocation ? {
         latitude: selectedLocation.lat,
@@ -140,9 +142,8 @@ export const CartScreen = ({ navigation }: any) => {
                         setEcocashPending(false);
                         setPendingOrderId(null);
                         WebBrowser.dismissBrowser();
-                        clearCart();
-                        navigation.navigate('Home', { screen: 'HomeMain' });
-                        navigation.navigate('Tracking', { screen: 'TrackingMain', params: { orderId: pendingOrderId } });
+                        setOrderIdForNav(pendingOrderId);
+                        setIsSuccess(true);
                     } else if (result?.status === 'failed' || result?.status === 'cancelled') {
                         clearInterval(interval);
                         setEcocashPending(false);
@@ -330,12 +331,33 @@ export const CartScreen = ({ navigation }: any) => {
             setSelectedAddress(addresses[0]);
         }
     }, [addresses, selectedAddress]);
+ 
+    React.useEffect(() => {
+        if (isSuccess && orderIdForNav) {
+            console.log('[Cart] Order success detected, triggering navigation to tracking:', orderIdForNav);
+            const timer = setTimeout(() => {
+                // Navigate to the ROOT level tracking screen for maximum reliability
+                navigation.navigate('OrderTracking', { orderId: orderIdForNav });
+                
+                // Clear any lingering redirects to prevent being pulled back to cart on first-time setup
+                setPendingRedirect(null);
+                
+                // Clear cart after navigation has definitely started
+                setTimeout(() => {
+                    clearCart();
+                    setIsSuccess(false);
+                    setOrderIdForNav(null);
+                }, 2000);
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [isSuccess, orderIdForNav]);
 
     const handleCheckout = () => {
         if (items.length === 0) return;
 
         // AUTH GATE: Guest users are redirected to Login; cart is preserved via pendingRedirect
-        if (!profile) {
+        if (!user) {
             setPendingRedirect('Cart');
             navigation.navigate('Login', { returnToCart: true });
             return;
@@ -527,9 +549,8 @@ export const CartScreen = ({ navigation }: any) => {
                 return;
             }
 
-            clearCart();
-            navigation.navigate('Home', { screen: 'HomeMain' });
-            navigation.navigate('Tracking', { screen: 'TrackingMain', params: { orderId: data.orderId } });
+            setOrderIdForNav(data.orderId);
+            setIsSuccess(true);
         } catch (error: any) {
             console.log('Checkout Error:', error);
             Alert.alert('Checkout Error', error.message || 'Failed to process order.');
@@ -564,7 +585,13 @@ export const CartScreen = ({ navigation }: any) => {
             </View>
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
-                {items.length === 0 ? (
+                {isSuccess ? (
+                    <View style={styles.emptyContainer}>
+                        <ActivityIndicator size="large" color={theme.accent} />
+                        <Text style={{ color: theme.text, marginTop: 16, fontSize: 18, fontWeight: 'bold' }}>Order Placed!</Text>
+                        <Text style={{ color: theme.textMuted, marginTop: 8 }}>Redirecting to tracking...</Text>
+                    </View>
+                ) : items.length === 0 ? (
                     <View style={styles.emptyContainer}>
                         <Text style={{ color: theme.textMuted }}>Your cart is empty.</Text>
                         <TouchableOpacity
@@ -751,8 +778,8 @@ export const CartScreen = ({ navigation }: any) => {
                         {loading && paymentMethod === 'cod' ? (
                             <ActivityIndicator color="#FFF" />
                         ) : (
-                            <Text style={styles.buttonText}>
-                                {!profile ? 'Sign in to Place Order' : 
+                        <Text style={styles.buttonText}>
+                                {!user ? 'Sign in to Place Order' : 
                                  paymentMethod === 'ecocash' ? 'Pay with EcoCash' : 
                                  paymentMethod === 'card' ? 'Pay with Card' : 
                                  (fulfillmentType === 'delivery' ? 'Confirm Delivery & Pay' : 'Confirm Pickup & Pay')}
@@ -1173,7 +1200,7 @@ export const CartScreen = ({ navigation }: any) => {
                 </View>
             </Modal>
 
-            <Modal transparent visible={!hasChosenFulfillment} animationType="fade">
+            <Modal transparent visible={!hasChosenFulfillment && items.length > 0} animationType="fade">
                 <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: 24 }]}>
                     <View style={{ backgroundColor: theme.background, width: '100%', borderRadius: 32, padding: 24, paddingBottom: 32 }}>
                         <Text style={{ fontSize: 24, fontWeight: '900', color: theme.text, textAlign: 'center', marginBottom: 8 }}>How would you like your order?</Text>

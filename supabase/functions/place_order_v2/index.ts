@@ -105,7 +105,7 @@ Deno.serve(async (req: Request) => {
     ]);
 
     const restaurant = restaurantRes.data;
-    const config = settingsRes.data?.value || { base_fee: 2.0, per_km_fee: 0.5, service_commission_pct: 20.0 };
+    const config = settingsRes.data?.value || { base_fee: 1.5, per_km_fee: 0.4, service_fee: 0.5, surge_amount: 0 };
 
     if (!restaurant || !restaurant.lat || !restaurant.lng) {
         throw new Error('Restaurant location not found for distance calculation.');
@@ -348,7 +348,7 @@ Deno.serve(async (req: Request) => {
 
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error('place_order error:', message);
+    console.error('place_order_v2 error:', message);
     return new Response(JSON.stringify({ error: message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,

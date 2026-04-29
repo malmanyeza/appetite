@@ -54,6 +54,7 @@ export const useLocationStore = create<LocationState>()(
         {
             name: 'appetite-location-storage',
             storage: createJSONStorage(() => secureStorage),
+            partialize: (state) => ({ selectedLocation: state.selectedLocation }),
         }
     )
 );

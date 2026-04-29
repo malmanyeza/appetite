@@ -8,7 +8,6 @@ import { useAuthStore } from '../store/authStore';
 
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
-        shouldShowAlert: true,
         shouldPlaySound: true,
         shouldSetBadge: false,
         shouldShowBanner: true,
@@ -24,20 +23,25 @@ export const usePushNotifications = () => {
     const { user } = useAuthStore();
 
     useEffect(() => {
+        if (!user) {
+            console.log('[Push] No user logged in, skipping token registration/sync');
+            return;
+        }
+
         registerForPushNotificationsAsync().then((token) => {
             setExpoPushToken(token);
             if (token && typeof token === 'string' && !token.includes('Error:') && user && supabase) {
-                // Sync to Supabase
+                console.log('[Push] Syncing token to Supabase for user:', user.id);
                 supabase
                     .from('profiles')
                     .update({ expo_push_token: token })
                     .eq('id', user.id)
                     .then(({ error }: { error: any }) => {
-                        if (error) console.error('Failed to sync push token', error);
-                        else console.log('Successfully synced push token to Supabase');
+                        if (error) console.error('[Push] Failed to sync push token', error);
+                        else console.log('[Push] Successfully synced push token to Supabase');
                     });
             } else if (token) {
-                console.warn('Invalid token or missing Supabase/User, skipping sync:', token);
+                console.warn('[Push] Skipping sync: token is invalid or Supabase client missing');
             }
         });
 
@@ -67,7 +71,6 @@ async function registerForPushNotificationsAsync() {
             importance: Notifications.AndroidImportance.MAX,
             vibrationPattern: [0, 250, 250, 250],
             lightColor: '#FF231F7C',
-            sound: 'appetite_alert.wav',
         });
     }
 
@@ -97,7 +100,7 @@ async function registerForPushNotificationsAsync() {
             const projectId =
                 Constants?.expoConfig?.extra?.eas?.projectId ?? 
                 Constants?.easConfig?.projectId ??
-                '15c0aa0d-83d5-40df-ac4d-7ab315d086da'; // Hard fallback based on app.json check
+                '45c51f2f-51a5-475c-a2be-f287a73356a7'; // Hard fallback based on app.json check
 
             if (projectId) {
                 token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;

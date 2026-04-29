@@ -26,11 +26,13 @@ Deno.serve(async (req) => {
        return new Response(JSON.stringify({ error: 'Invalid order or customer id' }), { status: 400 })
     }
 
-    // Determine message content based on status change or flags
     let title = 'Order Update';
     let body = `Your order status has changed to ${order.status.replace(/_/g, ' ')}.`;
 
-    if (order.status === 'confirmed' && oldOrder.status === 'pending') {
+    if (!oldOrder.status) {
+        title = 'Order Received!';
+        body = 'We have received your order and are notifying the restaurant.';
+    } else if (order.status === 'confirmed' && oldOrder.status === 'pending') {
         title = 'Order Confirmed!';
         body = 'The restaurant has accepted your order and is starting to prepare it.';
     } else if (order.status === 'on_the_way' && oldOrder.status !== 'on_the_way') {

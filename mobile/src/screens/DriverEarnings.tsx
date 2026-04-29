@@ -9,7 +9,9 @@ import {
     TouchableOpacity,
     Modal,
     TextInput,
-    Alert
+    Alert,
+    TouchableWithoutFeedback,
+    Keyboard
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
@@ -74,28 +76,34 @@ export const DriverEarnings = () => {
 
     // 3. Payout Request Mutation
     const requestPayoutMutation = useMutation({
-        mutationFn: async (amount: number) => {
+        mutationFn: async (grossAmount: number) => {
+            const fee = grossAmount * 0.05;
+            const netAmount = grossAmount - fee;
+            
             const { data, error } = await supabase
                 .from('payouts')
                 .insert([{
                     driver_id: user?.id,
-                    amount: amount,
+                    amount: netAmount,
                     status: 'pending',
                     metadata: {
                         ecocash_number: driverProfile?.ecocash_number,
                         account_name: driverProfile?.account_name,
-                        requested_at: new Date().toISOString()
+                        requested_at: new Date().toISOString(),
+                        gross_amount: grossAmount,
+                        fee: fee
                     }
                 }])
                 .select();
             if (error) throw error;
             return data;
         },
-        onSuccess: () => {
+        onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: ['driver-payouts'] });
             setIsModalVisible(false);
+            const receiveAmount = variables * 0.95;
             setPayoutAmount('');
-            Alert.alert('Success', 'Your payout request has been submitted to the admin.');
+            Alert.alert('Success', `Your payout request has been submitted. You will receive $${receiveAmount.toFixed(2)} after charges.`);
         },
         onError: (err: any) => {
             Alert.alert('Error', err.message || 'Failed to submit request');
@@ -131,15 +139,21 @@ export const DriverEarnings = () => {
         return acc;
     }, { totalEarnings: 0, today: 0, week: 0, month: 0 });
 
-    const totalPaid = (payouts || [])
+    // Total amount that has left the wallet (including fees)
+    const totalDeducted = (payouts || [])
+        .filter(p => p.status === 'processed')
+        .reduce((sum, p) => sum + Number(p.amount) + Number(p.metadata?.fee || 0), 0);
+    
+    // Amount the driver actually received in their pocket
+    const totalActuallyReceived = (payouts || [])
         .filter(p => p.status === 'processed')
         .reduce((sum, p) => sum + Number(p.amount), 0);
     
-    const pendingWithdrawal = (payouts || [])
+    const pendingWithdrawalDeduction = (payouts || [])
         .filter(p => p.status === 'pending')
-        .reduce((sum, p) => sum + Number(p.amount), 0);
+        .reduce((sum, p) => sum + Number(p.amount) + Number(p.metadata?.fee || 0), 0);
 
-    const availableBalance = Math.max(0, stats.totalEarnings - totalPaid - pendingWithdrawal);
+    const availableBalance = Math.max(0, stats.totalEarnings - totalDeducted - pendingWithdrawalDeduction);
 
     const handleRequestSubmit = () => {
         const amount = parseFloat(payoutAmount);
@@ -178,9 +192,9 @@ export const DriverEarnings = () => {
                     </View>
                     <Text style={[styles.balanceValue, { color: theme.text }]}>${availableBalance.toFixed(2)}</Text>
                     
-                    {pendingWithdrawal > 0 && (
+                    {pendingWithdrawalDeduction > 0 && (
                         <Text style={[styles.pendingText, { color: theme.textMuted }]}>
-                            Pending Request: ${pendingWithdrawal.toFixed(2)}
+                            Pending Request: ${pendingWithdrawalDeduction.toFixed(2)}
                         </Text>
                     )}
 
@@ -201,7 +215,7 @@ export const DriverEarnings = () => {
                     </View>
                     <View style={[styles.statBox, { backgroundColor: theme.surface }]}>
                         <Text style={[styles.statBoxLabel, { color: theme.textMuted }]}>Total Paid</Text>
-                        <Text style={[styles.statBoxValue, { color: '#22c55e' }]}>${totalPaid.toFixed(2)}</Text>
+                        <Text style={[styles.statBoxValue, { color: '#22c55e' }]}>${totalActuallyReceived.toFixed(2)}</Text>
                     </View>
                 </View>
 
@@ -285,47 +299,75 @@ export const DriverEarnings = () => {
                 animationType="slide"
                 onRequestClose={() => setIsModalVisible(false)}
             >
-                <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
-                        <Text style={[styles.modalTitle, { color: theme.text }]}>Request Payout</Text>
-                        <Text style={[styles.modalSubtitle, { color: theme.textMuted }]}>
-                            Available: ${availableBalance.toFixed(2)}
-                        </Text>
+                <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                    <View style={styles.modalOverlay}>
+                        <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
+                            <Text style={[styles.modalTitle, { color: theme.text }]}>Request Payout</Text>
+                            <Text style={[styles.modalSubtitle, { color: theme.textMuted }]}>
+                                Available Balance: ${availableBalance.toFixed(2)}
+                            </Text>
+                            <View style={[styles.infoBanner, { backgroundColor: `${theme.accent}10` }]}>
+                                <Text style={{ color: theme.accent, fontSize: 12, textAlign: 'center', fontWeight: '500' }}>
+                                    Note: A 5% processing fee applies. You will receive 95% of the requested amount.
+                                </Text>
+                            </View>
 
-                        <View style={[styles.inputWrapper, { backgroundColor: theme.background }]}>
-                            <Text style={{ color: theme.text, fontSize: 18, marginRight: 8 }}>$</Text>
-                            <TextInput
-                                style={[styles.input, { color: theme.text }]}
-                                value={payoutAmount}
-                                onChangeText={setPayoutAmount}
-                                placeholder="0.00"
-                                placeholderTextColor={theme.textMuted}
-                                keyboardType="numeric"
-                                autoFocus
-                            />
-                        </View>
+                            <View style={[styles.inputWrapper, { backgroundColor: theme.background }]}>
+                                <Text style={{ color: theme.text, fontSize: 18, marginRight: 8 }}>$</Text>
+                                <TextInput
+                                    style={[styles.input, { color: theme.text }]}
+                                    value={payoutAmount}
+                                    onChangeText={setPayoutAmount}
+                                    placeholder="0.00"
+                                    placeholderTextColor={theme.textMuted}
+                                    keyboardType="numeric"
+                                    autoFocus
+                                />
+                            </View>
 
-                        <View style={styles.modalButtons}>
-                            <TouchableOpacity 
-                                style={[styles.modalButton, { backgroundColor: theme.border }]}
-                                onPress={() => setIsModalVisible(false)}
-                            >
-                                <Text style={[styles.modalButtonText, { color: theme.text }]}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity 
-                                style={[styles.modalButton, { backgroundColor: theme.accent }]}
-                                onPress={handleRequestSubmit}
-                                disabled={requestPayoutMutation.isPending}
-                            >
-                                {requestPayoutMutation.isPending ? (
-                                    <ActivityIndicator size="small" color="#FFF" />
-                                ) : (
-                                    <Text style={[styles.modalButtonText, { color: '#FFF' }]}>Submit</Text>
-                                )}
-                            </TouchableOpacity>
+                            {parseFloat(payoutAmount) > 0 && (
+                                <View style={styles.calculationBox}>
+                                    <View style={styles.calcRow}>
+                                        <Text style={{ color: theme.textMuted }}>Requested Amount</Text>
+                                        <Text style={{ color: theme.text }}>${parseFloat(payoutAmount).toFixed(2)}</Text>
+                                    </View>
+                                    <View style={styles.calcRow}>
+                                        <Text style={{ color: theme.textMuted }}>Charges (5%)</Text>
+                                        <Text style={{ color: '#ef4444' }}>-${(parseFloat(payoutAmount) * 0.05).toFixed(2)}</Text>
+                                    </View>
+                                    <View style={[styles.calcRow, { borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 8, marginTop: 4 }]}>
+                                        <Text style={{ color: theme.text, fontWeight: 'bold' }}>You will receive</Text>
+                                        <Text style={{ color: '#22c55e', fontWeight: 'bold' }}>${(parseFloat(payoutAmount) * 0.95).toFixed(2)}</Text>
+                                    </View>
+                                </View>
+                            )}
+
+                            <Text style={{ color: theme.textMuted, fontSize: 11, textAlign: 'center' }}>
+                                Based on your balance, you can receive a maximum of <Text style={{ color: theme.text, fontWeight: 'bold' }}>${(availableBalance * 0.95).toFixed(2)}</Text>
+                            </Text>
+
+                            <View style={styles.modalButtons}>
+                                <TouchableOpacity 
+                                    style={[styles.modalButton, { backgroundColor: theme.border }]}
+                                    onPress={() => setIsModalVisible(false)}
+                                >
+                                    <Text style={[styles.modalButtonText, { color: theme.text }]}>Cancel</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity 
+                                    style={[styles.modalButton, { backgroundColor: theme.accent }]}
+                                    onPress={handleRequestSubmit}
+                                    disabled={requestPayoutMutation.isPending}
+                                >
+                                    {requestPayoutMutation.isPending ? (
+                                        <ActivityIndicator size="small" color="#FFF" />
+                                    ) : (
+                                        <Text style={[styles.modalButtonText, { color: '#FFF' }]}>Submit</Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     </View>
-                </View>
+                </TouchableWithoutFeedback>
             </Modal>
         </View>
     );
@@ -371,5 +413,9 @@ const styles = StyleSheet.create({
     input: { flex: 1, fontSize: 24, fontWeight: 'bold' },
     modalButtons: { flexDirection: 'row', gap: 12, marginTop: 8 },
     modalButton: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
-    modalButtonText: { fontWeight: 'bold', fontSize: 16 }
+    modalButtonText: { fontWeight: 'bold', fontSize: 16 },
+    
+    infoBanner: { padding: 12, borderRadius: 12, marginBottom: 8 },
+    calculationBox: { padding: 16, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.02)', gap: 8 },
+    calcRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }
 });

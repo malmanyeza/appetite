@@ -140,9 +140,19 @@ export const RootNavigator = () => {
 
         // A fresh login just happened and there is a pending screen to redirect to
         if (!prevUserId && currentUserId && pendingRedirect) {
+            // Safety: Don't redirect if we are already on the target screen
+            const isAlreadyOnTarget = navigationRef.isReady() && 
+                navigationRef.getCurrentRoute()?.name === pendingRedirect;
+
+            if (isAlreadyOnTarget) {
+                setPendingRedirect(null);
+                return;
+            }
+
             // Wait for the remounted navigator to fully settle before navigating
             const timer = setTimeout(() => {
                 if (navigationRef.isReady()) {
+                    console.log(`[Navigation] Executing pending redirect to: ${pendingRedirect}`);
                     (navigationRef as any).navigate(pendingRedirect);
                     setPendingRedirect(null);
                 }
@@ -153,7 +163,6 @@ export const RootNavigator = () => {
 
     return (
         <Stack.Navigator 
-            key={activeRole || 'guest'} 
             screenOptions={{ headerShown: false }}
         >
             {/* 1. Only render ONE interface as the root screen to prevent "stack slip" */}
@@ -177,6 +186,7 @@ export const RootNavigator = () => {
             {/* 4. Shared Public & Customer Screens */}
             <Stack.Screen name="RestaurantDetails" component={RestaurantDetails} />
             <Stack.Screen name="Cart" component={CartScreen} />
+            <Stack.Screen name="OrderTracking" component={OrderTracking} />
             <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} />
             <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
             <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
@@ -184,7 +194,6 @@ export const RootNavigator = () => {
 
             {/* 5. Authenticated-Only Customer Screens (will handle guest state internally) */}
             <Stack.Screen name="AddressManagement" component={AddressManagementScreen} />
-            <Stack.Screen name="OrderTracking" component={OrderTracking} />
             <Stack.Screen name="ActiveDelivery" component={ActiveDelivery} />
             <Stack.Screen name="DeliveryCompleted" component={DeliveryCompleted} />
         </Stack.Navigator>

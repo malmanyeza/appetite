@@ -100,13 +100,13 @@ Deno.serve(async (req: Request) => {
                 },
                 body: JSON.stringify({ ...order, status: orderStatus })
             }),
-            fetch(`${supabaseUrl}/functions/v1/send_order_email`, {
+            fetch(`${supabaseUrl}/functions/v1/notify_customer`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${supabaseServiceKey}`
                 },
-                body: JSON.stringify({ orderId: orderId })
+                body: JSON.stringify({ ...order, status: orderStatus })
             })
         ]).catch(err => console.error('Notification trigger failed:', err));
     }

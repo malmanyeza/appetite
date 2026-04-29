@@ -132,10 +132,6 @@ function App() {
     const theme = isDark ? Colors.dark : Colors.light;
 
     useEffect(() => {
-        // RESET SPLASH STATE: Ensure every fresh app launch starts from zero to avoid pre-emptive triggers
-        setSplashHasFinished(false);
-        setHasAutoPrompted(false);
-
         // Initial session check
         refreshSession();
         
@@ -204,7 +200,10 @@ function App() {
                         {showSplash && (
                             <AnimatedSplash 
                                 isAppReady={!loading} 
-                                onReady={() => setShowSplash(false)} 
+                                onReady={() => {
+                                    setShowSplash(false);
+                                    useLocationStore.getState().setSplashHasFinished(true);
+                                }} 
                             />
                         )}
                     </ThemeContext.Provider>

@@ -453,7 +453,7 @@ export const OrderTracking = ({ route, navigation }: any) => {
                 </Text>
                 <TouchableOpacity
                     style={[styles.browseButton, { backgroundColor: theme.accent }]}
-                    onPress={() => navigation.navigate('Home', { screen: 'HomeMain' })}
+                    onPress={() => navigation.navigate('CustomerApp')}
                     activeOpacity={0.8}
                 >
                     <Search size={20} color="white" style={{ marginRight: 8 }} />
@@ -487,13 +487,17 @@ export const OrderTracking = ({ route, navigation }: any) => {
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.navigate('Home', { screen: 'HomeMain' })}>
-                    <ChevronLeft color={theme.text} size={24} />
-                </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: theme.text }]}>Order Tracking</Text>
-                <TouchableOpacity onPress={() => makeCall(order?.restaurant_locations?.phone || order?.restaurants?.owner_phone)}>
-                    <Phone color={theme.accent} size={20} />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {passedOrderId && (
+                        <TouchableOpacity 
+                            onPress={() => navigation.navigate('CustomerApp')}
+                            style={{ marginRight: 16 }}
+                        >
+                            <ChevronLeft color={theme.text} size={24} />
+                        </TouchableOpacity>
+                    )}
+                    <Text style={[styles.headerTitle, { color: theme.text }]}>Order Tracking</Text>
+                </View>
             </View>
 
             <ScrollView 
@@ -796,7 +800,7 @@ const styles = StyleSheet.create({
         paddingTop: 60,
         paddingBottom: 20
     },
-    headerTitle: { fontSize: 18, fontWeight: 'bold' },
+    headerTitle: { fontSize: 28, fontWeight: 'bold' },
     content: { padding: 20 },
     statusCard: { padding: 24, borderRadius: 24, alignItems: 'center' },
     restaurantName: { fontSize: 20, fontWeight: 'bold' },

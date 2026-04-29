@@ -2,8 +2,9 @@
   "expo": {
     "name": "Appetite",
     "slug": "appetite-mobile",
+    "owner": "malappbuilds",
     "scheme": "appetite",
-    "version": "1.4.7",
+    "version": "1.5.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -17,7 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.appetite.mobile",
-      "buildNumber": "5",
+      "buildNumber": "17",
       "config": {
         "googleMapsApiKey": "AIzaSyAfW8js09sB0cfQzz19aRBkSE7sDMy5cu0"
       },
@@ -55,7 +56,7 @@
         }
       ],
       "package": "com.appetite.delivery",
-      "versionCode": 5,
+      "versionCode": 17,
       "googleServicesFile": "./google-services.json",
       "config": {
         "googleMaps": {
@@ -92,7 +93,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "0f5eef58-6e7c-4f28-931e-e153a0202657"
+        "projectId": "45c51f2f-51a5-475c-a2be-f287a73356a7"
       }
     }
   }

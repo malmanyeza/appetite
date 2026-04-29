@@ -111,23 +111,20 @@ export const CustomerHome = () => {
         }).start();
     };
 
+    const openLocationModal = () => {
+        setLocationModalVisible(true);
+    };
+
     const closeLocationModal = () => {
         setHasAutoPrompted(true);
         setIsLocationSelected(false);
-        setIsAutoTrigger(false); // Reset to ensure next manual opening is fast
-        doneButtonAnim.setValue(120); // Reset for next time
-        Animated.timing(modalEntryAnim, {
-            toValue: Dimensions.get('window').height,
-            duration: 800, // Balanced responsive close
-            easing: (t) => Math.pow(t, 4), // Smooth acceleration mirror
-            useNativeDriver: true,
-        }).start(() => {
-            setLocationModalVisible(false);
-        });
+        setIsAutoTrigger(false);
+        doneButtonAnim.setValue(120);
+        setLocationModalVisible(false);
     };
 
-    const SHEET_HEIGHT = Dimensions.get('window').height * 0.65;
-    const DOWN_VALUE = Dimensions.get('window').height * 0.55;
+    const SHEET_HEIGHT = Dimensions.get('window').height * 0.55;
+    const DOWN_VALUE = Dimensions.get('window').height * 0.45;
 
     const initialPanY = React.useRef(0);
     const panResponder = React.useMemo(() => PanResponder.create({
@@ -193,10 +190,9 @@ export const CustomerHome = () => {
                 const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
                 if (status === 'granted') {
                     // Fast path: OS-cached position resolves instantly
-                    let loc = await ExpoLocation.getLastKnownPositionAsync({ maxAge: 120000, requiredAccuracy: 500 });
+                    let loc = await ExpoLocation.getLastKnownPositionAsync({ maxAge: 60000, requiredAccuracy: 100 });
                     if (!loc) {
-                        // Slow path: only if no cached position exists
-                        loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
+                        loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.High });
                     }
 
                     setGpsLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
@@ -223,8 +219,8 @@ export const CustomerHome = () => {
             try {
                 const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
                 if (status === 'granted') {
-                    const loc = await ExpoLocation.getLastKnownPositionAsync({ maxAge: 300000, requiredAccuracy: 1000 })
-                        || await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
+                    const loc = await ExpoLocation.getLastKnownPositionAsync({ maxAge: 60000, requiredAccuracy: 100 })
+                        || await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.High });
                     setGpsLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
                 }
             } catch (err) {
@@ -261,8 +257,8 @@ export const CustomerHome = () => {
                 try {
                     const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
                     if (status === 'granted') {
-                        let loc = await ExpoLocation.getLastKnownPositionAsync({ maxAge: 300000, requiredAccuracy: 1000 });
-                        if (!loc) loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
+                        let loc = await ExpoLocation.getLastKnownPositionAsync({ maxAge: 60000, requiredAccuracy: 100 });
+                        if (!loc) loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.High });
 
                         const rev = await reverseGeocodeGoogle(loc.coords.latitude, loc.coords.longitude);
 
@@ -342,37 +338,27 @@ export const CustomerHome = () => {
     }, [restaurants]);
 
     // 1. Auto-trigger modal after a small delay once the app is REVEALED
-
-    // 1. Auto-trigger modal after a small delay once the app is REVEALED
-    React.useEffect(() => {
-        // Only trigger if:
-        // 1. Splash is gone (splashHasFinished is now true)
-        // 2. Restaurants are loaded
-        // 3. We haven't prompted yet
-        if (splashHasFinished && !isLoading && !hasAutoPrompted && restaurants && restaurants.length > 0) {
-            const timer = setTimeout(() => {
-                setIsAutoTrigger(true); // Auto trigger uses slow animation
-                setLocationModalVisible(true);
-                setHasAutoPrompted(true);
-            }, 500);
-            return () => clearTimeout(timer);
-        }
-    }, [splashHasFinished, isLoading, restaurants, hasAutoPrompted]);
-
-    // 5. Modal Animation Control -- Monitors visibility changes (Auto or Manual)
+    // 1. Consolidated Modal Animation Controller
     React.useEffect(() => {
         if (locationModalVisible) {
-            // Strictly enforce UP position on every load 
+            // Strictly enforce UI state on open
             modalY.setValue(0);
             setIsModalDown(false);
 
-            // SECURE GPS LOCK: When the modal opens, we want to show exactly where the user is
-            // right now, especially if they have physically moved since the app started.
+            // Animate SLIDE UP
+            Animated.spring(modalEntryAnim, {
+                toValue: 0,
+                tension: 40,
+                friction: 8,
+                useNativeDriver: true,
+            }).start();
+
+            // Refresh GPS on open
             (async () => {
                 try {
                     const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
                     if (status === 'granted') {
-                        const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
+                        const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.High });
                         const region = {
                             latitude: loc.coords.latitude,
                             longitude: loc.coords.longitude,
@@ -388,26 +374,30 @@ export const CustomerHome = () => {
                     console.warn('[Home] Modal GPS snap failed:', err);
                 }
             })();
-
-            // Super smooth decelerating animation
-            // Speed logic: Auto-start is very slow (2.5s) for premium feel, Manual is elegant (800ms)
-            modalEntryAnim.stopAnimation((value) => {
-                const targetDuration = isAutoTrigger ? 2500 : 800;
-                if (value > 0) {
-                    Animated.timing(modalEntryAnim, {
-                        toValue: 0,
-                        duration: targetDuration,
-                        easing: isAutoTrigger ? (t) => 1 - Math.pow(1 - t, 6) : (t) => 1 - Math.pow(1 - t, 3),
-                        useNativeDriver: true,
-                    }).start();
-                }
-            });
         } else {
-            // Ensure off-screen when hidden
-            modalEntryAnim.setValue(Dimensions.get('window').height);
-            setIsMapReady(false); // Reset for next time
+            // Animate SLIDE DOWN
+            Animated.timing(modalEntryAnim, {
+                toValue: Dimensions.get('window').height,
+                duration: 800,
+                easing: (t) => Math.pow(t, 4),
+                useNativeDriver: true,
+            }).start();
         }
-    }, [locationModalVisible, modalEntryAnim, isAutoTrigger]);
+    }, [locationModalVisible]);
+
+    // 2. Simple Auto-trigger logic (Once per session)
+    const hasAutoTriggeredLocal = React.useRef(false);
+    React.useEffect(() => {
+        if (!hasAutoTriggeredLocal.current) {
+            const timer = setTimeout(() => {
+                setLocationModalVisible(true);
+                hasAutoTriggeredLocal.current = true;
+            }, 1500); // Safe delay for all device speeds
+            return () => clearTimeout(timer);
+        }
+    }, []);
+
+
 
     const prefetchRestaurant = async (locationId: string, restaurantId: string) => {
         if (!locationId || !restaurantId) return;
@@ -548,7 +538,7 @@ export const CustomerHome = () => {
                         onPress={() => {
                             setIsAutoTrigger(false); // Manual trigger uses snappy animation
                             setModalLocationFetched(false);
-                            setLocationModalVisible(true);
+                            openLocationModal();
                         }}
                     >
                         <MapPin size={16} color={theme.accent} />
@@ -666,22 +656,22 @@ export const CustomerHome = () => {
                 )}
             </Animated.ScrollView>
 
-            <Modal
-                visible={locationModalVisible}
-                animationType="none"
-                transparent={true}
-                statusBarTranslucent={true}
+            {/* Location Picker Overlay (Replaces Modal for instant load) */}
+            <Animated.View
+                pointerEvents={locationModalVisible ? 'auto' : 'none'}
+                style={[
+                    StyleSheet.absoluteFillObject,
+                    {
+                        zIndex: locationModalVisible ? 3000 : -1,
+                        backgroundColor: theme.background,
+                        transform: [{ translateY: modalEntryAnim }]
+                    }
+                ]}
             >
                 <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                    <Animated.View
-                        style={{
-                            height: Dimensions.get('screen').height,
-                            backgroundColor: 'transparent',
-                            transform: [{ translateY: modalEntryAnim }]
-                        }}
-                    >
+                    <View style={{ flex: 1 }}>
                         <MapSkeleton visible={!isMapReady} />
-                        {/* Full Screen Map */}
+                        {/* Full Screen Map - Always mounted for instant speed */}
                         <MapView
                             ref={mapRef}
                             provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
@@ -909,7 +899,7 @@ export const CustomerHome = () => {
                                 bottom: 0,
                                 left: 0,
                                 right: 0,
-                                height: Dimensions.get('screen').height * 0.65,
+                                height: Dimensions.get('screen').height * 0.55,
                                 borderTopLeftRadius: 48,
                                 borderTopRightRadius: 48,
                                 backgroundColor: theme.background,
@@ -982,9 +972,9 @@ export const CustomerHome = () => {
                                                     if (status === 'granted') {
                                                         // Get coordinates — lastKnown is instant, Balanced is 1-2s fallback
                                                         const lastKnown = await ExpoLocation.getLastKnownPositionAsync();
-                                                        const loc = lastKnown && (Date.now() - lastKnown.timestamp) < 120000
+                                                        const loc = lastKnown && (Date.now() - lastKnown.timestamp) < 60000
                                                             ? lastKnown
-                                                            : await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
+                                                            : await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Highest });
 
                                                         if (currentRequestId !== gpsRequestCounter.current) return;
 
@@ -1167,9 +1157,9 @@ export const CustomerHome = () => {
                                 </Animated.View>
                             )}
                         </Animated.View>
-                    </Animated.View>
+                    </View>
                 </TouchableWithoutFeedback>
-            </Modal>
+            </Animated.View>
         </View>
     );
 };
@@ -1257,7 +1247,7 @@ const styles = StyleSheet.create({
     },
     fixedPinContainer: {
         position: 'absolute',
-        top: Dimensions.get('window').height * 0.3 - 38,
+        top: Dimensions.get('window').height * 0.25 - 38,
         left: '50%',
         marginLeft: -15,
         alignItems: 'center',

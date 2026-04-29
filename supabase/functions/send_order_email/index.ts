@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         from: 'Appetite <appetite@nexura.co.zw>', 
-        to: [customer.email, manager?.email].filter(Boolean),
+        to: [manager?.email].filter(Boolean),
         subject: `Order Recieved: #${order.id.slice(0, 8).toUpperCase()}`,
         html: emailHtml
       })
