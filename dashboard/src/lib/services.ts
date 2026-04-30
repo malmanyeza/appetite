@@ -312,6 +312,22 @@ export const restaurantService = {
             .getPublicUrl(filePath);
 
         return data.publicUrl;
+    },
+
+    async deleteRestaurant(id: string) {
+        const { error } = await supabase
+            .from('restaurants')
+            .delete()
+            .eq('id', id);
+        if (error) throw error;
+    },
+
+    async deleteRestaurants(ids: string[]) {
+        const { error } = await supabase
+            .from('restaurants')
+            .delete()
+            .in('id', ids);
+        if (error) throw error;
     }
 };
 
