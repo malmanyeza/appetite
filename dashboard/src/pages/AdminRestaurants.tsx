@@ -209,7 +209,7 @@ export const AdminRestaurants = () => {
                                         {(rest.orders?.[0]?.count || 0).toLocaleString()}
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="flex items-center justify-end gap-2 transition-opacity">
                                             <button
                                                 onClick={() => navigate(`/admin/restaurants/${rest.id}/menu`)}
                                                 className="px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-bold transition-colors flex items-center gap-2 text-muted hover:text-white"
