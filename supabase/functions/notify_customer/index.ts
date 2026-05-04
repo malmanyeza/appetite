@@ -87,6 +87,21 @@ Deno.serve(async (req) => {
     const result = await response.json()
     console.log('Expo notification result (Customer):', result)
 
+    // Trigger Admin notification for status updates
+    fetch(`${supabaseUrl}/functions/v1/notify_admins`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseServiceKey}`
+        },
+        body: JSON.stringify({
+            title: `Order Update: ${title}`,
+            message: `Order #${order.id.slice(0,8)}: ${body}`,
+            type: 'order_alert',
+            payload: { orderId: order.id, status: order.status }
+        })
+    }).catch(err => console.error('Admin status notification trigger failed:', err));
+
     return new Response(JSON.stringify({ success: true, result }), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     })

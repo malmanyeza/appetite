@@ -41,9 +41,12 @@ export const LoginScreen = ({ navigation, route }: any) => {
 
         setLoading(true);
         try {
+            const cleanEmail = email.trim();
+            const cleanPassword = password.trim();
+
             const { error } = await supabase.auth.signInWithPassword({
-                email,
-                password,
+                email: cleanEmail,
+                password: cleanPassword,
             });
 
             if (error) {

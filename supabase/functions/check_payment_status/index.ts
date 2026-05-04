@@ -124,15 +124,38 @@ Deno.serve(async (req: Request) => {
 
       // Trigger notification if just confirmed
       if (orderStatus === 'confirmed' && order.status === 'pending') {
-         steps.push("Triggering restaurant notification...");
-         await fetch(`${supabaseUrl}/functions/v1/notify_restaurant`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${supabaseServiceKey}`
-            },
-            body: JSON.stringify(updatedOrder)
-        }).catch(err => console.error('Notification trigger failed:', err));
+         steps.push("Triggering notifications...");
+         await Promise.all([
+             fetch(`${supabaseUrl}/functions/v1/notify_admins`, {
+                 method: 'POST',
+                 headers: {
+                     'Content-Type': 'application/json',
+                     'Authorization': `Bearer ${supabaseServiceKey}`
+                 },
+                 body: JSON.stringify({
+                     title: 'New Paid Order!',
+                     message: `Order #${orderId.slice(0,8)} has been paid via ${order.payment?.method || 'Online'}`,
+                     type: 'order_alert',
+                     payload: { orderId: orderId }
+                 })
+             }),
+             fetch(`${supabaseUrl}/functions/v1/notify_restaurant`, {
+                 method: 'POST',
+                 headers: {
+                     'Content-Type': 'application/json',
+                     'Authorization': `Bearer ${supabaseServiceKey}`
+                 },
+                 body: JSON.stringify(updatedOrder)
+             }),
+             fetch(`${supabaseUrl}/functions/v1/notify_customer`, {
+                 method: 'POST',
+                 headers: {
+                     'Content-Type': 'application/json',
+                     'Authorization': `Bearer ${supabaseServiceKey}`
+                 },
+                 body: JSON.stringify(updatedOrder)
+             })
+         ]).catch(err => console.error('Notification trigger failed:', err));
       }
 
       return new Response(JSON.stringify({ 

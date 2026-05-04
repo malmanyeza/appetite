@@ -27,6 +27,7 @@ export const AdminRestaurants = () => {
     const queryClient = useQueryClient();
     const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
     const [isDeleting, setIsDeleting] = React.useState(false);
+    const [searchTerm, setSearchTerm] = React.useState('');
 
     const { data: restaurants, isLoading } = useQuery({
         queryKey: ['admin-restaurants'],
@@ -52,11 +53,20 @@ export const AdminRestaurants = () => {
         }
     });
 
+    const filteredRestaurants = React.useMemo(() => {
+        if (!restaurants) return [];
+        if (!searchTerm) return restaurants;
+        const s = searchTerm.toLowerCase();
+        return restaurants.filter(r => 
+            r.name?.toLowerCase().includes(s)
+        );
+    }, [restaurants, searchTerm]);
+
     const toggleSelectAll = () => {
-        if (selectedIds.size === restaurants?.length) {
+        if (selectedIds.size === filteredRestaurants.length) {
             setSelectedIds(new Set());
         } else {
-            setSelectedIds(new Set(restaurants?.map(r => r.id)));
+            setSelectedIds(new Set(filteredRestaurants.map(r => r.id)));
         }
     };
 
@@ -89,6 +99,16 @@ export const AdminRestaurants = () => {
                     <p className="text-muted-foreground text-sm">Manage restaurant partners and onboarding</p>
                 </div>
                 <div className="flex items-center gap-4">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted h-4 w-4" />
+                        <input
+                            type="text"
+                            placeholder="Search restaurants..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-accent/50 transition-all w-64"
+                        />
+                    </div>
                     {selectedIds.size > 0 && (
                         <button
                             onClick={() => handleDelete(Array.from(selectedIds))}
@@ -146,11 +166,13 @@ export const AdminRestaurants = () => {
                                 <tr>
                                     <td colSpan={7} className="px-6 py-12 text-center text-muted">Loading restaurants...</td>
                                 </tr>
-                            ) : restaurants?.length === 0 ? (
+                            ) : filteredRestaurants.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="px-6 py-12 text-center text-muted">No restaurants found.</td>
+                                    <td colSpan={7} className="px-6 py-12 text-center text-muted">
+                                        {searchTerm ? `No restaurants matching "${searchTerm}"` : 'No restaurants found.'}
+                                    </td>
                                 </tr>
-                            ) : restaurants?.map((rest) => (
+                            ) : filteredRestaurants.map((rest) => (
                                 <tr 
                                     key={rest.id} 
                                     className={cn(
@@ -190,9 +212,26 @@ export const AdminRestaurants = () => {
                                             {rest.is_open ? 'Open' : 'Closed'}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 text-center">
-                                        <div className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-white/5 font-bold text-white text-xs border border-white/5">
-                                            {rest.locations?.[0]?.count || 0}
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center justify-center gap-2 group/branches relative">
+                                            <div className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-white/5 font-bold text-white text-xs border border-white/5 group-hover/branches:bg-accent/20 group-hover/branches:border-accent/30 transition-all cursor-help">
+                                                {rest.locations?.length || 0}
+                                            </div>
+                                            {rest.locations && rest.locations.length > 0 && (
+                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-[#0F0F0F] border border-white/10 rounded-xl p-3 shadow-2xl opacity-0 group-hover/branches:opacity-100 pointer-events-none transition-all z-50">
+                                                    <p className="text-[10px] uppercase font-black text-accent mb-2 tracking-widest flex items-center gap-2">
+                                                        <MapPin size={10} /> Active Branches
+                                                    </p>
+                                                    <div className="space-y-1.5">
+                                                        {rest.locations.map((loc: any, idx: number) => (
+                                                            <div key={idx} className="text-[11px] text-white/90 font-medium border-l border-white/10 pl-2">
+                                                                {loc.location_name}
+                                                                <span className="block text-[9px] text-muted font-normal">{loc.city}, {loc.suburb}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">

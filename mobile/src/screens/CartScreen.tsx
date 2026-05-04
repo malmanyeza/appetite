@@ -768,7 +768,7 @@ export const CartScreen = ({ navigation }: any) => {
                 )}
             </ScrollView>
 
-            {items.length > 0 && (
+            {items.length > 0 && !showEcocashModal && (
                 <View style={styles.footer}>
                     <TouchableOpacity
                         style={[styles.primaryButton, { backgroundColor: theme.accent, opacity: loading ? 0.7 : 1 }]}
@@ -1141,54 +1141,97 @@ export const CartScreen = ({ navigation }: any) => {
                 </TouchableWithoutFeedback>
             </Modal>
 
-            <Modal visible={showEcocashModal} animationType="slide" transparent>
-                <KeyboardAvoidingView 
-                    style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }} 
-                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                >
-                    <View style={{ backgroundColor: theme.background, padding: 24, borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                            <Text style={{ color: theme.text, fontSize: 20, fontWeight: 'bold' }}>Enter EcoCash Number</Text>
-                            <TouchableOpacity onPress={() => setShowEcocashModal(false)}>
-                                <Text style={{ color: theme.textMuted, fontSize: 16 }}>Cancel</Text>
-                            </TouchableOpacity>
-                        </View>
-                        <Text style={{ color: theme.textMuted, marginBottom: 12 }}>Please enter the phone number registered with EcoCash to receive the push prompt.</Text>
-                        
-                        <TextInput
-                            style={[
-                                styles.ecocashInput,
-                                { backgroundColor: theme.surface, color: theme.text, borderColor: theme.border, borderWidth: 1, marginBottom: 24 }
-                            ]}
-                            placeholder="e.g. 0771234567"
-                            placeholderTextColor={theme.textMuted}
-                            value={ecocashPhone}
-                            onChangeText={setEcocashPhone}
-                            keyboardType="phone-pad"
-                            maxLength={12}
-                            autoFocus
-                        />
-
-                        <TouchableOpacity
-                            style={[styles.primaryButton, { backgroundColor: theme.accent, opacity: loading ? 0.7 : 1 }]}
-                            onPress={() => {
-                                if (!ecocashPhone.trim() || ecocashPhone.trim().length < 9) {
-                                    Alert.alert('Invalid Number', 'Please enter a valid phone number.');
-                                    return;
-                                }
-                                processPayment(ecocashPhone);
+            {/* EcoCash Payment Overlay (Using View instead of Modal to fix Android keyboard issues) */}
+            {showEcocashModal && (
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 10000, justifyContent: 'flex-end' }]}>
+                    <TouchableOpacity 
+                        style={StyleSheet.absoluteFill} 
+                        activeOpacity={1} 
+                        onPress={() => {
+                            Keyboard.dismiss();
+                            setShowEcocashModal(false);
+                        }}
+                    />
+                    <KeyboardAvoidingView 
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+                        style={{ width: '100%', alignItems: 'center', padding: 16, paddingBottom: Platform.OS === 'ios' ? 40 : 20 }}
+                        keyboardVerticalOffset={Platform.OS === 'android' ? 20 : 0}
+                    >
+                        <View 
+                            style={{ 
+                                width: '100%', 
+                                backgroundColor: theme.background, 
+                                padding: 32, 
+                                borderRadius: 32,
+                                elevation: 20,
+                                shadowColor: '#000',
+                                shadowOffset: { width: 0, height: 10 },
+                                shadowOpacity: 0.3,
+                                shadowRadius: 20,
+                                maxHeight: '90%',
+                                justifyContent: 'center'
                             }}
-                            disabled={loading}
                         >
-                            {loading ? (
-                                <ActivityIndicator color="#FFF" />
-                            ) : (
-                                <Text style={styles.buttonText}>Confirm Payment</Text>
-                            )}
-                        </TouchableOpacity>
-                    </View>
-                </KeyboardAvoidingView>
-            </Modal>
+                            <View style={{ width: '100%' }}>
+                                <View style={{ width: 40, height: 4, backgroundColor: theme.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20, opacity: 0.3 }} />
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                                    <Text style={{ color: theme.text, fontSize: 22, fontWeight: '900' }}>EcoCash Payment</Text>
+                                    <TouchableOpacity onPress={() => setShowEcocashModal(false)}>
+                                        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: theme.surface, justifyContent: 'center', alignItems: 'center' }}>
+                                            <X color={theme.text} size={22} />
+                                        </View>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <Text style={{ color: theme.textMuted, fontSize: 16, lineHeight: 24, marginBottom: 24 }}>
+                                    Enter your EcoCash number
+                                </Text>
+                                
+                                <TextInput
+                                    style={[
+                                        styles.ecocashInput,
+                                        { 
+                                            backgroundColor: theme.surface, 
+                                            color: theme.text, 
+                                            borderColor: theme.border, 
+                                            borderWidth: 1.5, 
+                                            marginBottom: 24,
+                                            height: 64,
+                                            fontSize: 20,
+                                            borderRadius: 16
+                                        }
+                                    ]}
+                                    placeholder="e.g. 0771234567"
+                                    placeholderTextColor={theme.textMuted}
+                                    value={ecocashPhone}
+                                    onChangeText={setEcocashPhone}
+                                    keyboardType="phone-pad"
+                                    maxLength={12}
+                                    autoFocus
+                                />
+
+                                <TouchableOpacity
+                                    style={[styles.primaryButton, { backgroundColor: theme.accent, opacity: loading ? 0.7 : 1, borderRadius: 20, height: 60, justifyContent: 'center' }]}
+                                    onPress={() => {
+                                        if (!ecocashPhone.trim() || ecocashPhone.trim().length < 9) {
+                                            Alert.alert('Invalid Number', 'Please enter a valid phone number.');
+                                            return;
+                                        }
+                                        processPayment(ecocashPhone);
+                                    }}
+                                    disabled={loading}
+                                >
+                                    {loading ? (
+                                        <ActivityIndicator color="#FFF" />
+                                    ) : (
+                                        <Text style={[styles.buttonText, { fontSize: 20 }]}>Confirm Payment</Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </KeyboardAvoidingView>
+                </View>
+            )}
 
             {/* Full Screen Loading Overlay */}
             <Modal transparent visible={loading} animationType="fade">

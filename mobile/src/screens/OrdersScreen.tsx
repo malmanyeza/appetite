@@ -79,6 +79,7 @@ export const OrdersScreen = ({ navigation }: any) => {
             case 'delivered': return '#10B981';
             case 'cancelled': return '#EF4444';
             case 'pending': return '#F59E0B';
+            case 'awaiting_payment': return '#F59E0B';
             case 'preparing': return '#3B82F6';
             case 'ready_for_pickup': return theme.accent;
             case 'on_the_way': return theme.accent;

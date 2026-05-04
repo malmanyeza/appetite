@@ -24,7 +24,8 @@ import {
     HelpCircle,
     Briefcase,
     Trash2,
-    FileText
+    FileText,
+    ShieldCheck
 } from 'lucide-react-native';
 
 export const AccountScreen = ({ navigation }: any) => {
@@ -225,6 +226,17 @@ export const AccountScreen = ({ navigation }: any) => {
                 <Text style={[styles.name, { color: theme.text }]}>{profile?.full_name || 'Appetite User'}</Text>
                 <Text style={[styles.email, { color: theme.textMuted }]}>{user?.email}</Text>
 
+                {activeRole !== 'admin' && roles.includes('admin') && (
+                    <TouchableOpacity
+                        style={[styles.roleBadge, { backgroundColor: '#8B5CF6', marginBottom: 12 }]}
+                        onPress={() => setActiveRole('admin')}
+                        disabled={isSwitching}
+                    >
+                        <ShieldCheck size={16} color="white" />
+                        <Text style={styles.roleBadgeText}>Switch to Admin Mode</Text>
+                    </TouchableOpacity>
+                )}
+
                 {activeRole === 'customer' ? (
                     <TouchableOpacity
                         style={[styles.roleBadge, { backgroundColor: theme.accent }]}
@@ -249,7 +261,7 @@ export const AccountScreen = ({ navigation }: any) => {
                 ) : (
                     <TouchableOpacity
                         style={[styles.roleBadge, { backgroundColor: theme.accent }]}
-                        onPress={handleRoleSwitch}
+                        onPress={() => setActiveRole('customer')}
                         disabled={isSwitching}
                     >
                         {isSwitching ? (
@@ -292,6 +304,10 @@ export const AccountScreen = ({ navigation }: any) => {
                 <Trash2 size={20} color="#DC2626" />
                 <Text style={styles.deleteText}>Delete Account</Text>
             </TouchableOpacity>
+
+            <Text style={[styles.versionText, { color: theme.textMuted }]}>
+                v1.5.5 (Build 20)
+            </Text>
 
         </ScrollView>
     );

@@ -16,6 +16,9 @@
         },
         "preview": {
             "distribution": "internal",
+            "android": {
+                "buildType": "app-bundle"
+            },
             "env": {
                 "EXPO_PUBLIC_SUPABASE_URL": "https://zmsactoninhdtngtlyep.supabase.co",
                 "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_gmk-IQPPNgIxrasWP_I8QQ_e9_zRyxd",

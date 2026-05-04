@@ -23,6 +23,8 @@ jobs:
           # Force sync secrets to .env.production to bypass any caching or hidden files
           echo "VITE_SUPABASE_URL=${VITE_SUPABASE_URL}" > .env.production
           echo "VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}" >> .env.production
+          echo "VITE_GOOGLE_MAPS_API_KEY=${VITE_GOOGLE_MAPS_API_KEY}" >> .env.production
+          echo "VITE_VAPID_PUBLIC_KEY=${VITE_VAPID_PUBLIC_KEY}" >> .env.production
           
           # Diagnostic: Show prefix of URL being used (masked)
           URL_PREFIX=$(echo $VITE_SUPABASE_URL | cut -c1-15)
@@ -50,6 +52,8 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
+          VITE_VAPID_PUBLIC_KEY: ${{ secrets.VITE_VAPID_PUBLIC_KEY }}
 
       - name: Deploy 🚀
         uses: JamesIves/github-pages-deploy-action@v4

@@ -4,7 +4,7 @@
     "slug": "appetite-mobile",
     "owner": "malappbuilds",
     "scheme": "appetite",
-    "version": "1.5.2",
+    "version": "1.5.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -18,7 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.appetite.mobile",
-      "buildNumber": "17",
+      "buildNumber": "20",
       "config": {
         "googleMapsApiKey": "AIzaSyAfW8js09sB0cfQzz19aRBkSE7sDMy5cu0"
       },
@@ -56,7 +56,7 @@
         }
       ],
       "package": "com.appetite.delivery",
-      "versionCode": 17,
+      "versionCode": 20,
       "googleServicesFile": "./google-services.json",
       "config": {
         "googleMaps": {

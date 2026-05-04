@@ -11,6 +11,7 @@ export const ordersService = {
         order_items (*)
       `)
             .eq('restaurant_id', restaurantId)
+            .neq('status', 'pending')
             .order('created_at', { ascending: false });
         if (error) throw error;
         return data;
@@ -44,6 +45,7 @@ export const ordersService = {
         ),
         order_items (*)
       `)
+            .neq('status', 'pending')
             .order('created_at', { ascending: false });
         if (error) throw error;
         return data;
@@ -92,10 +94,10 @@ export const restaurantService = {
     },
 
     async getAllRestaurants() {
-        // Fetch all restaurants with their total order count, branch count, and menu item count
+        // Fetch all restaurants with their total order count, branch details, and menu item count
         const { data, error } = await supabase
             .from('restaurants')
-            .select('*, locations:restaurant_locations(count), menu:menu_items(count), orders:orders(count)')
+            .select('*, locations:restaurant_locations(location_name, city, suburb), menu:menu_items(count), orders:orders(count)')
             .order('name');
         if (error) throw error;
         return data;
@@ -259,6 +261,7 @@ export const restaurantService = {
             .from('orders')
             .select('*')
             .eq('restaurant_id', restaurantId)
+            .neq('status', 'pending')
             .gte('created_at', today.toISOString());
 
         if (ordersError) throw ordersError;
@@ -437,7 +440,8 @@ export const adminService = {
         const { data: orders, error: ordersError } = await supabase
             .from('orders')
             .select('pricing, created_at, status, delivered_at')
-            .neq('status', 'cancelled');
+            .neq('status', 'cancelled')
+            .neq('status', 'pending');
 
         if (ordersError) throw ordersError;
 

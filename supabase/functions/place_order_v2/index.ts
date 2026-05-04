@@ -208,6 +208,21 @@ Deno.serve(async (req: Request) => {
 
     // COD: return immediately
     if (paymentMethod === 'cod') {
+        // Trigger Admin notification
+        fetch(`${supabaseUrl}/functions/v1/notify_admins`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${supabaseServiceKey}`
+            },
+            body: JSON.stringify({
+                title: 'New Platform Order!',
+                message: `Order #${newOrder.id.slice(0,8)} placed at ${restaurant?.name || 'Restaurant'}`,
+                type: 'order_alert',
+                payload: { orderId: newOrder.id }
+            })
+        }).catch(err => console.error('Admin Notification trigger failed:', err));
+
         // Trigger restaurant notification - Await to ensure it completes
         console.log('Triggering restaurant notification for COD order:', newOrder.id);
         await Promise.all([

@@ -22,6 +22,7 @@ import { SignUpScreen } from '../screens/SignUpScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { OrderDetailsScreen } from '../screens/OrderDetailsScreen';
 import { DriverOnboarding } from '../screens/DriverOnboarding';
+import { AdminOrdersScreen } from '../screens/AdminOrdersScreen';
 import { PrivacyPolicyScreen } from '../screens/PrivacyPolicyScreen';
 import { TermsOfServiceScreen } from '../screens/TermsOfServiceScreen';
 import { HelpSupportScreen } from '../screens/HelpSupportScreen';
@@ -103,6 +104,32 @@ const DriverJobsStack = () => {
     );
 };
 
+const AdminTabs = () => {
+    const { theme } = useTheme();
+    return (
+        <Tab.Navigator
+            screenOptions={({ route }) => ({
+                tabBarIcon: ({ color, size }) => {
+                    if (route.name === 'Live Orders') return <ClipboardList color={color} size={size} />;
+                    if (route.name === 'Account') return <User color={color} size={size} />;
+                },
+                tabBarActiveTintColor: theme.accent,
+                tabBarInactiveTintColor: theme.textMuted,
+                tabBarStyle: { backgroundColor: theme.background, borderTopWidth: 0, elevation: 0 },
+                headerStyle: { backgroundColor: theme.background },
+                headerTintColor: theme.text,
+            })}
+        >
+            <Tab.Screen 
+                name="Live Orders" 
+                component={AdminOrdersScreen} 
+                options={{ headerShown: false }} 
+            />
+            <Tab.Screen name="Account" component={AccountStack} options={{ headerShown: false }} />
+        </Tab.Navigator>
+    );
+};
+
 const DriverTabs = () => {
     const { theme } = useTheme();
     return (
@@ -166,8 +193,14 @@ export const RootNavigator = () => {
             screenOptions={{ headerShown: false }}
         >
             {/* 1. Only render ONE interface as the root screen to prevent "stack slip" */}
-            {user && activeRole === 'driver' && !isSigningUp ? (
-                <Stack.Screen name="DriverApp" component={DriverTabs} />
+            {user && !isSigningUp ? (
+                activeRole === 'driver' ? (
+                    <Stack.Screen name="DriverApp" component={DriverTabs} />
+                ) : activeRole === 'admin' ? (
+                    <Stack.Screen name="AdminApp" component={AdminTabs} />
+                ) : (
+                    <Stack.Screen name="CustomerApp" component={CustomerTabs} />
+                )
             ) : (
                 <Stack.Screen name="CustomerApp" component={CustomerTabs} />
             )}

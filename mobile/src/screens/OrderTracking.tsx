@@ -554,7 +554,8 @@ export const OrderTracking = ({ route, navigation }: any) => {
                     )}
                     <Text style={[styles.restaurantName, { color: theme.text }]}>{order.restaurants?.name}</Text>
                     <Text style={[styles.statusText, { color: theme.accent }]}>
-                        {order.is_driver_at_customer ? 'DRIVER HAS ARRIVED! Please meet them at the delivery point.' :
+                        {order.status === 'pending' ? 'Awaiting payment confirmation...' :
+                         order.is_driver_at_customer ? 'DRIVER HAS ARRIVED! Please meet them at the delivery point.' :
                          order.is_driver_at_restaurant ? 'Driver has arrived at the restaurant and is picking up your order' :
                             displayStatus === 'confirmed' ? 'Restaurant is confirming your order' :
                             displayStatus === 'preparing' ? 'Your food is being prepared' :

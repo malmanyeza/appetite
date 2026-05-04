@@ -442,7 +442,13 @@ export const DriverJobs = () => {
                                 <View style={styles.cardInfo}>
                                     <View style={styles.jobHeader}>
                                         <View>
-                                            <Text style={[styles.orderId, { color: theme.textMuted }]}>Order #{job.id.slice(0, 8)}</Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                <Text style={[styles.orderId, { color: theme.textMuted }]}>Order #{job.id.slice(0, 8)}</Text>
+                                                <Text style={{ color: theme.textMuted, fontSize: 10 }}>•</Text>
+                                                <Text style={{ color: theme.textMuted, fontSize: 10 }}>
+                                                    {new Date(job.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </Text>
+                                            </View>
                                             <Text style={[styles.jobStatus, { color: theme.accent, fontWeight: 'bold' }]}>{job.status.replace('_', ' ').toUpperCase()}</Text>
                                         </View>
                                         <View style={{ alignItems: 'flex-end' }}>

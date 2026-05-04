@@ -90,8 +90,21 @@ Deno.serve(async (req: Request) => {
         const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
         const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
         
-        console.log('Triggering restaurant notification for confirmed order:', orderId);
+        console.log('Triggering notifications for confirmed order:', orderId);
         await Promise.all([
+            fetch(`${supabaseUrl}/functions/v1/notify_admins`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${supabaseServiceKey}`
+                },
+                body: JSON.stringify({
+                    title: 'New Paid Order!',
+                    message: `Order #${orderId.slice(0,8)} has been paid via ${order.payment?.method || 'Online'}`,
+                    type: 'order_alert',
+                    payload: { orderId: orderId }
+                })
+            }),
             fetch(`${supabaseUrl}/functions/v1/notify_restaurant`, {
                 method: 'POST',
                 headers: {

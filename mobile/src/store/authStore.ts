@@ -51,7 +51,7 @@ interface AuthState {
     user: any | null;
     profile: any | null;
     roles: Role[];
-    activeRole: 'customer' | 'driver' | null;
+    activeRole: 'customer' | 'driver' | 'admin' | null;
     loading: boolean;
     isSigningUp: boolean;
     isRefreshing: boolean;
@@ -59,7 +59,7 @@ interface AuthState {
 
     refreshSession: (providedSession?: any) => Promise<void>;
     refreshProfile: () => Promise<void>;
-    setActiveRole: (role: 'customer' | 'driver') => Promise<void>;
+    setActiveRole: (role: 'customer' | 'driver' | 'admin') => Promise<void>;
     setSigningUp: (status: boolean) => void;
     setPendingRedirect: (screen: string | null) => void;
     signOut: () => Promise<void>;
@@ -193,6 +193,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 defaultRole = savedRole as any;
             } else if (currentRole && availableRoles.includes(currentRole as Role)) {
                 defaultRole = currentRole as any;
+            } else if (availableRoles.includes('admin' as Role)) {
+                defaultRole = 'admin';
             } else if (availableRoles.includes('driver' as Role)) {
                 defaultRole = 'driver';
             } else if (availableRoles.includes('customer' as Role)) {
@@ -248,7 +250,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
     },
 
-    setActiveRole: async (role) => {
+    setActiveRole: async (role: 'customer' | 'driver' | 'admin') => {
         const { roles } = get();
         if (roles.includes(role)) {
             console.log(`[Auth] Switching active role to: ${role}`);
@@ -278,16 +280,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     },
 
     signOut: async () => {
-        if (supabase) {
-            await supabase.auth.signOut().catch(() => {});
-        }
+        const userId = get().user?.id;
+        
+        // 1. Instant UI update
         set({ 
             user: null, 
             profile: null, 
             roles: [], 
             activeRole: null,
-            isSigningUp: false // Reset sign-up mode
+            isSigningUp: false 
         });
+
+        // 2. Background cleanup
+        if (supabase) {
+            if (userId) {
+                supabase
+                    .from('profiles')
+                    .update({ expo_push_token: null })
+                    .eq('id', userId)
+                    .catch(err => console.warn('[Auth] Background token clear failed:', err));
+            }
+            await supabase.auth.signOut().catch(() => {});
+        }
     },
 
     resetPasswordForEmail: async (email: string) => {

@@ -77,7 +77,7 @@ export const OrderDetailsScreen = ({ route, navigation }: any) => {
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
+                <TouchableOpacity onPress={() => navigation.navigate('Home')}>
                     <ChevronLeft color={theme.text} size={24} />
                 </TouchableOpacity>
                 <Text style={[styles.headerTitle, { color: theme.text }]}>Order Details</Text>
