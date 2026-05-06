@@ -71,7 +71,7 @@ export const RestaurantSettings = () => {
     const totalSteps = isAdminRoute ? 6 : 5;
 
     // ─── EXISTING RESTAURANT: TABBED EDIT VIEW ────────────────────────
-    const [activeTab, setActiveTab] = useState<'store' | 'payouts' | 'locations' | 'menu-scanner'>('store');
+    const [activeTab, setActiveTab] = useState<'store' | 'payouts' | 'locations' | 'categories' | 'banners' | 'menu-scanner'>('store');
     const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
     const [selectedLocationForEdit, setSelectedLocationForEdit] = useState<any>(null);
     const [locationDetails, setLocationDetails] = useState({
@@ -196,6 +196,108 @@ export const RestaurantSettings = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['restaurant-locations'] });
             alert('Location deleted successfully!');
+        }
+    });
+
+    // Menu Categories
+    const { data: menuCategories, refetch: refetchCategories } = useQuery({
+        queryKey: ['menu-categories', restaurant?.id],
+        queryFn: async () => {
+            const { data, error } = await supabase.from('menu_categories').select('*').eq('restaurant_id', restaurant?.id).order('sort_order', { ascending: true });
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!restaurant?.id
+    });
+
+    const addCategory = useMutation({
+        mutationFn: async (name: string) => {
+            const { error } = await supabase.from('menu_categories').insert({ restaurant_id: restaurant.id, name });
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['menu-categories'] });
+            alert('Category added!');
+        }
+    });
+
+    const deleteCategory = useMutation({
+        mutationFn: async (id: string) => {
+            const { error } = await supabase.from('menu_categories').delete().eq('id', id);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['menu-categories'] });
+            alert('Category deleted!');
+        }
+    });
+
+    // Promo Banners
+    const { data: banners, refetch: refetchBanners } = useQuery({
+        queryKey: ['restaurant-banners', restaurant?.id],
+        queryFn: async () => {
+            const { data, error } = await supabase.from('restaurant_banners').select('*').eq('restaurant_id', restaurant?.id).order('sort_order', { ascending: true });
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!restaurant?.id
+    });
+
+    const addBanner = useMutation({
+        mutationFn: async (banner: any) => {
+            const { error } = await supabase.from('restaurant_banners').insert({ ...banner, restaurant_id: restaurant.id });
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['restaurant-banners'] });
+            alert('Banner added!');
+        }
+    });
+
+    const deleteBanner = useMutation({
+        mutationFn: async (id: string) => {
+            const { error } = await supabase.from('restaurant_banners').delete().eq('id', id);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['restaurant-banners'] });
+            alert('Banner deleted!');
+        }
+    });
+
+    const [isBannerModalOpen, setIsBannerModalOpen] = useState(false);
+    const [selectedBannerForEdit, setSelectedBannerForEdit] = useState<any>(null);
+
+    // Fetch all menu items for this restaurant
+    const { data: menuItems } = useQuery({
+        queryKey: ['restaurant-menu-all', restaurant?.id],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('menu_items')
+                .select('id, name, price, category')
+                .eq('restaurant_id', restaurant?.id)
+                .order('name');
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!restaurant?.id
+    });
+
+    const upsertBanner = useMutation({
+        mutationFn: async (banner: any) => {
+            if (banner.id) {
+                const { error } = await supabase.from('restaurant_banners').update(banner).eq('id', banner.id);
+                if (error) throw error;
+            } else {
+                const { error } = await supabase.from('restaurant_banners').insert({ ...banner, restaurant_id: restaurant.id });
+                if (error) throw error;
+            }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['restaurant-banners'] });
+            setIsBannerModalOpen(false);
+            setSelectedBannerForEdit(null);
+            alert('Banner saved successfully!');
         }
     });
 
@@ -427,6 +529,18 @@ export const RestaurantSettings = () => {
                         className={cn("pb-4 text-sm font-bold border-b-2 transition-all", activeTab === 'locations' ? "border-accent text-accent" : "border-transparent text-muted hover:text-white")}
                     >
                         Locations
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('categories')}
+                        className={cn("pb-4 text-sm font-bold border-b-2 transition-all", activeTab === 'categories' ? "border-accent text-accent" : "border-transparent text-muted hover:text-white")}
+                    >
+                        Menu Categories
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('banners')}
+                        className={cn("pb-4 text-sm font-bold border-b-2 transition-all", activeTab === 'banners' ? "border-accent text-accent" : "border-transparent text-muted hover:text-white")}
+                    >
+                        Promo Banners
                     </button>
                     <button
                         onClick={() => setActiveTab('payouts')}
@@ -682,6 +796,131 @@ export const RestaurantSettings = () => {
                         </div>
                     )}
 
+
+                    {activeTab === 'categories' && (
+                        <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
+                            <div className="glass p-8 space-y-6">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <h3 className="text-xl font-bold flex items-center gap-2"><Utensils size={20} className="text-accent" /> Menu Categories</h3>
+                                        <p className="text-sm text-muted">Create categories for your menu items (e.g. Promos, Burgers, Drinks).</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const name = prompt('Enter category name:');
+                                            if (name) addCategory.mutate(name);
+                                        }}
+                                        className="btn-primary px-4 py-2 text-sm flex items-center gap-2"
+                                    >
+                                        <Plus size={16} /> Add Category
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6">
+                                    {menuCategories?.map((cat: any) => (
+                                        <div key={cat.id} className="bg-white/5 border border-white/10 p-4 rounded-xl flex justify-between items-center">
+                                            <span className="font-bold">{cat.name}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (confirm('Delete this category? Items in this category will become uncategorized.')) {
+                                                        deleteCategory.mutate(cat.id);
+                                                    }
+                                                }}
+                                                className="text-red-500 hover:text-red-400 p-2"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {(!menuCategories || menuCategories.length === 0) && (
+                                        <p className="text-sm text-muted italic p-4">No categories created yet.</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'banners' && (
+                        <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
+                            <div className="glass p-8 space-y-6">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <h3 className="text-xl font-bold flex items-center gap-2"><ImageIcon size={20} className="text-accent" /> Promo Banners</h3>
+                                        <p className="text-sm text-muted">Manage promotional banners for your restaurant slideshow.</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedBannerForEdit(null);
+                                            setIsBannerModalOpen(true);
+                                        }}
+                                        className="btn-primary px-4 py-2 text-sm flex items-center gap-2"
+                                    >
+                                        <Plus size={16} /> Add Banner
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6">
+                                    {banners?.map((banner: any) => (
+                                        <div key={banner.id} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden group relative">
+                                            <img src={banner.image_url} alt={banner.title} className="w-full h-40 object-cover" />
+                                            <div className="p-4 bg-black/60 absolute bottom-0 left-0 right-0">
+                                                <h4 className="font-bold text-white">{banner.title}</h4>
+                                                {banner.menu_item_id && (
+                                                    <p className="text-xs text-accent mt-1 flex items-center gap-1">
+                                                        <CheckCircle2 size={10} /> Linked to: {menuItems?.find((m: any) => m.id === banner.menu_item_id)?.name || 'Food Item'}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSelectedBannerForEdit(banner);
+                                                        setIsBannerModalOpen(true);
+                                                    }}
+                                                    className="p-2 bg-accent rounded-lg text-white"
+                                                >
+                                                    <Wand2 size={16} />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (confirm('Delete this banner?')) {
+                                                            deleteBanner.mutate(banner.id);
+                                                        }
+                                                    }}
+                                                    className="p-2 bg-red-500 rounded-lg text-white"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {(!banners || banners.length === 0) && (
+                                        <p className="text-sm text-muted italic p-4">No banners added yet.</p>
+                                    )}
+                                </div>
+                                
+                                {/* Image Upload Helper for Banner */}
+                                <div className="mt-8 pt-8 border-t border-white/10 space-y-4">
+                                    <h4 className="text-sm font-bold text-muted uppercase">Upload a Banner Image</h4>
+                                    <div className="max-w-md">
+                                        <ImageUploadField
+                                            onUpload={(url: string) => {
+                                                setSelectedBannerForEdit({ image_url: url });
+                                                setIsBannerModalOpen(true);
+                                            }}
+                                            path={`banners/${restaurant?.id}`}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {activeTab === 'payouts' && (
                         <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
                             <div className="glass p-8 space-y-6 border-l-4 border-l-blue-500">
@@ -818,6 +1057,68 @@ export const RestaurantSettings = () => {
                         </div>
                     )}
                 </form>
+
+                {/* Banner Modal */}
+                {isBannerModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                        <div className="glass w-full max-w-lg rounded-3xl overflow-hidden border border-white/10 flex flex-col">
+                            <div className="p-6 border-b border-white/10 bg-white/5 flex justify-between items-center">
+                                <h3 className="text-xl font-bold">{selectedBannerForEdit?.id ? 'Edit Banner' : 'Add New Banner'}</h3>
+                                <button onClick={() => setIsBannerModalOpen(false)} className="text-muted hover:text-white"><X size={24} /></button>
+                            </div>
+                            <form 
+                                className="p-6 space-y-6"
+                                onSubmit={(e: any) => {
+                                    e.preventDefault();
+                                    const formData = new FormData(e.currentTarget);
+                                    upsertBanner.mutate({
+                                        id: selectedBannerForEdit?.id,
+                                        title: formData.get('title'),
+                                        image_url: formData.get('image_url'),
+                                        menu_item_id: formData.get('menu_item_id') || null
+                                    });
+                                }}
+                            >
+                                <InputField label="Banner Title" name="title" required defaultValue={selectedBannerForEdit?.title} placeholder="e.g. 50% Off Burger Deal" />
+                                <InputField label="Image URL" name="image_url" required defaultValue={selectedBannerForEdit?.image_url} />
+                                
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold uppercase tracking-widest text-muted ml-1">Link to Food Item (Optional)</label>
+                                    <select 
+                                        name="menu_item_id" 
+                                        className="input-field w-full py-3"
+                                        defaultValue={selectedBannerForEdit?.menu_item_id || ''}
+                                    >
+                                        <option value="">None (Static Banner)</option>
+                                        {menuItems?.map((item: any) => (
+                                            <option key={item.id} value={item.id}>
+                                                [{item.category}] {item.name} - ${item.price}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <p className="text-[10px] text-accent ml-1 italic">Selecting an item will make the banner clickable in the mobile app.</p>
+                                </div>
+
+                                <div className="pt-4 flex gap-3">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setIsBannerModalOpen(false)} 
+                                        className="flex-1 py-3 rounded-xl border border-white/10 font-bold hover:bg-white/5 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button 
+                                        type="submit" 
+                                        className="flex-[2] py-3 rounded-xl bg-accent text-white font-bold shadow-lg shadow-accent/20 hover:scale-[1.02] active:scale-95 transition-all"
+                                        disabled={upsertBanner.isPending}
+                                    >
+                                        {upsertBanner.isPending ? 'Saving...' : 'Save Banner'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
 
                 {/* Location Modal */}
                 {isLocationModalOpen && (

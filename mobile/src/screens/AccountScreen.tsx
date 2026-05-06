@@ -306,7 +306,7 @@ export const AccountScreen = ({ navigation }: any) => {
             </TouchableOpacity>
 
             <Text style={[styles.versionText, { color: theme.textMuted }]}>
-                v1.5.5 (Build 20)
+                v1.6.0 (Build 22)
             </Text>
 
         </ScrollView>

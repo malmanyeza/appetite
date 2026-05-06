@@ -29,6 +29,7 @@ import { HelpSupportScreen } from '../screens/HelpSupportScreen';
 import { EmailVerificationScreen } from '../screens/EmailVerificationScreen';
 import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { ResetPasswordScreen } from '../screens/ResetPasswordScreen';
+import { FoodItemDetail } from '../screens/FoodItemDetail';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -218,6 +219,7 @@ export const RootNavigator = () => {
 
             {/* 4. Shared Public & Customer Screens */}
             <Stack.Screen name="RestaurantDetails" component={RestaurantDetails} />
+            <Stack.Screen name="FoodItemDetail" component={FoodItemDetail} />
             <Stack.Screen name="Cart" component={CartScreen} />
             <Stack.Screen name="OrderTracking" component={OrderTracking} />
             <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} />

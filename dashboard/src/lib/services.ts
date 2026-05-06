@@ -106,9 +106,8 @@ export const restaurantService = {
     async getMenu(restaurantId: string) {
         const { data, error } = await supabase
             .from('menu_items')
-            .select('*')
+            .select('*, menu_categories(name)')
             .eq('restaurant_id', restaurantId)
-            .order('category')
             .order('name');
         if (error) throw error;
         return data;
