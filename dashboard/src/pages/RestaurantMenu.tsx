@@ -460,8 +460,11 @@ export const RestaurantMenu = () => {
                             e.preventDefault();
                             const formData = new FormData(e.currentTarget);
                             const data = Object.fromEntries(formData.entries());
+                            const categoryName = menuCategories?.find((c: any) => c.id === data.category_id)?.name || '';
+                            
                             const itemData = {
                                 ...data,
+                                category: categoryName,
                                 price: parseFloat(data.price as string),
                                 image_url: editImageUrl || null,
                                 add_ons: addons,
