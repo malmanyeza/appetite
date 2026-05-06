@@ -10,8 +10,10 @@ import {
     Animated,
     TextInput,
     Dimensions,
-    FlatList
+    FlatList,
+    StatusBar
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../theme';
@@ -26,6 +28,7 @@ const { width } = Dimensions.get('window');
 export const RestaurantDetails = ({ route, navigation }: any) => {
     const { id } = route.params;
     const { theme } = useTheme();
+    const insets = useSafeAreaInsets();
     const { addItem, items: cartItems } = useCartStore();
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -222,7 +225,7 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
                 }
             >
                 {/* Hero / Banners Section */}
-                <View style={styles.bannerWrapper}>
+                <View style={[styles.bannerWrapper, { paddingTop: insets.top }]}>
                     {banners && banners.length > 0 ? (
                         <View>
                             <FlatList
@@ -289,7 +292,7 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
                         </View>
                     )}
                     
-                    <View style={styles.navOverlay}>
+                    <View style={[styles.navOverlay, { top: insets.top + 10 }]}>
                         <TouchableOpacity style={[styles.iconButton, { backgroundColor: 'rgba(0,0,0,0.4)' }]} onPress={() => navigation.goBack()}>
                             <ChevronLeft color="#FFF" size={24} />
                         </TouchableOpacity>
@@ -450,7 +453,6 @@ const styles = StyleSheet.create({
     },
     navOverlay: {
         position: 'absolute',
-        top: 60,
         left: 20,
         right: 20,
         flexDirection: 'row',
