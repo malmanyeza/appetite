@@ -266,7 +266,7 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
                                 )}
                             />
                             {banners.length > 1 && (
-                                <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5 pointer-events-none">
+                                <View style={styles.paginationContainer}>
                                     {banners.map((_, i) => (
                                         <View 
                                             key={i} 
@@ -276,7 +276,7 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
                                             ]} 
                                         />
                                     ))}
-                                </div>
+                                </View>
                             )}
                         </View>
                     ) : (
@@ -438,6 +438,16 @@ const styles = StyleSheet.create({
     },
     bannerTitle: { color: '#FFF', fontSize: 24, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 10 },
     paginationDot: { width: 8, height: 8, borderRadius: 4, marginHorizontal: 3 },
+    paginationContainer: {
+        position: 'absolute',
+        bottom: 20,
+        left: 0,
+        right: 0,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 6
+    },
     navOverlay: {
         position: 'absolute',
         top: 60,
