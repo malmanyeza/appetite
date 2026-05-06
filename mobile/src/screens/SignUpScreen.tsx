@@ -28,6 +28,7 @@ export const SignUpScreen = ({ navigation, route }: any) => {
 
     const setSigningUp = useAuthStore(state => state.setSigningUp);
     const setPendingRedirect = useAuthStore(state => state.setPendingRedirect);
+    const refreshSession = useAuthStore(state => state.refreshSession);
 
     const validateEmail = (email: string) => {
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -72,7 +73,7 @@ export const SignUpScreen = ({ navigation, route }: any) => {
             }
 
             // 1. Sign up user
-            const { data: { user }, error: signUpError } = await supabase.auth.signUp({
+            const { data: { user, session }, error: signUpError } = await supabase.auth.signUp({
                 email,
                 password,
                 options: {
@@ -94,22 +95,18 @@ export const SignUpScreen = ({ navigation, route }: any) => {
             // 2. Profile & roles are auto-created on the server via DB trigger.
 
             // 3. Check if email verification is required.
-            //    NOTE: Do NOT call refreshSession() manually here.
-            //    onAuthStateChange already handles the session update, and calling
-            //    refreshSession() concurrently is what caused the crash.
-            const { data: { session } } = await supabase.auth.getSession();
-
+            //    If auto-confirm is enabled in Supabase, session will be returned immediately.
             if (!session) {
                 // Email verification required — navigate before auth state change remounts navigator
                 navigation.navigate('EmailVerification', { email: email.trim() });
             } else {
-                // Auto-signed-in — set pendingRedirect if user came from cart.
-                // The authStore/navigator will handle the transition automatically.
+                // Auto-signed-in — explicitly update the store with the session.
+                // This is more reliable on iOS than waiting for onAuthStateChange.
+                await refreshSession(session);
+                
                 if (returnToCart) {
                     setPendingRedirect('Cart');
                 }
-                // No manual navigation needed — onAuthStateChange triggered refreshSession
-                // which sets user + activeRole, causing RootNavigator to show CustomerApp.
             }
 
         } catch (error: any) {

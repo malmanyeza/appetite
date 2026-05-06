@@ -164,18 +164,43 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 user = verifiedUser;
             }
 
-            // 5. Fetch profile and roles (parallel for speed)
-            const [profileRes, rolesRes]: any[] = await Promise.all([
-                withTimeout(supabase.from('profiles').select('*').eq('id', user.id).single(), TIMEOUT_MS, 'Profile fetch timed out'),
-                withTimeout(supabase.from('user_roles').select('role').eq('user_id', user.id), TIMEOUT_MS, 'Roles fetch timed out')
-            ]);
+            // 5. Fetch profile and roles (with retry for profile since triggers might be slow)
+            let profileRes: any;
+            let rolesRes: any;
+            let profile: any = null;
+            let roles: any = null;
+            let retries = 0;
+            const MAX_RETRIES = 3;
 
-            const profile = profileRes.data;
-            const roles = rolesRes.data;
+            while (retries < MAX_RETRIES) {
+                const [pRes, rRes]: any[] = await Promise.all([
+                    withTimeout(supabase.from('profiles').select('*').eq('id', user.id).single(), TIMEOUT_MS, 'Profile fetch timed out'),
+                    withTimeout(supabase.from('user_roles').select('role').eq('user_id', user.id), TIMEOUT_MS, 'Roles fetch timed out')
+                ]);
+                
+                profileRes = pRes;
+                rolesRes = rRes;
+                profile = pRes.data;
+                roles = rRes.data;
 
-            if ((profileRes.error && profileRes.error.code === 'PGRST116') || !profile) {
+                // If profile found, break
+                if (profile) break;
+                
+                // If it's a "not found" error, wait and retry
+                if (pRes.error?.code === 'PGRST116') {
+                    console.log(`[Auth] Profile not found, retry ${retries + 1}/${MAX_RETRIES}...`);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    retries++;
+                } else {
+                    // Other error, don't retry
+                    break;
+                }
+            }
+
+            if (!profile) {
+                console.warn('[Auth] Profile still not found after retries. Signing out.');
                 await supabase.auth.signOut().catch(() => { });
-                set({ user: null, profile: null, roles: [], activeRole: null, loading: false });
+                set({ user: null, profile: null, roles: [], activeRole: null, loading: false, isRefreshing: false });
                 return;
             }
 
