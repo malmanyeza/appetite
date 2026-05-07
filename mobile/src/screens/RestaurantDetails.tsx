@@ -286,8 +286,6 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
                                     </TouchableOpacity>
                                 )}
                             />
-                                </View>
-                            )}
                         </View>
                     ) : (
                         <View style={styles.imageContainer}>
