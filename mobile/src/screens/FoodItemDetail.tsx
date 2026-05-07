@@ -15,6 +15,7 @@ import { ChevronLeft, Plus, Minus, Info, Check } from 'lucide-react-native';
 import { useTheme } from '../theme';
 import { restaurantService } from '../services/restaurantService';
 import { useCartStore } from '../store/cartStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getOriginalUrl } from '../utils/storageUtils';
 
 const { width } = Dimensions.get('window');
@@ -22,6 +23,7 @@ const { width } = Dimensions.get('window');
 export const FoodItemDetail = ({ route, navigation }: any) => {
     const { item, restaurantId, locationId } = route.params;
     const { theme } = useTheme();
+    const insets = useSafeAreaInsets();
     const { addItem } = useCartStore();
     const scrollY = React.useRef(new Animated.Value(0)).current;
 
@@ -152,7 +154,7 @@ export const FoodItemDetail = ({ route, navigation }: any) => {
                         contentFit="cover"
                         transition={300}
                     />
-                    <View style={styles.navOverlay}>
+                    <View style={[styles.navOverlay, { top: insets.top + 10 }]}>
                         <TouchableOpacity 
                             style={[styles.backButton, { backgroundColor: 'rgba(0,0,0,0.5)' }]} 
                             onPress={() => navigation.goBack()}
@@ -316,7 +318,8 @@ export const FoodItemDetail = ({ route, navigation }: any) => {
                     backgroundColor: theme.background, 
                     opacity: headerOpacity,
                     borderBottomColor: theme.surface,
-                    borderBottomWidth: StyleSheet.hairlineWidth
+                    borderBottomWidth: StyleSheet.hairlineWidth,
+                    paddingTop: insets.top + 10
                 }
             ]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.stickyBack}>
@@ -366,7 +369,6 @@ const styles = StyleSheet.create({
     heroImage: { width: '100%', height: '100%' },
     navOverlay: {
         position: 'absolute',
-        top: 60,
         left: 20,
         zIndex: 10
     },
@@ -384,9 +386,9 @@ const styles = StyleSheet.create({
         alignItems: 'flex-start',
         marginBottom: 8
     },
-    name: { fontSize: 26, fontWeight: '800', flex: 1, marginRight: 16 },
-    price: { fontSize: 20, fontWeight: 'bold' },
-    description: { fontSize: 15, lineHeight: 22, opacity: 0.7, marginBottom: 32 },
+    name: { fontSize: 26, fontFamily: theme.fonts.headingBlack, flex: 1, marginRight: 16 },
+    price: { fontSize: 20, fontFamily: theme.fonts.heading },
+    description: { fontSize: 15, fontFamily: theme.fonts.body, lineHeight: 22, opacity: 0.7, marginBottom: 32 },
     modifiersSection: { gap: 32 },
     groupContainer: {},
     groupHeader: {
@@ -395,14 +397,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 16
     },
-    groupName: { fontSize: 18, fontWeight: 'bold' },
-    groupSubtitle: { fontSize: 12, marginTop: 2 },
+    groupName: { fontSize: 18, fontFamily: theme.fonts.heading },
+    groupSubtitle: { fontSize: 12, fontFamily: theme.fonts.body, marginTop: 2 },
     badge: {
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 8
     },
-    badgeText: { fontSize: 10, fontWeight: '800', uppercase: true },
+    badgeText: { fontSize: 10, fontFamily: theme.fonts.heading, uppercase: true },
     optionsList: {
         backgroundColor: 'rgba(255,255,255,0.02)',
         borderRadius: 20,
@@ -415,8 +417,8 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1
     },
     optionInfo: { flex: 1 },
-    optionName: { fontSize: 15, fontWeight: '500' },
-    optionPrice: { fontSize: 13, marginTop: 4, fontWeight: 'bold' },
+    optionName: { fontSize: 15, fontFamily: theme.fonts.bodyMedium },
+    optionPrice: { fontSize: 13, fontFamily: theme.fonts.heading, marginTop: 4 },
     checkbox: {
         width: 22,
         height: 22,
@@ -430,7 +432,6 @@ const styles = StyleSheet.create({
         top: 0,
         left: 0,
         right: 0,
-        paddingTop: 55,
         paddingBottom: 15,
         paddingHorizontal: 20,
         flexDirection: 'row',
@@ -446,7 +447,7 @@ const styles = StyleSheet.create({
     },
     stickyTitle: {
         fontSize: 16,
-        fontWeight: 'bold',
+        fontFamily: theme.fonts.heading,
         marginLeft: 12,
         flex: 1
     },
@@ -474,7 +475,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center'
     },
-    qtyText: { fontSize: 18, fontWeight: 'bold', minWidth: 24, textAlign: 'center' },
+    qtyText: { fontSize: 18, fontFamily: theme.fonts.heading, minWidth: 24, textAlign: 'center' },
     addBtn: {
         flex: 1,
         height: 56,
@@ -482,5 +483,5 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center'
     },
-    addBtnText: { fontSize: 16, fontWeight: 'bold' }
+    addBtnText: { fontSize: 16, fontFamily: theme.fonts.heading }
 });

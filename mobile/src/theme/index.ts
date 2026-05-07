@@ -20,13 +20,21 @@ export const Colors = {
     }
 };
 
-export type Theme = typeof Colors.light;
+export const Fonts = {
+    heading: 'Outfit_700Bold',
+    headingBlack: 'Outfit_900Black',
+    body: 'Inter_400Regular',
+    bodyMedium: 'Inter_500Medium',
+    bodyBold: 'Inter_700Bold',
+};
+
+export type Theme = typeof Colors.light & { fonts: typeof Fonts };
 
 export const ThemeContext = createContext<{
     theme: Theme;
     isDark: boolean;
 }>({
-    theme: Colors.light,
+    theme: { ...Colors.light, fonts: Fonts },
     isDark: false,
 });
 

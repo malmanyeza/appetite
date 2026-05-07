@@ -7,7 +7,7 @@ LogBox.ignoreAllLogs();
 import { NavigationContainer } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './src/store/authStore';
-import { ThemeContext, Colors } from './src/theme';
+import { ThemeContext, Colors, Fonts } from './src/theme';
 import { RootNavigator } from './src/navigation';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from './src/lib/supabase';
@@ -23,6 +23,17 @@ import { ErrorBoundary } from 'react-error-boundary';
 import { GlobalError } from './src/components/GlobalError';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { navigationRef } from './src/lib/navigationRef';
+import { 
+    useFonts, 
+    Outfit_400Regular, 
+    Outfit_700Bold, 
+    Outfit_900Black 
+} from '@expo-google-fonts/outfit';
+import { 
+    Inter_400Regular, 
+    Inter_700Bold,
+    Inter_500Medium
+} from '@expo-google-fonts/inter';
 
 
 const queryClient = new QueryClient({
@@ -104,6 +115,14 @@ function App() {
     useApprovalListener();
 
     const [showSplash, setShowSplash] = useState(true);
+    const [fontsLoaded] = useFonts({
+        Outfit_400Regular,
+        Outfit_700Bold,
+        Outfit_900Black,
+        Inter_400Regular,
+        Inter_700Bold,
+        Inter_500Medium
+    });
 
     const colorScheme = useColorScheme();
     const { loading, user, refreshSession } = useAuthStore();
@@ -129,7 +148,7 @@ function App() {
     }, [initialUrl]);
 
     const isDark = colorScheme === 'dark';
-    const theme = isDark ? Colors.dark : Colors.light;
+    const theme = isDark ? { ...Colors.dark, fonts: Fonts } : { ...Colors.light, fonts: Fonts };
 
     useEffect(() => {
         // Initial session check
@@ -199,7 +218,7 @@ function App() {
                         </NavigationContainer>
                         {showSplash && (
                             <AnimatedSplash 
-                                isAppReady={!loading} 
+                                isAppReady={!loading && fontsLoaded} 
                                 onReady={() => {
                                     setShowSplash(false);
                                     useLocationStore.getState().setSplashHasFinished(true);

@@ -33,7 +33,24 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
 
     const [searchQuery, setSearchQuery] = useState('');
     const scrollY = useRef(new Animated.Value(0)).current;
+    const bannerFlatListRef = useRef<FlatList>(null);
     const [bannerIndex, setBannerIndex] = useState(0);
+
+    // Auto-sliding logic for banners
+    useEffect(() => {
+        if (!banners || banners.length <= 1) return;
+        
+        const interval = setInterval(() => {
+            const nextIndex = (bannerIndex + 1) % banners.length;
+            setBannerIndex(nextIndex);
+            bannerFlatListRef.current?.scrollToIndex({
+                index: nextIndex,
+                animated: true
+            });
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, [banners, bannerIndex]);
 
     const { data: locationData, isLoading: loadingLoc, error: errorLoc, refetch: refetchLoc, isRefetching: isRefetchingLoc } = useQuery({
         queryKey: ['location', id],
@@ -229,6 +246,7 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
                     {banners && banners.length > 0 ? (
                         <View>
                             <FlatList
+                                ref={bannerFlatListRef}
                                 data={banners}
                                 horizontal
                                 pagingEnabled
@@ -268,17 +286,6 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
                                     </TouchableOpacity>
                                 )}
                             />
-                            {banners.length > 1 && (
-                                <View style={styles.paginationContainer}>
-                                    {banners.map((_, i) => (
-                                        <View 
-                                            key={i} 
-                                            style={[
-                                                styles.paginationDot, 
-                                                { backgroundColor: i === bannerIndex ? theme.accent : 'rgba(255,255,255,0.3)' }
-                                            ]} 
-                                        />
-                                    ))}
                                 </View>
                             )}
                         </View>
@@ -439,18 +446,7 @@ const styles = StyleSheet.create({
         paddingBottom: 30,
         backgroundColor: 'rgba(0,0,0,0.3)'
     },
-    bannerTitle: { color: '#FFF', fontSize: 24, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 10 },
-    paginationDot: { width: 8, height: 8, borderRadius: 4, marginHorizontal: 3 },
-    paginationContainer: {
-        position: 'absolute',
-        bottom: 20,
-        left: 0,
-        right: 0,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: 6
-    },
+    bannerTitle: { color: '#FFF', fontSize: 24, fontFamily: theme.fonts.headingBlack, textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 10 },
     navOverlay: {
         position: 'absolute',
         left: 20,
@@ -462,8 +458,8 @@ const styles = StyleSheet.create({
     iconButton: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
     backButton: { paddingHorizontal: 30, paddingVertical: 12, borderRadius: 12 },
     infoSection: { padding: 20 },
-    name: { fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
-    description: { fontSize: 14, marginTop: 6, lineHeight: 20, opacity: 0.7 },
+    name: { fontSize: 28, fontFamily: theme.fonts.headingBlack, letterSpacing: -0.5 },
+    description: { fontSize: 14, fontFamily: theme.fonts.body, marginTop: 6, lineHeight: 20, opacity: 0.7 },
     statsRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -475,8 +471,8 @@ const styles = StyleSheet.create({
         borderBottomColor: 'rgba(255,255,255,0.05)'
     },
     statItem: { flex: 1, alignItems: 'center' },
-    statValue: { fontSize: 16, fontWeight: 'bold' },
-    statLabel: { fontSize: 11, marginTop: 2, opacity: 0.5 },
+    statValue: { fontSize: 16, fontFamily: theme.fonts.heading },
+    statLabel: { fontSize: 11, fontFamily: theme.fonts.body, marginTop: 2, opacity: 0.5 },
     divider: { width: 1, height: 24, opacity: 0.1 },
     categoryNav: { marginTop: 20 },
     catNavItem: { 
@@ -487,15 +483,15 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center'
     },
-    catNavText: { fontSize: 14, fontWeight: 'bold', textTransform: 'capitalize' },
+    catNavText: { fontSize: 14, fontFamily: theme.fonts.heading, textTransform: 'capitalize' },
     menuSection: { padding: 20 },
     categorySection: { marginBottom: 32 },
-    categoryTitle: { fontSize: 22, fontWeight: '900', marginBottom: 20, letterSpacing: -0.5 },
+    categoryTitle: { fontSize: 22, fontFamily: theme.fonts.headingBlack, marginBottom: 20, letterSpacing: -0.5 },
     menuItem: { flexDirection: 'row', paddingVertical: 20, borderBottomWidth: 1 },
     itemText: { flex: 1, paddingRight: 16 },
-    itemName: { fontSize: 17, fontWeight: '700' },
-    itemDesc: { fontSize: 13, marginTop: 4, lineHeight: 18, opacity: 0.6 },
-    itemPrice: { fontSize: 16, fontWeight: '800', marginTop: 10 },
+    itemName: { fontSize: 17, fontFamily: theme.fonts.heading },
+    itemDesc: { fontSize: 13, fontFamily: theme.fonts.body, marginTop: 4, lineHeight: 18, opacity: 0.6 },
+    itemPrice: { fontSize: 16, fontFamily: theme.fonts.heading, marginTop: 10 },
     itemAction: { position: 'relative' },
     itemImage: { width: 110, height: 110, borderRadius: 20 },
     cartBar: {
@@ -520,17 +516,17 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginRight: 14
     },
-    cartCountText: { color: '#FFF', fontSize: 14, fontWeight: 'bold' },
-    cartButtonText: { flex: 1, color: '#FFF', fontSize: 17, fontWeight: '800' },
-    cartTotalText: { color: '#FFF', fontSize: 17, fontWeight: '800' },
+    cartCountText: { color: '#FFF', fontSize: 14, fontFamily: theme.fonts.heading },
+    cartButtonText: { flex: 1, color: '#FFF', fontSize: 17, fontFamily: theme.fonts.heading },
+    cartTotalText: { color: '#FFF', fontSize: 17, fontFamily: theme.fonts.heading },
     stickyHeader: { position: 'absolute', top: 0, left: 0, right: 0 },
     stickyInner: { paddingTop: 55, paddingBottom: 15, paddingHorizontal: 20 },
     stickyContent: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     stickyIconButton: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
     stickySearchBar: { flex: 1, height: 40, borderRadius: 20, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 },
-    stickySearchInput: { flex: 1, fontSize: 14, height: '100%' },
+    stickySearchInput: { flex: 1, fontSize: 14, fontFamily: theme.fonts.body, height: '100%' },
     inlineSearchBar: { flexDirection: 'row', alignItems: 'center', height: 56, borderRadius: 18, paddingHorizontal: 18, marginTop: 10 },
-    inlineSearchInput: { flex: 1, fontSize: 16, height: '100%', fontWeight: '500' },
+    inlineSearchInput: { flex: 1, fontSize: 16, fontFamily: theme.fonts.bodyMedium, height: '100%' },
     stickyCatItem: {
         paddingHorizontal: 16,
         height: 40,
@@ -541,7 +537,7 @@ const styles = StyleSheet.create({
     },
     stickyCatText: {
         fontSize: 13,
-        fontWeight: '700',
+        fontFamily: theme.fonts.heading,
         textTransform: 'capitalize'
     }
 });
