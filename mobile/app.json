@@ -70,6 +70,7 @@
       "output": "single"
     },
     "plugins": [
+      "expo-font",
       "expo-secure-store",
       [
         "expo-location",
