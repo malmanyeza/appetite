@@ -19,7 +19,8 @@ import {
     Animated,
     RefreshControl,
     PanResponder,
-    StatusBar
+    StatusBar,
+    Easing
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Marker, PROVIDER_GOOGLE } from '../components/Map';
@@ -37,7 +38,9 @@ import { Image } from 'expo-image';
 import { useLocationStore } from '../store/locationStore';
 import { useAuthStore } from '../store/authStore';
 import { useNavigation } from '@react-navigation/native';
-import { getThumbnailUrl } from '../utils/storageUtils';
+import { useCartStore } from '../store/cartStore';
+import { getThumbnailUrl, getOriginalUrl } from '../utils/storageUtils';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const INITIAL_REGION = {
     latitude: -17.8248, // Harare
@@ -51,6 +54,7 @@ export const CustomerHome = () => {
     const queryClient = useQueryClient();
     const insets = useSafeAreaInsets();
     const { theme, isDark } = useTheme();
+    const { items: cartItems } = useCartStore();
     const [selectedCategory, setSelectedCategory] = React.useState<string | null>(null);
     const [searchQuery, setSearchQuery] = React.useState('');
     const [locationModalVisible, setLocationModalVisible] = React.useState(false);
@@ -73,6 +77,9 @@ export const CustomerHome = () => {
     // Live GPS position — used for distance calculations (separate from delivery address)
     const [gpsLocation, setGpsLocation] = React.useState<{ lat: number; lng: number } | null>(null);
     const mapRef = React.useRef<MapView | null>(null);
+    // Replaced ScrollView refs with Animated values
+    const bannerPan = React.useRef(new Animated.Value(0)).current;
+    const bannerPanValue = React.useRef(0);
     const googlePlacesRef = React.useRef<any>(null);
     const modalY = React.useRef(new Animated.Value(0)).current;
 
@@ -324,6 +331,20 @@ export const CustomerHome = () => {
         }
     });
 
+    const { data: dbBanners } = useQuery({
+        queryKey: ['all_banners'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('restaurant_banners')
+                .select('*, restaurants(name), menu_item:menu_items(*)');
+            if (error) {
+                console.warn('Error fetching banners', error);
+                return [];
+            }
+            return data || [];
+        }
+    });
+
     // Integrated Smart Prefetching for the home feed
     React.useEffect(() => {
         if (restaurants && Array.isArray(restaurants) && restaurants.length > 0) {
@@ -442,9 +463,101 @@ export const CustomerHome = () => {
         );
     }, [restaurants, searchQuery]);
 
+    const randomBanners = React.useMemo(() => {
+        if (!dbBanners || dbBanners.length === 0 || !filteredRestaurants) return [];
+        
+        // Find matching locations for banners
+        const activeBanners = dbBanners.map((b: any) => {
+            // Find a nearby location for this restaurant
+            const location = filteredRestaurants.find((r: any) => r.restaurant_id === b.restaurant_id);
+            if (!location) return null;
+            return {
+                ...b,
+                locationId: location.id,
+                restaurantName: b.restaurants?.name || location.name,
+                menuItem: b.menu_item
+            };
+        }).filter(Boolean);
+
+        // Shuffle the active banners
+        const shuffled = [...activeBanners].sort(() => 0.5 - Math.random());
+        return shuffled.slice(0, 5);
+    }, [dbBanners, filteredRestaurants]);
+
     React.useEffect(() => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     }, [filteredRestaurants, selectedCategory]);
+
+    React.useEffect(() => {
+        const id = bannerPan.addListener(({ value }) => { bannerPanValue.current = value; });
+        return () => bannerPan.removeListener(id);
+    }, [bannerPan]);
+
+    const startBannerAnimation = React.useCallback(() => {
+        if (!randomBanners || randomBanners.length === 0) return;
+        const cardWidth = Dimensions.get('window').width - 24;
+        const originalScrollWidth = randomBanners.length * cardWidth;
+        
+        let currentOffset = bannerPanValue.current;
+        if (currentOffset > 0) currentOffset = 0; 
+        
+        let remainingDistance = originalScrollWidth + currentOffset; 
+        if (remainingDistance <= 0) {
+            bannerPan.setValue(0);
+            remainingDistance = originalScrollWidth;
+        }
+
+        const duration = (remainingDistance / originalScrollWidth) * 15000; // 15 seconds per loop
+
+        Animated.timing(bannerPan, {
+            toValue: bannerPanValue.current - remainingDistance,
+            duration: duration,
+            easing: Easing.linear,
+            useNativeDriver: false, // Must be false to sync perfectly with JS PanResponder
+        }).start(({ finished }) => {
+            if (finished) {
+                bannerPan.setValue(0);
+                startBannerAnimation();
+            }
+        });
+    }, [randomBanners]);
+
+    React.useEffect(() => {
+        startBannerAnimation();
+    }, [startBannerAnimation]);
+
+    const bannerPanResponder = React.useMemo(() => PanResponder.create({
+        onStartShouldSetPanResponder: () => false, 
+        onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dx) > 10, 
+        onPanResponderGrant: () => {
+            bannerPan.stopAnimation();
+            bannerPan.setOffset(bannerPanValue.current);
+            bannerPan.setValue(0);
+        },
+        onPanResponderMove: Animated.event(
+            [null, { dx: bannerPan }],
+            { useNativeDriver: false } 
+        ),
+        onPanResponderRelease: () => {
+            bannerPan.flattenOffset();
+            const cardWidth = Dimensions.get('window').width - 24;
+            const originalScrollWidth = randomBanners.length * cardWidth;
+            
+            let finalValue = bannerPanValue.current;
+            if (finalValue > 0) {
+                finalValue -= originalScrollWidth;
+                bannerPan.setValue(finalValue);
+            } else if (finalValue < -originalScrollWidth * 2) {
+                finalValue += originalScrollWidth;
+                bannerPan.setValue(finalValue);
+            }
+            startBannerAnimation();
+        },
+        onPanResponderTerminate: () => {
+            bannerPan.flattenOffset();
+            startBannerAnimation();
+        }
+    }), [randomBanners, startBannerAnimation]);
 
     const tempCoords = React.useRef<{ lat: number, lng: number } | null>(null);
 
@@ -558,6 +671,7 @@ export const CustomerHome = () => {
 
             <Animated.ScrollView
                 showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="always"
                 onScroll={Animated.event(
                     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
                     { useNativeDriver: true }
@@ -575,6 +689,69 @@ export const CustomerHome = () => {
                 <View style={styles.searchContainer}>
                     {renderSearchBar()}
                 </View>
+
+                {/* Random Banners */}
+                {randomBanners.length > 0 && !searchQuery && !selectedCategory && (
+                    <View style={styles.bannersSection}>
+                        <View style={{ overflow: 'hidden' }}>
+                            <Animated.View 
+                                style={[
+                                    styles.bannersContainer, 
+                                    { flexDirection: 'row', transform: [{ translateX: bannerPan }] }
+                                ]}
+                                {...bannerPanResponder.panHandlers}
+                            >
+                                {[...randomBanners, ...randomBanners, ...randomBanners].map((banner: any, index: number) => (
+                                    <TouchableOpacity 
+                                        key={`banner-${banner.id}-${index}`}
+                                        style={[styles.bannerCard, { backgroundColor: theme.surface, marginRight: 16 }]}
+                                        onPress={() => {
+                                            if (banner.menuItem) {
+                                                navigation.navigate('FoodItemDetail', {
+                                                    item: banner.menuItem,
+                                                    restaurantId: banner.restaurant_id,
+                                                    locationId: banner.locationId
+                                                });
+                                            } else {
+                                                navigation.navigate('RestaurantDetails', { id: banner.locationId });
+                                            }
+                                        }}
+                                        activeOpacity={0.9}
+                                    >
+                                        <Image
+                                            source={getOriginalUrl(banner.image_url) || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'}
+                                            style={styles.bannerImage}
+                                            contentFit="cover"
+                                            transition={300}
+                                        />
+                                        <LinearGradient 
+                                            colors={['transparent', 'rgba(0,0,0,0.8)']}
+                                            style={styles.bannerOverlay}
+                                        >
+                                            <Text style={styles.bannerTitle} numberOfLines={1}>{banner.title || banner.restaurantName}</Text>
+                                            <TouchableOpacity 
+                                                style={[styles.bannerBuyNow, { backgroundColor: theme.accent }]}
+                                                onPress={() => {
+                                                    if (banner.menuItem) {
+                                                        navigation.navigate('FoodItemDetail', {
+                                                            item: banner.menuItem,
+                                                            restaurantId: banner.restaurant_id,
+                                                            locationId: banner.locationId
+                                                        });
+                                                    } else {
+                                                        navigation.navigate('RestaurantDetails', { id: banner.locationId });
+                                                    }
+                                                }}
+                                            >
+                                                <Text style={styles.bannerBuyNowText}>Buy Now</Text>
+                                            </TouchableOpacity>
+                                        </LinearGradient>
+                                    </TouchableOpacity>
+                                ))}
+                            </Animated.View>
+                        </View>
+                    </View>
+                )}
 
                 {/* Categories */}
                 <View style={styles.section}>
@@ -1160,6 +1337,22 @@ export const CustomerHome = () => {
                     </View>
                 </TouchableWithoutFeedback>
             </Animated.View>
+
+            {/* Circular Floating Cart Button */}
+            {cartItems && cartItems.length > 0 && (
+                <TouchableOpacity 
+                    style={[styles.fabCart, { backgroundColor: theme.accent }]} 
+                    onPress={() => navigation.navigate('Cart')}
+                    activeOpacity={0.8}
+                >
+                    <ShoppingBag color="#FFF" size={24} />
+                    <View style={[styles.fabBadge, { borderColor: theme.background }]}>
+                        <Text style={styles.fabBadgeText}>
+                            {cartItems.reduce((sum: number, i: any) => sum + i.qty, 0)}
+                        </Text>
+                    </View>
+                </TouchableOpacity>
+            )}
         </View>
     );
 };
@@ -1200,6 +1393,33 @@ const styles = StyleSheet.create({
     categoriesContainer: { paddingHorizontal: 20, gap: 12 },
     categoryCard: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },
     categoryText: { fontWeight: '600' },
+    bannersSection: { marginBottom: 24 },
+    bannersContainer: { paddingHorizontal: 20, gap: 16 },
+    bannerCard: { 
+        width: Dimensions.get('window').width - 40, 
+        height: 180, 
+        borderRadius: 20, 
+        overflow: 'hidden',
+        position: 'relative',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 5
+    },
+    bannerImage: { width: '100%', height: '100%' },
+    bannerOverlay: {
+        position: 'absolute',
+        bottom: 0, left: 0, right: 0,
+        padding: 16,
+        paddingTop: 80,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-end'
+    },
+    bannerTitle: { color: '#FFF', fontSize: 18, fontWeight: 'bold', textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6, flex: 1, marginRight: 10 },
+    bannerBuyNow: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+    bannerBuyNowText: { color: '#FFF', fontWeight: 'bold', fontSize: 14 },
     restaurantCard: { marginHorizontal: 20, borderRadius: 20, overflow: 'hidden', marginBottom: 20 },
     restaurantImage: { width: '100%', height: 180 },
     restaurantDetails: { padding: 16 },
@@ -1284,5 +1504,38 @@ const styles = StyleSheet.create({
         padding: 20
     },
     saveLocationBtn: { height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-    saveLocationBtnText: { color: 'white', fontSize: 16, fontWeight: 'bold' }
+    saveLocationBtnText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
+    fabCart: {
+        position: 'absolute',
+        bottom: 30, // Or higher if there's a bottom nav bar
+        right: 20,
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8
+    },
+    fabBadge: {
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        backgroundColor: '#ef4444',
+        minWidth: 24,
+        height: 24,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 6,
+        borderWidth: 2
+    },
+    fabBadgeText: {
+        color: '#FFF',
+        fontSize: 12,
+        fontWeight: 'bold'
+    }
 });

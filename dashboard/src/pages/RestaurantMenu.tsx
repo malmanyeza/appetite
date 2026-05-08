@@ -287,7 +287,7 @@ export const RestaurantMenu = () => {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <span className="font-bold text-accent">${item.price.toFixed(2)}</span>
+                                                <span className="font-bold text-accent">${(Number(item.price) || 0).toFixed(2)}</span>
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <div className="flex flex-col items-center gap-2">
@@ -403,7 +403,7 @@ export const RestaurantMenu = () => {
                                         <div key={opt.id} className="flex justify-between items-center bg-white/5 px-4 py-2 rounded-lg text-sm">
                                             <span>{opt.name}</span>
                                             <div className="flex items-center gap-4">
-                                                <span className="text-accent font-bold">${opt.price.toFixed(2)}</span>
+                                                <span className="text-accent font-bold">${(Number(opt.price) || 0).toFixed(2)}</span>
                                                 <button
                                                     onClick={() => {
                                                         supabase.from('modifier_options').delete().eq('id', opt.id)

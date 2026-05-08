@@ -16,18 +16,20 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
-import { useTheme } from '../theme';
+import { useTheme, Theme } from '../theme';
 import { ChevronLeft, Share2, Info, Plus, Minus, X, Check, MapPin, Clock, Search, Utensils } from 'lucide-react-native';
 import { Image } from 'expo-image';
 import { useCartStore } from '../store/cartStore';
 import { restaurantService } from '../services/restaurantService';
 import { getThumbnailUrl, getOriginalUrl } from '../utils/storageUtils';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
 export const RestaurantDetails = ({ route, navigation }: any) => {
     const { id } = route.params;
     const { theme } = useTheme();
+    const styles = useMemo(() => createStyles(theme), [theme]);
     const insets = useSafeAreaInsets();
     const { addItem, items: cartItems } = useCartStore();
 
@@ -244,7 +246,7 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
                 {/* Hero / Banners Section */}
                 <View style={[styles.bannerWrapper, { paddingTop: insets.top }]}>
                     {banners && banners.length > 0 ? (
-                        <View>
+                        <View style={styles.cardContainer}>
                             <FlatList
                                 ref={bannerFlatListRef}
                                 data={banners}
@@ -252,7 +254,7 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
                                 pagingEnabled
                                 showsHorizontalScrollIndicator={false}
                                 onMomentumScrollEnd={(e) => {
-                                    setBannerIndex(Math.round(e.nativeEvent.contentOffset.x / width));
+                                    setBannerIndex(Math.round(e.nativeEvent.contentOffset.x / (width - 40))); // 40 is total horizontal margin (20 each side)
                                 }}
                                 keyExtractor={(item) => item.id}
                                 renderItem={({ item }) => (
@@ -270,7 +272,7 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
                                                 }
                                             }
                                         }}
-                                        style={{ width, height: 280 }}
+                                        style={{ width: width - 40, height: 180 }}
                                     >
                                         <Image
                                             source={getOriginalUrl(item.image_url)}
@@ -279,16 +281,36 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
                                             cachePolicy="memory-disk"
                                         />
                                         {item.title && (
-                                            <View style={styles.bannerTitleOverlay}>
+                                            <LinearGradient 
+                                                colors={['transparent', 'rgba(0,0,0,0.8)']}
+                                                style={styles.bannerTitleOverlay}
+                                            >
                                                 <Text style={styles.bannerTitle}>{item.title}</Text>
-                                            </View>
+                                                <TouchableOpacity 
+                                                    style={[styles.bannerBuyNow, { backgroundColor: theme.accent }]}
+                                                    onPress={() => {
+                                                        if (item.menu_item_id && menu) {
+                                                            const foodItem = menu.find((f: any) => f.id === item.menu_item_id);
+                                                            if (foodItem) {
+                                                                navigation.navigate('FoodItemDetail', { 
+                                                                    item: foodItem, 
+                                                                    restaurantId, 
+                                                                    locationId: id 
+                                                                });
+                                                            }
+                                                        }
+                                                    }}
+                                                >
+                                                    <Text style={styles.bannerBuyNowText}>Buy Now</Text>
+                                                </TouchableOpacity>
+                                            </LinearGradient>
                                         )}
                                     </TouchableOpacity>
                                 )}
                             />
                         </View>
                     ) : (
-                        <View style={styles.imageContainer}>
+                        <View style={[styles.imageContainer, styles.cardContainer]}>
                             <Image
                                 source={getOriginalUrl(restaurant?.cover_image_url) || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'}
                                 style={styles.heroImage}
@@ -297,7 +319,7 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
                         </View>
                     )}
                     
-                    <View style={[styles.navOverlay, { top: insets.top + 10 }]}>
+                    <View style={[styles.navOverlay, { top: insets.top + 20 }]}>
                         <TouchableOpacity style={[styles.iconButton, { backgroundColor: 'rgba(0,0,0,0.4)' }]} onPress={() => navigation.goBack()}>
                             <ChevronLeft color="#FFF" size={24} />
                         </TouchableOpacity>
@@ -429,31 +451,48 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
     container: { flex: 1 },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     bannerWrapper: { position: 'relative' },
-    imageContainer: { width: '100%', height: 280 },
+    cardContainer: {
+        marginHorizontal: 20, // Match width - 40 from Home
+        marginTop: 10,
+        borderRadius: 20, // Match Home
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 }, // Match Home
+        shadowOpacity: 0.2, // Match Home
+        shadowRadius: 8, // Match Home
+        elevation: 5, // Match Home
+        backgroundColor: '#000',
+        height: 180 // Match Home height
+    },
+    imageContainer: { width: '100%', height: 180 }, // Match Home height
     heroImage: { width: '100%', height: '100%' },
     bannerTitleOverlay: {
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
-        padding: 20,
-        paddingBottom: 30,
-        backgroundColor: 'rgba(0,0,0,0.3)'
+        padding: 16, // Match Home
+        paddingTop: 80, // Match Home
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-end'
     },
-    bannerTitle: { color: '#FFF', fontSize: 24, fontFamily: theme.fonts.headingBlack, textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 10 },
+    bannerTitle: { color: '#FFF', fontSize: 18, fontWeight: 'bold', fontFamily: theme.fonts.headingBlack, textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6, flex: 1, marginRight: 10 }, // Match Home fontSize 18, fontWeight bold
+    bannerBuyNow: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }, // Match Home paddingVertical 8
+    bannerBuyNowText: { color: '#FFF', fontWeight: 'bold', fontSize: 14 },
     navOverlay: {
         position: 'absolute',
-        left: 20,
-        right: 20,
+        left: 32, 
+        right: 32,
         flexDirection: 'row',
         justifyContent: 'space-between',
         zIndex: 10
     },
-    iconButton: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+    iconButton: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' }, // Slightly smaller to match shorter banner
     backButton: { paddingHorizontal: 30, paddingVertical: 12, borderRadius: 12 },
     infoSection: { padding: 20 },
     name: { fontSize: 28, fontFamily: theme.fonts.headingBlack, letterSpacing: -0.5 },

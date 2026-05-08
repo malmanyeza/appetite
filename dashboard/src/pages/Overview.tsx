@@ -184,7 +184,7 @@ export const Overview = () => {
 
     const displayStats = isAdmin ? [
         { label: "Today's Orders", value: stats?.todayOrders || '0', icon: <Activity size={20} />, color: "text-blue-400" },
-        { label: `Rev (${timeFrame})`, value: `$${timeframeRevenue.toFixed(2)}`, icon: <DollarSign size={20} />, color: "text-green-400" },
+        { label: `Rev (${timeFrame})`, value: `$${(timeframeRevenue || 0).toFixed(2)}`, icon: <DollarSign size={20} />, color: "text-green-400" },
         { label: "Online Restaurants", value: stats?.onlineRestaurants?.toString() || '0', icon: <Store size={20} />, color: "text-purple-400" },
         { label: "Active Drivers", value: stats?.activeDrivers?.toString() || '0', icon: <Users size={20} />, color: "text-orange-400" },
     ] : [
@@ -381,7 +381,7 @@ export const Overview = () => {
                                             <StatusPill status={order.status} />
                                         </td>
                                         <td className="py-4 text-sm font-bold text-green-400 text-right">
-                                            ${order.pricing?.appetite_margin?.toFixed(2) || '0.00'}
+                                            ${(order.pricing?.appetite_margin || 0).toFixed(2)}
                                         </td>
                                     </tr>
                                 ))}

@@ -1032,7 +1032,7 @@ export const RestaurantSettings = () => {
                                                     <div className="p-4 flex flex-col gap-2">
                                                         <div className="flex justify-between items-start">
                                                             <h4 className="font-bold text-lg text-white">{item.name}</h4>
-                                                            <span className="font-bold text-accent">${parseFloat(item.price).toFixed(2)}</span>
+                                                            <span className="font-bold text-accent">${(Number(item.price) || 0).toFixed(2)}</span>
                                                         </div>
                                                         <p className="text-xs font-bold text-purple-400 uppercase tracking-widest">{item.category}</p>
                                                         {item.description && <p className="text-sm text-muted">{item.description}</p>}
@@ -1042,7 +1042,7 @@ export const RestaurantSettings = () => {
                                                                 {item.add_ons.map((addon: any, i: number) => (
                                                                     <div key={i} className="flex justify-between text-xs">
                                                                         <span className="text-muted">{addon.name}</span>
-                                                                        <span className="text-white">+${parseFloat(addon.price).toFixed(2)}</span>
+                                                                        <span className="text-white">+${(Number(addon.price) || 0).toFixed(2)}</span>
                                                                     </div>
                                                                 ))}
                                                             </div>

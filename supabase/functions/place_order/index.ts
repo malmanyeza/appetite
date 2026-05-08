@@ -67,6 +67,32 @@ Deno.serve(async (req: Request) => {
     if (menuError) throw new Error('Failed to fetch menu items: ' + menuError.message);
     if (!menuItems || menuItems.length === 0) throw new Error('No valid menu items found for the given IDs.');
 
+    // Pre-fetch all relational modifiers and category add-ons to prevent tampering
+    const allOptionIds: string[] = [];
+    const allMenuAddonIds: string[] = [];
+    
+    items.forEach((item: any) => {
+        (item.selected_add_ons || []).forEach((ext: any) => {
+            if (ext.is_category_addon && ext.id) {
+                allMenuAddonIds.push(cleanId(ext.id));
+            } else if (ext.id) {
+                allOptionIds.push(cleanId(ext.id));
+            }
+        });
+    });
+
+    let masterOptions: any[] = [];
+    let masterMenuAddons: any[] = [];
+
+    if (allOptionIds.length > 0) {
+        const { data } = await adminClient.from('modifier_options').select('id, name, price').in('id', allOptionIds);
+        masterOptions = data || [];
+    }
+    if (allMenuAddonIds.length > 0) {
+        const { data } = await adminClient.from('menu_items').select('id, name, price').in('id', allMenuAddonIds);
+        masterMenuAddons = data || [];
+    }
+
     let subtotal = 0;
     const finalItemsToInsert = items.map((item: any) => {
         const menuItemId = cleanId(item.menu_item_id || item.id);
@@ -79,15 +105,27 @@ Deno.serve(async (req: Request) => {
         const dbExtras = dbItem.add_ons || [];
 
         for (const selected of selectedExtras) {
-            const masterExtra = dbExtras.find((e: any) => e.name === selected.name);
+            let masterExtra;
+            
+            if (selected.is_category_addon && selected.id) {
+                masterExtra = masterMenuAddons.find((m: any) => m.id === selected.id);
+            } else if (selected.id) {
+                masterExtra = masterOptions.find((m: any) => m.id === selected.id);
+            }
+
+            // Fallback for legacy JSON add_ons or untracked ones (using trim for safety)
+            if (!masterExtra) {
+                masterExtra = dbExtras.find((e: any) => e.name?.trim() === selected.name?.trim());
+            }
+
             if (!masterExtra) {
                 throw new Error(`Extra "${selected.name}" is not a valid option for ${dbItem.name}.`);
             }
             // Use the price from the database, not the client
-            extrasPrice += masterExtra.price;
+            extrasPrice += Number(masterExtra.price || 0);
         }
 
-        subtotal += (dbItem.price + extrasPrice) * item.qty;
+        subtotal += (Number(dbItem.price) + extrasPrice) * item.qty;
         
         return {
             menu_item_id: menuItemId,

@@ -482,7 +482,7 @@ export const AdminOrders = () => {
                                         <div className="text-right">
                                             <span className="text-white">${selectedOrder.pricing?.delivery_fee?.toFixed(2) || '0.00'}</span>
                                             {selectedOrder.pricing?.surge_applied > 0 && (
-                                                <p className="text-[10px] text-accent font-bold">Incl. ${selectedOrder.pricing.surge_applied.toFixed(2)} Surge</p>
+                                                <p className="text-[10px] text-accent font-bold">Incl. ${(selectedOrder.pricing?.surge_applied || 0).toFixed(2)} Surge</p>
                                             )}
                                         </div>
                                     </div>
@@ -497,7 +497,7 @@ export const AdminOrders = () => {
                                             <div className="text-right">
                                                 <span className="text-blue-400 font-bold">${selectedOrder.pricing?.driver_earnings?.toFixed(2) || '0.00'}</span>
                                                 {selectedOrder.pricing?.driver_bonus_applied > 0 && (
-                                                    <p className="text-[10px] text-green-400 font-bold font-mono">+${selectedOrder.pricing.driver_bonus_applied.toFixed(2)} Bonus</p>
+                                                    <p className="text-[10px] text-green-400 font-bold font-mono">+${(selectedOrder.pricing?.driver_bonus_applied || 0).toFixed(2)} Bonus</p>
                                                 )}
                                             </div>
                                         </div>

@@ -11,8 +11,8 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, Plus, Minus, Info, Check } from 'lucide-react-native';
-import { useTheme } from '../theme';
+import { ChevronLeft, Plus, Minus, Info, Check, ShoppingCart } from 'lucide-react-native';
+import { useTheme, Theme } from '../theme';
 import { restaurantService } from '../services/restaurantService';
 import { useCartStore } from '../store/cartStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,8 +23,9 @@ const { width } = Dimensions.get('window');
 export const FoodItemDetail = ({ route, navigation }: any) => {
     const { item, restaurantId, locationId } = route.params;
     const { theme } = useTheme();
+    const styles = useMemo(() => createStyles(theme), [theme]);
     const insets = useSafeAreaInsets();
-    const { addItem } = useCartStore();
+    const { addItem, items: cartItems } = useCartStore();
     const scrollY = React.useRef(new Animated.Value(0)).current;
 
     // Selected options state: { [groupId]: [option1, option2] }
@@ -138,6 +139,29 @@ export const FoodItemDetail = ({ route, navigation }: any) => {
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
+            <View style={[styles.navOverlay, { top: insets.top + 10 }]}>
+                <TouchableOpacity 
+                    style={[styles.backButton, { backgroundColor: 'rgba(0,0,0,0.5)' }]} 
+                    onPress={() => navigation.goBack()}
+                >
+                    <ChevronLeft color="#FFF" size={24} />
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                    style={[styles.backButton, { backgroundColor: 'rgba(0,0,0,0.5)' }]} 
+                    onPress={() => navigation.navigate('Cart')}
+                >
+                    <ShoppingCart color="#FFF" size={20} />
+                    {cartItems && cartItems.length > 0 && (
+                        <View style={styles.cartBadge}>
+                            <Text style={styles.cartBadgeText}>
+                                {cartItems.reduce((sum: number, i: any) => sum + i.qty, 0)}
+                            </Text>
+                        </View>
+                    )}
+                </TouchableOpacity>
+            </View>
+
             <Animated.ScrollView
                 onScroll={Animated.event(
                     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -154,14 +178,6 @@ export const FoodItemDetail = ({ route, navigation }: any) => {
                         contentFit="cover"
                         transition={300}
                     />
-                    <View style={[styles.navOverlay, { top: insets.top + 10 }]}>
-                        <TouchableOpacity 
-                            style={[styles.backButton, { backgroundColor: 'rgba(0,0,0,0.5)' }]} 
-                            onPress={() => navigation.goBack()}
-                        >
-                            <ChevronLeft color="#FFF" size={24} />
-                        </TouchableOpacity>
-                    </View>
                 </View>
 
                 {/* Content */}
@@ -363,14 +379,17 @@ export const FoodItemDetail = ({ route, navigation }: any) => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
     container: { flex: 1 },
     imageContainer: { width: width, height: 300 },
     heroImage: { width: '100%', height: '100%' },
     navOverlay: {
         position: 'absolute',
         left: 20,
-        zIndex: 10
+        right: 20,
+        zIndex: 10,
+        flexDirection: 'row',
+        justifyContent: 'space-between'
     },
     backButton: {
         width: 44,
@@ -378,6 +397,25 @@ const styles = StyleSheet.create({
         borderRadius: 22,
         justifyContent: 'center',
         alignItems: 'center'
+    },
+    cartBadge: {
+        position: 'absolute',
+        top: -4,
+        right: -4,
+        backgroundColor: theme.accent,
+        borderRadius: 10,
+        minWidth: 20,
+        height: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 4,
+        borderWidth: 2,
+        borderColor: theme.background
+    },
+    cartBadgeText: {
+        color: '#FFF',
+        fontSize: 10,
+        fontFamily: theme.fonts.headingBlack
     },
     content: { padding: 24 },
     headerInfo: {
