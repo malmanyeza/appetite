@@ -15,13 +15,14 @@ import {
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../theme';
 import { Branding } from '../components/Branding';
-import { Mail, Lock, LogIn, UserPlus } from 'lucide-react-native';
+import { Mail, Lock, LogIn, UserPlus, Eye, EyeOff } from 'lucide-react-native';
 
 export const LoginScreen = ({ navigation, route }: any) => {
     const { theme } = useTheme();
     const returnToCart = route?.params?.returnToCart ?? false;
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const validateEmail = (email: string) => {
@@ -116,9 +117,16 @@ export const LoginScreen = ({ navigation, route }: any) => {
                                 placeholderTextColor={theme.textMuted}
                                 value={password}
                                 onChangeText={setPassword}
-                                secureTextEntry
+                                secureTextEntry={!showPassword}
                                 style={[styles.input, { color: theme.text }]}
                             />
+                            <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
+                                {showPassword ? (
+                                    <EyeOff size={20} color={theme.textMuted} />
+                                ) : (
+                                    <Eye size={20} color={theme.textMuted} />
+                                )}
+                            </TouchableOpacity>
                         </View>
 
                         <TouchableOpacity 

@@ -14,7 +14,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../theme';
 import { useAuthStore } from '../store/authStore';
-import { ArrowLeft, Mail, Lock, User, UserCircle, Car, Phone } from 'lucide-react-native';
+import { ArrowLeft, Mail, Lock, User, UserCircle, Car, Phone, Eye, EyeOff } from 'lucide-react-native';
 
 export const SignUpScreen = ({ navigation, route }: any) => {
     const { theme } = useTheme();
@@ -23,6 +23,7 @@ export const SignUpScreen = ({ navigation, route }: any) => {
     const [phone, setPhone] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [role] = useState<'customer'>('customer');
     const [loading, setLoading] = useState(false);
 
@@ -188,9 +189,16 @@ export const SignUpScreen = ({ navigation, route }: any) => {
                             placeholderTextColor={theme.textMuted}
                             value={password}
                             onChangeText={setPassword}
-                            secureTextEntry
+                            secureTextEntry={!showPassword}
                             style={[styles.input, { color: theme.text }]}
                         />
+                        <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
+                            {showPassword ? (
+                                <EyeOff size={20} color={theme.textMuted} />
+                            ) : (
+                                <Eye size={20} color={theme.textMuted} />
+                            )}
+                        </TouchableOpacity>
                     </View>
 
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginTop: 8, paddingHorizontal: 16 }}>
