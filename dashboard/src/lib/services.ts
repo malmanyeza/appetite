@@ -543,3 +543,73 @@ export const adminService = {
         if (error) throw error;
     }
 };
+
+export const modifierService = {
+    async getModifierGroups(restaurantId: string) {
+        const { data, error } = await supabase
+            .from('modifier_groups')
+            .select('*, modifier_options(*)')
+            .eq('restaurant_id', restaurantId)
+            .order('name');
+        if (error) throw error;
+        return data;
+    },
+
+    async addModifierGroup(group: any) {
+        const { data, error } = await supabase
+            .from('modifier_groups')
+            .insert(group)
+            .select()
+            .single();
+        if (error) throw error;
+        return data;
+    },
+
+    async updateModifierGroup(id: string, updates: any) {
+        const { data, error } = await supabase
+            .from('modifier_groups')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
+        if (error) throw error;
+        return data;
+    },
+
+    async deleteModifierGroup(id: string) {
+        const { error } = await supabase
+            .from('modifier_groups')
+            .delete()
+            .eq('id', id);
+        if (error) throw error;
+    },
+
+    async addModifierOption(option: any) {
+        const { data, error } = await supabase
+            .from('modifier_options')
+            .insert(option)
+            .select()
+            .single();
+        if (error) throw error;
+        return data;
+    },
+
+    async updateModifierOption(id: string, updates: any) {
+        const { data, error } = await supabase
+            .from('modifier_options')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
+        if (error) throw error;
+        return data;
+    },
+
+    async deleteModifierOption(id: string) {
+        const { error } = await supabase
+            .from('modifier_options')
+            .delete()
+            .eq('id', id);
+        if (error) throw error;
+    }
+};

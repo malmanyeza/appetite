@@ -2,7 +2,7 @@ import * as React from 'react';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { restaurantService } from '../lib/services';
+import { restaurantService, modifierService } from '../lib/services';
 import { supabase } from '../lib/supabase';
 import {
     Plus,
@@ -38,6 +38,9 @@ export const RestaurantMenu = () => {
     const [branchSearch, setBranchSearch] = useState('');
     const [selectedModifierGroups, setSelectedModifierGroups] = useState<string[]>([]);
     const [selectedSuggestedCategories, setSelectedSuggestedCategories] = useState<string[]>([]);
+    const [isEditingModifierGroup, setIsEditingModifierGroup] = useState<any>(null); // null, 'new', or group object
+    const [isEditingModifierOption, setIsEditingModifierOption] = useState<any>(null); // null, { option, group }
+
 
     const { user, profile } = useAuthStore();
     
@@ -74,13 +77,7 @@ export const RestaurantMenu = () => {
                 ? { id: paramId }
                 : await restaurantService.getMyRestaurant(profile?.id);
             if (!restaurant) return [];
-            const { data, error } = await supabase
-                .from('modifier_groups')
-                .select('*, modifier_options(*)')
-                .eq('restaurant_id', restaurant.id)
-                .order('name');
-            if (error) throw error;
-            return data;
+            return modifierService.getModifierGroups(restaurant.id);
         },
         enabled: !!paramId || !!profile?.id
     });
@@ -161,6 +158,47 @@ export const RestaurantMenu = () => {
             restaurantService.updateMenuAvailability(id, is_available),
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['restaurant-menu'] })
     });
+
+    // Modifier Group Mutations
+    const modifierMutationOptions = {
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['modifier-groups'] });
+            setIsEditingModifierGroup(null);
+            setIsEditingModifierOption(null);
+        },
+        onError: (err: any) => alert(err.message)
+    };
+
+    const addModifierGroupMutation = useMutation({
+        mutationFn: (group: any) => modifierService.addModifierGroup(group),
+        ...modifierMutationOptions
+    });
+
+    const updateModifierGroupMutation = useMutation({
+        mutationFn: ({ id, updates }: { id: string, updates: any }) => modifierService.updateModifierGroup(id, updates),
+        ...modifierMutationOptions
+    });
+
+    const deleteModifierGroupMutation = useMutation({
+        mutationFn: (id: string) => modifierService.deleteModifierGroup(id),
+        ...modifierMutationOptions
+    });
+
+    const addModifierOptionMutation = useMutation({
+        mutationFn: (option: any) => modifierService.addModifierOption(option),
+        ...modifierMutationOptions
+    });
+
+    const updateModifierOptionMutation = useMutation({
+        mutationFn: ({ id, updates }: { id: string, updates: any }) => modifierService.updateModifierOption(id, updates),
+        ...modifierMutationOptions
+    });
+
+    const deleteModifierOptionMutation = useMutation({
+        mutationFn: (id: string) => modifierService.deleteModifierOption(id),
+        ...modifierMutationOptions
+    });
+
 
     const toggleBranchAvailability = useMutation({
         mutationFn: ({ locationId, menuItemId, isAvailable }: { locationId: string, menuItemId: string, isAvailable: boolean }) =>
@@ -350,25 +388,7 @@ export const RestaurantMenu = () => {
                             <p className="text-sm text-muted">Create reusable customizations like "Spice Level" or "Extra Toppings".</p>
                         </div>
                         <button
-                            onClick={() => {
-                                const name = prompt('Group Name (e.g. Spice Level):');
-                                if (!name) return;
-                                const min = parseInt(prompt('Minimum selections (e.g. 1 for required):', '0') || '0');
-                                const max = parseInt(prompt('Maximum selections (e.g. 1 for single choice):', '1') || '1');
-                                
-                                const rId = paramId || menuItems?.[0]?.restaurant_id;
-                                if (!rId) {
-                                    alert('Please add at least one menu item first to determine restaurant ID.');
-                                    return;
-                                }
-
-                                supabase.from('modifier_groups').insert({
-                                    restaurant_id: rId,
-                                    name,
-                                    min_selection: min,
-                                    max_selection: max
-                                }).then(() => queryClient.invalidateQueries({ queryKey: ['modifier-groups'] }));
-                            }}
+                            onClick={() => setIsEditingModifierGroup('new')}
                             className="btn-primary px-6 py-2 flex items-center gap-2"
                         >
                             <Plus size={18} /> New Group
@@ -377,56 +397,66 @@ export const RestaurantMenu = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {modifierGroups?.map((group: any) => (
-                            <div key={group.id} className="glass p-6 space-y-4">
-                                <div className="flex justify-between items-start border-b border-white/5 pb-4">
-                                    <div>
-                                        <h4 className="font-bold text-lg text-white">{group.name}</h4>
-                                        <p className="text-xs text-muted uppercase tracking-widest mt-1">
-                                            {group.min_selection} to {group.max_selection} selections
-                                        </p>
-                                    </div>
+                            <div key={group.id} className="glass p-6 space-y-4 group/card relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-2 opacity-0 group-hover/card:opacity-100 transition-opacity flex gap-1">
+                                    <button
+                                        onClick={() => setIsEditingModifierGroup(group)}
+                                        className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 text-muted hover:text-white transition-colors"
+                                        title="Edit Group"
+                                    >
+                                        <Edit2 size={14} />
+                                    </button>
                                     <button
                                         onClick={() => {
                                             if (confirm('Delete this group?')) {
-                                                supabase.from('modifier_groups').delete().eq('id', group.id)
-                                                    .then(() => queryClient.invalidateQueries({ queryKey: ['modifier-groups'] }));
+                                                deleteModifierGroupMutation.mutate(group.id);
                                             }
                                         }}
-                                        className="text-red-500 p-2 hover:bg-red-500/10 rounded-lg transition-colors"
+                                        className="w-8 h-8 rounded-lg flex items-center justify-center bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors"
+                                        title="Delete Group"
                                     >
-                                        <Trash2 size={16} />
+                                        <Trash2 size={14} />
                                     </button>
+                                </div>
+
+                                <div className="border-b border-white/5 pb-4">
+                                    <h4 className="font-bold text-lg text-white">{group.name}</h4>
+                                    <p className="text-xs text-muted uppercase tracking-widest mt-1">
+                                        {group.min_selection} to {group.max_selection} selections
+                                    </p>
                                 </div>
 
                                 <div className="space-y-2">
                                     {group.modifier_options?.map((opt: any) => (
-                                        <div key={opt.id} className="flex justify-between items-center bg-white/5 px-4 py-2 rounded-lg text-sm">
+                                        <div key={opt.id} className="flex justify-between items-center bg-white/5 px-4 py-2 rounded-lg text-sm group/opt">
                                             <span>{opt.name}</span>
-                                            <div className="flex items-center gap-4">
+                                            <div className="flex items-center gap-3">
                                                 <span className="text-accent font-bold">${(Number(opt.price) || 0).toFixed(2)}</span>
-                                                <button
-                                                    onClick={() => {
-                                                        supabase.from('modifier_options').delete().eq('id', opt.id)
-                                                            .then(() => queryClient.invalidateQueries({ queryKey: ['modifier-groups'] }));
-                                                    }}
-                                                    className="text-muted hover:text-red-400 transition-colors"
-                                                >
-                                                    <X size={14} />
-                                                </button>
+                                                <div className="flex gap-1 opacity-0 group-hover/opt:opacity-100 transition-opacity">
+                                                    <button
+                                                        onClick={() => setIsEditingModifierOption({ option: opt, group })}
+                                                        className="text-muted hover:text-white transition-colors"
+                                                        title="Edit Option"
+                                                    >
+                                                        <Edit2 size={12} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            if (confirm(`Delete ${opt.name}?`)) {
+                                                                deleteModifierOptionMutation.mutate(opt.id);
+                                                            }
+                                                        }}
+                                                        className="text-muted hover:text-red-400 transition-colors"
+                                                        title="Delete Option"
+                                                    >
+                                                        <X size={14} />
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
                                     <button
-                                        onClick={() => {
-                                            const name = prompt('Option name (e.g. Extra Cheese):');
-                                            if (!name) return;
-                                            const price = parseFloat(prompt('Extra price (e.g. 0.50):', '0') || '0');
-                                            supabase.from('modifier_options').insert({
-                                                group_id: group.id,
-                                                name,
-                                                price
-                                            }).then(() => queryClient.invalidateQueries({ queryKey: ['modifier-groups'] }));
-                                        }}
+                                        onClick={() => setIsEditingModifierOption({ option: 'new', group })}
                                         className="w-full py-2 border border-dashed border-white/10 rounded-lg text-xs text-muted hover:text-white hover:border-white/20 transition-all font-bold"
                                     >
                                         + Add Option
@@ -738,6 +768,123 @@ export const RestaurantMenu = () => {
                         >
                             Done
                         </button>
+                    </div>
+                </div>
+            )}
+            {/* Modifier Group Modal */}
+            {isEditingModifierGroup && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="w-full max-w-md glass p-8 space-y-6">
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-xl font-bold">{isEditingModifierGroup === 'new' ? 'New Modifier Group' : 'Edit Modifier Group'}</h2>
+                            <button onClick={() => setIsEditingModifierGroup(null)} className="text-muted hover:text-white">
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={(e) => {
+                            e.preventDefault();
+                            const formData = new FormData(e.currentTarget);
+                            const name = formData.get('name') as string;
+                            const min = parseInt(formData.get('min_selection') as string);
+                            const max = parseInt(formData.get('max_selection') as string);
+                            
+                            const rId = paramId || menuItems?.[0]?.restaurant_id;
+                            if (!rId) {
+                                alert('Please add at least one menu item first.');
+                                return;
+                            }
+
+                            if (isEditingModifierGroup === 'new') {
+                                addModifierGroupMutation.mutate({
+                                    restaurant_id: rId,
+                                    name,
+                                    min_selection: min,
+                                    max_selection: max
+                                });
+                            } else {
+                                updateModifierGroupMutation.mutate({
+                                    id: isEditingModifierGroup.id,
+                                    updates: { name, min_selection: min, max_selection: max }
+                                });
+                            }
+                        }} className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-muted">Group Name</label>
+                                <input name="name" required defaultValue={isEditingModifierGroup?.name} placeholder="e.g. Spice Level" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-accent/50" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-muted">Min Selection</label>
+                                    <input name="min_selection" type="number" required defaultValue={isEditingModifierGroup?.min_selection ?? 0} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-accent/50" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-muted">Max Selection</label>
+                                    <input name="max_selection" type="number" required defaultValue={isEditingModifierGroup?.max_selection ?? 1} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-accent/50" />
+                                </div>
+                            </div>
+                            <div className="flex gap-4 pt-4">
+                                <button type="button" onClick={() => setIsEditingModifierGroup(null)} className="flex-1 px-6 py-3 rounded-xl border border-white/10 font-bold hover:bg-white/5 transition-colors">Cancel</button>
+                                <button type="submit" className="flex-1 btn-primary py-3 font-bold">
+                                    {isEditingModifierGroup === 'new' ? 'Create' : 'Save'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modifier Option Modal */}
+            {isEditingModifierOption && (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="w-full max-w-md glass p-8 space-y-6">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h2 className="text-xl font-bold">{isEditingModifierOption.option === 'new' ? 'Add Option' : 'Edit Option'}</h2>
+                                <p className="text-xs text-muted">Group: {isEditingModifierOption.group.name}</p>
+                            </div>
+                            <button onClick={() => setIsEditingModifierOption(null)} className="text-muted hover:text-white">
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={(e) => {
+                            e.preventDefault();
+                            const formData = new FormData(e.currentTarget);
+                            const name = formData.get('name') as string;
+                            const price = parseFloat(formData.get('price') as string);
+                            
+                            if (isEditingModifierOption.option === 'new') {
+                                addModifierOptionMutation.mutate({
+                                    group_id: isEditingModifierOption.group.id,
+                                    name,
+                                    price
+                                });
+                            } else {
+                                updateModifierOptionMutation.mutate({
+                                    id: isEditingModifierOption.option.id,
+                                    updates: { name, price }
+                                });
+                            }
+                        }} className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-muted">Option Name</label>
+                                <input name="name" required defaultValue={isEditingModifierOption.option?.name} placeholder="e.g. Extra Cheese" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-accent/50" />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-muted">Extra Price</label>
+                                <div className="relative">
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted">$</span>
+                                    <input name="price" type="number" step="0.01" required defaultValue={isEditingModifierOption.option?.price ?? 0} className="w-full bg-white/5 border border-white/10 rounded-xl pl-8 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-accent/50" />
+                                </div>
+                            </div>
+                            <div className="flex gap-4 pt-4">
+                                <button type="button" onClick={() => setIsEditingModifierOption(null)} className="flex-1 px-6 py-3 rounded-xl border border-white/10 font-bold hover:bg-white/5 transition-colors">Cancel</button>
+                                <button type="submit" className="flex-1 btn-primary py-3 font-bold">
+                                    {isEditingModifierOption.option === 'new' ? 'Add' : 'Save'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
