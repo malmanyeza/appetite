@@ -200,6 +200,8 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
                         <ScrollView 
                             horizontal 
                             showsHorizontalScrollIndicator={false} 
+                            style={{ marginHorizontal: -20 }}
+                            contentContainerStyle={{ paddingHorizontal: 20 }}
                         >
                             {categories.map((cat) => (
                                 <TouchableOpacity 
@@ -310,7 +312,7 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
                             />
                         </View>
                     ) : (
-                        <View style={[styles.imageContainer, styles.cardContainer]}>
+                        <View style={styles.cardContainer}>
                             <Image
                                 source={getOriginalUrl(restaurant?.cover_image_url) || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'}
                                 style={styles.heroImage}
@@ -337,8 +339,8 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
                     <ScrollView 
                         horizontal 
                         showsHorizontalScrollIndicator={false} 
-                        style={styles.categoryNav}
-                        contentContainerStyle={{ paddingVertical: 10 }}
+                        style={[styles.categoryNav, { marginHorizontal: -20 }]}
+                        contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 10 }}
                     >
                         {categories.map((cat) => (
                             <TouchableOpacity 

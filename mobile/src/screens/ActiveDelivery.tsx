@@ -109,6 +109,8 @@ export const ActiveDelivery = () => {
         refetchInterval: isNavigating ? 0 : 5000
     });
 
+    const paymentMethod = order?.payment?.method || order?.payment_method;
+
     // Sync isArrived state with DB flags on load/update
     useEffect(() => {
         if (order) {
@@ -599,6 +601,52 @@ export const ActiveDelivery = () => {
                             </>
                         )}
                         
+                    </View>
+
+                    {/* Payment Instruction (COD vs Online Paid) */}
+                    <View style={{
+                        padding: 16,
+                        borderRadius: 20,
+                        borderWidth: 1,
+                        marginTop: 16,
+                        backgroundColor: paymentMethod === 'cod' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(34, 197, 94, 0.08)',
+                        borderColor: paymentMethod === 'cod' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(34, 197, 94, 0.2)'
+                    }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                            <View style={{
+                                width: 36,
+                                height: 36,
+                                borderRadius: 18,
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                backgroundColor: paymentMethod === 'cod' ? '#F59E0B' : '#22C55E'
+                            }}>
+                                <Text style={{ fontSize: 16 }}>
+                                    {paymentMethod === 'cod' ? '💵' : '💳'}
+                                </Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{
+                                    fontSize: 12,
+                                    fontWeight: '900',
+                                    letterSpacing: 0.5,
+                                    color: paymentMethod === 'cod' ? '#D97706' : '#15803D'
+                                }}>
+                                    {paymentMethod === 'cod' ? 'COLLECT CASH FROM CUSTOMER' : 'PAID ONLINE - DO NOT COLLECT CASH'}
+                                </Text>
+                                <Text style={{
+                                    fontSize: 13,
+                                    fontWeight: '700',
+                                    marginTop: 2,
+                                    color: paymentMethod === 'cod' ? '#B45309' : '#166534'
+                                }}>
+                                    {paymentMethod === 'cod'
+                                        ? `Collect exactly $${(order.pricing?.total || 0).toFixed(2)} in cash upon delivery.`
+                                        : `Paid successfully via ${paymentMethod === 'ecocash' ? 'EcoCash' : 'Visa/Mastercard'}.`
+                                    }
+                                </Text>
+                            </View>
+                        </View>
                     </View>
 
                     {/* Order Payout Section */}

@@ -23,7 +23,7 @@ export const MapSkeleton: React.FC<MapSkeletonProps> = ({ visible }) => {
         }).start();
     }, [visible]);
 
-    if (!visible && opacity._value === 0) return null;
+    if (!visible && (opacity as any)._value === 0) return null;
 
     return (
         <Animated.View 

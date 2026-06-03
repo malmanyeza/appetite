@@ -131,21 +131,84 @@ export const FoodItemDetail = ({ route, navigation }: any) => {
         navigation.goBack();
     };
 
-    const headerOpacity = scrollY.interpolate({
-        inputRange: [0, 150],
-        outputRange: [0, 1],
-        extrapolate: 'clamp'
-    });
+
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
-            <View style={[styles.navOverlay, { top: insets.top + 10 }]}>
+            {/* Animated Solid Navigation Header Background (Fades in on scroll) */}
+            <Animated.View style={[
+                styles.navHeaderBg,
+                {
+                    height: insets.top + 64,
+                    backgroundColor: theme.background,
+                    borderBottomColor: theme.border,
+                    borderBottomWidth: scrollY.interpolate({
+                        inputRange: [0, 100],
+                        outputRange: [0, StyleSheet.hairlineWidth],
+                        extrapolate: 'clamp'
+                    }),
+                    opacity: scrollY.interpolate({
+                        inputRange: [0, 120],
+                        outputRange: [0, 1],
+                        extrapolate: 'clamp'
+                    }),
+                    zIndex: 9
+                }
+            ]} />
+
+            {/* Sticky Navigation Overlay (Always interactive) */}
+            <View style={[styles.navOverlay, { top: insets.top + 10, zIndex: 10 }]}>
                 <TouchableOpacity 
                     style={[styles.backButton, { backgroundColor: 'rgba(0,0,0,0.5)' }]} 
                     onPress={() => navigation.goBack()}
                 >
                     <ChevronLeft color="#FFF" size={24} />
                 </TouchableOpacity>
+
+                {/* Shrinking/Fading Image & Title Header (Fades in on scroll) */}
+                <Animated.View style={{ 
+                    flex: 1, 
+                    flexDirection: 'row', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    opacity: scrollY.interpolate({
+                        inputRange: [0, 120],
+                        outputRange: [0, 1],
+                        extrapolate: 'clamp'
+                    }), 
+                    transform: [
+                        {
+                            translateY: scrollY.interpolate({
+                                inputRange: [0, 120],
+                                outputRange: [15, 0], // Subtle slide up animation
+                                extrapolate: 'clamp'
+                            })
+                        }
+                    ],
+                    marginHorizontal: 12 
+                }}>
+                    <Image
+                        source={getOriginalUrl(item.image_url) || 'https://images.unsplash.com/photo-1513104890138-7c749659a591'}
+                        style={{ 
+                            width: 32, 
+                            height: 32, 
+                            borderRadius: 16, 
+                            marginRight: 8, 
+                            borderWidth: 1, 
+                            borderColor: theme.border 
+                        }}
+                        contentFit="cover"
+                    />
+                    <Text style={{ 
+                        color: theme.text, 
+                        fontSize: 16, 
+                        fontFamily: theme.fonts.heading,
+                        fontWeight: 'bold',
+                        textAlign: 'center'
+                    }} numberOfLines={1}>
+                        {item.name}
+                    </Text>
+                </Animated.View>
                 
                 <TouchableOpacity 
                     style={[styles.backButton, { backgroundColor: 'rgba(0,0,0,0.5)' }]} 
@@ -170,17 +233,42 @@ export const FoodItemDetail = ({ route, navigation }: any) => {
                 scrollEventThrottle={16}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Hero Image */}
-                <View style={styles.imageContainer}>
+                {/* Hero Image with Parallax, Pull-to-Zoom & Fade Out */}
+                <Animated.View style={[
+                    styles.imageContainer,
+                    {
+                        opacity: scrollY.interpolate({
+                            inputRange: [0, 200],
+                            outputRange: [1, 0],
+                            extrapolate: 'clamp'
+                        }),
+                        transform: [
+                            {
+                                translateY: scrollY.interpolate({
+                                    inputRange: [-300, 0, 300],
+                                    outputRange: [0, 0, 80], // Moves slower than scroll speed (parallax)
+                                    extrapolate: 'clamp'
+                                })
+                            },
+                            {
+                                scale: scrollY.interpolate({
+                                    inputRange: [-300, 0],
+                                    outputRange: [1.7, 1],
+                                    extrapolateRight: 'clamp'
+                                })
+                            }
+                        ]
+                    }
+                ]}>
                     <Image
                         source={getOriginalUrl(item.image_url) || 'https://images.unsplash.com/photo-1513104890138-7c749659a591'}
                         style={styles.heroImage}
                         contentFit="cover"
                         transition={300}
                     />
-                </View>
+                </Animated.View>
 
-                {/* Content */}
+                {/* Overlapping rounded content sheet */}
                 <View style={styles.content}>
                     <View style={styles.headerInfo}>
                         <Text style={[styles.name, { color: theme.text }]}>{item.name}</Text>
@@ -324,53 +412,53 @@ export const FoodItemDetail = ({ route, navigation }: any) => {
                         })}
                     </View>
                 </View>
-                <View style={{ height: 150 }} />
+                <View style={{ height: 180 }} />
             </Animated.ScrollView>
 
-            {/* Sticky Top Bar (shows on scroll) */}
-            <Animated.View style={[
-                styles.stickyBar, 
-                { 
-                    backgroundColor: theme.background, 
-                    opacity: headerOpacity,
-                    borderBottomColor: theme.surface,
-                    borderBottomWidth: StyleSheet.hairlineWidth,
-                    paddingTop: insets.top + 10
-                }
-            ]}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.stickyBack}>
-                    <ChevronLeft color={theme.text} size={24} />
-                </TouchableOpacity>
-                <Text style={[styles.stickyTitle, { color: theme.text }]} numberOfLines={1}>{item.name}</Text>
-            </Animated.View>
+
 
             {/* Bottom Action Bar */}
-            <View style={[styles.bottomBar, { backgroundColor: theme.background, borderTopColor: theme.surface }]}>
+            <View style={[
+                styles.bottomBar, 
+                { 
+                    backgroundColor: theme.background, 
+                    borderTopColor: theme.surface,
+                    paddingBottom: Math.max(insets.bottom, 16) + 8
+                }
+            ]}>
                 <View style={styles.qtyContainer}>
                     <TouchableOpacity 
                         onPress={() => setQty(Math.max(1, qty - 1))}
                         style={[styles.qtyBtn, { backgroundColor: theme.surface }]}
+                        activeOpacity={0.7}
                     >
-                        <Minus size={18} color={theme.text} />
+                        <Minus size={20} color={theme.text} />
                     </TouchableOpacity>
                     <Text style={[styles.qtyText, { color: theme.text }]}>{qty}</Text>
                     <TouchableOpacity 
                         onPress={() => setQty(qty + 1)}
                         style={[styles.qtyBtn, { backgroundColor: theme.surface }]}
+                        activeOpacity={0.7}
                     >
-                        <Plus size={18} color={theme.text} />
+                        <Plus size={20} color={theme.text} />
                     </TouchableOpacity>
                 </View>
 
                 <TouchableOpacity
                     style={[
                         styles.addBtn, 
-                        { backgroundColor: canAddToCart ? theme.accent : theme.textMuted + '20' }
+                        { backgroundColor: canAddToCart ? theme.accent : theme.surface + '80' }
                     ]}
                     onPress={handleAddToCart}
                     disabled={!canAddToCart}
+                    activeOpacity={0.8}
                 >
-                    <Text style={[styles.addBtnText, { color: canAddToCart ? '#FFF' : theme.textMuted }]}>
+                    <Text 
+                        style={[styles.addBtnText, { color: canAddToCart ? '#FFF' : theme.textMuted }]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit={true}
+                        minimumScaleFactor={0.85}
+                    >
                         Add to Cart • ${totalPrice.toFixed(2)}
                     </Text>
                 </TouchableOpacity>
@@ -381,7 +469,17 @@ export const FoodItemDetail = ({ route, navigation }: any) => {
 
 const createStyles = (theme: Theme) => StyleSheet.create({
     container: { flex: 1 },
-    imageContainer: { width: width, height: 300 },
+    navHeaderBg: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+    },
+    imageContainer: { 
+        width: width, 
+        height: 300,
+        overflow: 'hidden'
+    },
     heroImage: { width: '100%', height: '100%' },
     navOverlay: {
         position: 'absolute',
@@ -389,6 +487,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
         right: 20,
         zIndex: 10,
         flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'space-between'
     },
     backButton: {
@@ -417,7 +516,13 @@ const createStyles = (theme: Theme) => StyleSheet.create({
         fontSize: 10,
         fontFamily: theme.fonts.headingBlack
     },
-    content: { padding: 24 },
+    content: { 
+        padding: 24,
+        borderTopLeftRadius: 28,
+        borderTopRightRadius: 28,
+        backgroundColor: theme.background,
+        marginTop: -28,
+    },
     headerInfo: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -465,61 +570,52 @@ const createStyles = (theme: Theme) => StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center'
     },
-    stickyBar: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        paddingBottom: 15,
-        paddingHorizontal: 20,
-        flexDirection: 'row',
-        alignItems: 'center',
-        zIndex: 100
-    },
-    stickyBack: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        justifyContent: 'center',
-        alignItems: 'center'
-    },
-    stickyTitle: {
-        fontSize: 16,
-        fontFamily: theme.fonts.heading,
-        marginLeft: 12,
-        flex: 1
-    },
+
     bottomBar: {
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
-        padding: 24,
-        paddingBottom: 40,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 16,
-        borderTopWidth: 1
+        paddingHorizontal: 24,
+        paddingTop: 16,
+        borderTopWidth: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 10,
     },
     qtyContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 16
+        justifyContent: 'center',
+        gap: 24,
+        marginBottom: 16,
     },
     qtyBtn: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         justifyContent: 'center',
-        alignItems: 'center'
+        alignItems: 'center',
     },
-    qtyText: { fontSize: 18, fontFamily: theme.fonts.heading, minWidth: 24, textAlign: 'center' },
+    qtyText: { 
+        fontSize: 20, 
+        fontFamily: theme.fonts.heading, 
+        minWidth: 40, 
+        textAlign: 'center' 
+    },
     addBtn: {
-        flex: 1,
+        width: '100%',
         height: 56,
         borderRadius: 16,
         justifyContent: 'center',
-        alignItems: 'center'
+        alignItems: 'center',
     },
-    addBtnText: { fontSize: 16, fontFamily: theme.fonts.heading }
+    addBtnText: { 
+        fontSize: 16, 
+        fontFamily: theme.fonts.heading,
+        fontWeight: 'bold',
+        paddingHorizontal: 16
+    }
 });

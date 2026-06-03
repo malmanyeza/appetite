@@ -40,6 +40,23 @@ const setCachedAuthData = async (data: any) => {
     }
 };
 
+const clearCachedAuthData = async () => {
+    try {
+        if (Platform.OS === 'web') {
+            if (typeof window !== 'undefined') {
+                window.localStorage.removeItem('lastActiveRole');
+            }
+            return;
+        }
+        await Promise.all([
+            SecureStore.deleteItemAsync('cached_auth_data'),
+            SecureStore.deleteItemAsync('lastActiveRole')
+        ]);
+    } catch (e) {
+        console.warn('Failed to clear cached auth data:', e);
+    }
+};
+
 const withTimeout = <T>(promise: Promise<T>, ms: number, errorMessage: string): Promise<T> => {
     return Promise.race([
         promise,
@@ -81,12 +98,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // 1. Instant Transition: If a session is provided, set the user state immediately
         // This avoids the 'stuck on login screen' bug while profile data loads in background.
         if (providedSession?.user) {
-            console.log('[Auth] Instant user set from provided session');
-            set({ 
-                user: providedSession.user,
-                isSigningUp: false, // Ensure we exit sign-up mode
-                loading: false
-            });
+            const currentUser = get().user;
+            if (!currentUser || currentUser.id !== providedSession.user.id) {
+                console.log('[Auth] Instant user set from provided session, clearing profile to load');
+                set({ 
+                    user: providedSession.user,
+                    profile: null, // Clear profile to force loading transition on new logins
+                    isSigningUp: false, // Ensure we exit sign-up mode
+                    loading: false
+                });
+            }
         }
 
         // Bypass the refresh lock if a session is explicitly provided (e.g. from SIGNED_IN event)
@@ -316,7 +337,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             isSigningUp: false 
         });
 
-        // 2. Background cleanup
+        // 2. Clear cached credentials from SecureStore/LocalStorage
+        await clearCachedAuthData();
+
+        // 3. Background cleanup
         if (supabase) {
             if (userId) {
                 supabase
@@ -326,6 +350,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                     .catch(err => console.warn('[Auth] Background token clear failed:', err));
             }
             await supabase.auth.signOut().catch(() => {});
+        }
+
+        // 4. Native Google Sign-Out
+        if (Platform.OS !== 'web') {
+            try {
+                const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+                
+                const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+                const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+                
+                const hasValidIosClientId = !!(
+                    iosClientId &&
+                    iosClientId.trim() !== '' &&
+                    !iosClientId.includes('YOUR_GOOGLE_IOS_CLIENT_ID')
+                );
+
+                GoogleSignin.configure({
+                    webClientId: webClientId && !webClientId.includes('YOUR_GOOGLE_WEB_CLIENT_ID') ? webClientId : undefined,
+                    iosClientId: hasValidIosClientId ? iosClientId : undefined,
+                });
+
+                await GoogleSignin.signOut().catch(() => {});
+            } catch (err) {
+                console.warn('[Auth] Google native sign out failed:', err);
+            }
         }
     },
 

@@ -23,7 +23,11 @@
                 "EXPO_PUBLIC_SUPABASE_URL": "https://zmsactoninhdtngtlyep.supabase.co",
                 "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_gmk-IQPPNgIxrasWP_I8QQ_e9_zRyxd",
                 "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
-                "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+                "SENTRY_DISABLE_AUTO_UPLOAD": "true",
+                "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyAfW8js09sB0cfQzz19aRBkSE7sDMy5cu0",
+                "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "707903087617-47o4iccvvlrbmb0isa07437b323pdheh.apps.googleusercontent.com",
+                "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "707903087617-v1qf87j440t8gll84lgh3uf7dujrlqv8.apps.googleusercontent.com",
+                "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "707903087617-8t2fl175jc8b15883i413qbqk3dk9t0u.apps.googleusercontent.com"
             }
         },
         "production": {
@@ -32,7 +36,11 @@
                 "EXPO_PUBLIC_SUPABASE_URL": "https://zmsactoninhdtngtlyep.supabase.co",
                 "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_gmk-IQPPNgIxrasWP_I8QQ_e9_zRyxd",
                 "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
-                "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+                "SENTRY_DISABLE_AUTO_UPLOAD": "true",
+                "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyAfW8js09sB0cfQzz19aRBkSE7sDMy5cu0",
+                "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "707903087617-47o4iccvvlrbmb0isa07437b323pdheh.apps.googleusercontent.com",
+                "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "707903087617-v1qf87j440t8gll84lgh3uf7dujrlqv8.apps.googleusercontent.com",
+                "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "707903087617-8t2fl175jc8b15883i413qbqk3dk9t0u.apps.googleusercontent.com"
             }
         }
     },

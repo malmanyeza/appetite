@@ -507,7 +507,7 @@ export const CustomerHome = () => {
             remainingDistance = originalScrollWidth;
         }
 
-        const duration = (remainingDistance / originalScrollWidth) * 15000; // 15 seconds per loop
+        const duration = (remainingDistance / originalScrollWidth) * 45000; // 45 seconds per loop
 
         Animated.timing(bannerPan, {
             toValue: bannerPanValue.current - remainingDistance,
@@ -864,7 +864,7 @@ export const CustomerHome = () => {
                                     setIsModalDown(true);
                                 }
                             }}
-                            onRegionChangeStart={(_region, details) => {
+                            onRegionChangeStart={((_region: any, details: any) => {
                                 Keyboard.dismiss();
                                 // isGesture is supplied by react-native-maps (mostly reliable on iOS)
                                 // We store this in a ref so onRegionChangeComplete can see it
@@ -876,7 +876,7 @@ export const CustomerHome = () => {
                                     setIsFetchingLocation(true);
                                     setHasAnimatedInitialLocation(true);
                                 }
-                            }}
+                            }) as any}
                             onRegionChangeComplete={async (region, _details) => {
                                 // We stay in whatever state the user has left the sheet (usually UP)
                                 if (!isHumanGestureRef.current || isProgrammaticChange.current) {

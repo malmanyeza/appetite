@@ -237,7 +237,22 @@ export const AccountScreen = ({ navigation }: any) => {
                     </TouchableOpacity>
                 )}
 
-                {activeRole === 'customer' ? (
+                {activeRole === 'driver' || activeRole === 'admin' ? (
+                    <TouchableOpacity
+                        style={[styles.roleBadge, { backgroundColor: theme.accent }]}
+                        onPress={() => setActiveRole('customer')}
+                        disabled={isSwitching}
+                    >
+                        {isSwitching ? (
+                            <ActivityIndicator size="small" color="white" />
+                        ) : (
+                            <>
+                                <User size={16} color="white" />
+                                <Text style={styles.roleBadgeText}>Switch to Customer</Text>
+                            </>
+                        )}
+                    </TouchableOpacity>
+                ) : (
                     <TouchableOpacity
                         style={[styles.roleBadge, { backgroundColor: theme.accent }]}
                         onPress={handleRoleSwitch}
@@ -255,21 +270,6 @@ export const AccountScreen = ({ navigation }: any) => {
                                             ? 'Application Under Review'
                                             : 'Become a Driver'}
                                 </Text>
-                            </>
-                        )}
-                    </TouchableOpacity>
-                ) : (
-                    <TouchableOpacity
-                        style={[styles.roleBadge, { backgroundColor: theme.accent }]}
-                        onPress={() => setActiveRole('customer')}
-                        disabled={isSwitching}
-                    >
-                        {isSwitching ? (
-                            <ActivityIndicator size="small" color="white" />
-                        ) : (
-                            <>
-                                <User size={16} color="white" />
-                                <Text style={styles.roleBadgeText}>Switch to Customer</Text>
                             </>
                         )}
                     </TouchableOpacity>
@@ -306,7 +306,7 @@ export const AccountScreen = ({ navigation }: any) => {
             </TouchableOpacity>
 
             <Text style={[styles.versionText, { color: theme.textMuted }]}>
-                v1.6.1 (Build 23)
+                v1.6.7 (Build 29)
             </Text>
 
         </ScrollView>

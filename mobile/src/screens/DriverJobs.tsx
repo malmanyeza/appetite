@@ -280,7 +280,7 @@ export const DriverJobs = () => {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('targeted_driver_jobs')
-                .select('id, offer_id, status, created_at, delivery_address_snapshot, offer_assigned_driver_id, driver_id, customer_id, restaurant_id, pricing, restaurant_name, restaurant_suburb, restaurant_city, restaurant_landmark_notes, customer_name, customer_phone')
+                .select('id, offer_id, status, created_at, delivery_address_snapshot, offer_assigned_driver_id, driver_id, customer_id, restaurant_id, pricing, payment, restaurant_name, restaurant_suburb, restaurant_city, restaurant_landmark_notes, customer_name, customer_phone')
                 .eq('offer_assigned_driver_id', user?.id)
                 .order('created_at', { ascending: false });
 
@@ -305,6 +305,7 @@ export const DriverJobs = () => {
                     restaurant_id: offer.restaurant_id,
                     pricing: offer.pricing,
                     payment: offer.payment,
+                    payment_method: offer.payment?.method || offer.payment_method,
                     created_at: offer.created_at,
                     updated_at: offer.updated_at,
                     restaurants: {
@@ -449,7 +450,25 @@ export const DriverJobs = () => {
                                                     {new Date(job.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                 </Text>
                                             </View>
-                                            <Text style={[styles.jobStatus, { color: theme.accent, fontWeight: 'bold' }]}>{job.status.replace('_', ' ').toUpperCase()}</Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                                                <Text style={[styles.jobStatus, { color: theme.accent, fontWeight: 'bold' }]}>
+                                                    {job.status.replace('_', ' ').toUpperCase()}
+                                                </Text>
+                                                <View style={{
+                                                    paddingHorizontal: 8,
+                                                    paddingVertical: 2,
+                                                    borderRadius: 6,
+                                                    backgroundColor: job.payment_method === 'cod' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(34, 197, 94, 0.1)'
+                                                }}>
+                                                    <Text style={{
+                                                        fontSize: 10,
+                                                        fontWeight: 'bold',
+                                                        color: job.payment_method === 'cod' ? '#F59E0B' : '#22C55E'
+                                                    }}>
+                                                        {job.payment_method === 'cod' ? '💵 COD' : '💳 PAID'}
+                                                    </Text>
+                                                </View>
+                                            </View>
                                         </View>
                                         <View style={{ alignItems: 'flex-end' }}>
                                             <Text style={[styles.payout, { color: '#22C55E' }]}>${potentialPayout}</Text>

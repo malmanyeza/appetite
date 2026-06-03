@@ -1,4 +1,5 @@
 import React from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuthStore } from '../store/authStore';
@@ -18,6 +19,7 @@ import { ActiveDelivery } from '../screens/ActiveDelivery';
 import { DeliveryCompleted } from '../screens/DeliveryCompleted';
 import { DriverEarnings } from '../screens/DriverEarnings';
 import { LoginScreen } from '../screens/LoginScreen';
+import { PhoneEntryScreen } from '../screens/PhoneEntryScreen';
 import { SignUpScreen } from '../screens/SignUpScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { OrderDetailsScreen } from '../screens/OrderDetailsScreen';
@@ -156,7 +158,7 @@ const DriverTabs = () => {
 };
 
 export const RootNavigator = () => {
-    const { user, activeRole, isSigningUp, pendingRedirect, setPendingRedirect } = useAuthStore();
+    const { user, profile, activeRole, isSigningUp, pendingRedirect, setPendingRedirect } = useAuthStore();
 
     // Track the previous user ID so we can detect a fresh login (guest → authenticated)
     const prevUserIdRef = React.useRef<string | null>(null);
@@ -189,12 +191,25 @@ export const RootNavigator = () => {
         }
     }, [user?.id, pendingRedirect]);
 
+    const { theme } = useTheme();
+    const showPhoneEntry = user && profile && !profile.phone && !isSigningUp && activeRole !== 'admin';
+    const isProfileLoading = user && !profile && !isSigningUp;
+
+    if (isProfileLoading) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>
+                <ActivityIndicator size="large" color={theme.accent} />
+            </View>
+        );
+    }
+
     return (
         <Stack.Navigator 
             screenOptions={{ headerShown: false }}
         >
-            {/* 1. Only render ONE interface as the root screen to prevent "stack slip" */}
-            {user && !isSigningUp ? (
+            {showPhoneEntry ? (
+                <Stack.Screen name="PhoneEntry" component={PhoneEntryScreen} />
+            ) : user && !isSigningUp ? (
                 activeRole === 'driver' ? (
                     <Stack.Screen name="DriverApp" component={DriverTabs} />
                 ) : activeRole === 'admin' ? (

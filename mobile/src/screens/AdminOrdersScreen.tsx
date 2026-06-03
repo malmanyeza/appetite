@@ -152,9 +152,26 @@ export const AdminOrdersScreen = ({ navigation }: any) => {
             </View>
 
             <View style={styles.orderFooter}>
-                <Text style={[styles.itemCount, { color: theme.textMuted }]}>
-                    {item.order_items?.length} items • ${Number(item.pricing?.total).toFixed(2)}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={[styles.itemCount, { color: theme.textMuted }]}>
+                        {item.order_items?.length} items • ${Number(item.pricing?.total).toFixed(2)}
+                    </Text>
+                    <Text style={{ color: theme.textMuted, fontSize: 12 }}>•</Text>
+                    <View style={{
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 4,
+                        backgroundColor: item.payment?.method === 'cod' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(34, 197, 94, 0.1)'
+                    }}>
+                        <Text style={{
+                            fontSize: 10,
+                            fontWeight: 'bold',
+                            color: item.payment?.method === 'cod' ? '#F59E0B' : '#22C55E'
+                        }}>
+                            {item.payment?.method === 'cod' ? '💵 COD' : '💳 PAID'}
+                        </Text>
+                    </View>
+                </View>
                 {item.status === 'confirmed' && (
                     <TouchableOpacity 
                         style={[styles.dispatchButton, { backgroundColor: theme.accent }]}
@@ -292,6 +309,34 @@ export const AdminOrdersScreen = ({ navigation }: any) => {
                                         <View style={[styles.totalRow, { borderTopColor: theme.border }]}>
                                             <Text style={[styles.totalLabel, { color: theme.text }]}>Total</Text>
                                             <Text style={[styles.totalAmount, { color: theme.accent }]}>${Number(selectedOrder.pricing?.total).toFixed(2)}</Text>
+                                        </View>
+                                        <View style={{ 
+                                            flexDirection: 'row', 
+                                            justifyContent: 'space-between', 
+                                            alignItems: 'center', 
+                                            marginTop: 12, 
+                                            paddingTop: 12, 
+                                            borderTopWidth: 1, 
+                                            borderTopColor: theme.border 
+                                        }}>
+                                            <Text style={{ fontSize: 13, fontWeight: 'bold', color: theme.textMuted }}>PAYMENT METHOD</Text>
+                                            <View style={{
+                                                paddingHorizontal: 10,
+                                                paddingVertical: 4,
+                                                borderRadius: 8,
+                                                backgroundColor: selectedOrder.payment?.method === 'cod' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(34, 197, 94, 0.1)'
+                                            }}>
+                                                <Text style={{
+                                                    fontSize: 12,
+                                                    fontWeight: 'bold',
+                                                    color: selectedOrder.payment?.method === 'cod' ? '#F59E0B' : '#22C55E'
+                                                }}>
+                                                    {selectedOrder.payment?.method === 'cod' 
+                                                        ? '💵 CASH ON DELIVERY' 
+                                                        : `💳 ONLINE PAID (${selectedOrder.payment?.method?.toUpperCase()})`
+                                                    }
+                                                </Text>
+                                            </View>
                                         </View>
                                     </View>
                                 </View>

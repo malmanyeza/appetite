@@ -2,9 +2,9 @@
   "expo": {
     "name": "Appetite",
     "slug": "appetite-mobile",
-    "owner": "malappbuilds",
+    "owner": "solidifiedmal",
     "scheme": "appetite",
-    "version": "1.6.4",
+    "version": "1.7.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -18,11 +18,18 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.appetite.mobile",
-      "buildNumber": "26",
+      "buildNumber": "32",
       "config": {
         "googleMapsApiKey": "AIzaSyAfW8js09sB0cfQzz19aRBkSE7sDMy5cu0"
       },
       "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.707903087617-v1qf87j440t8gll84lgh3uf7dujrlqv8"
+            ]
+          }
+        ],
         "NSCameraUsageDescription": "Allow Appetite to access your camera to take a photo for your driver profile picture.",
         "NSPhotoLibraryUsageDescription": "Allow Appetite to access your photos to upload a driver profile picture.",
         "NSLocationWhenInUseUsageDescription": "Allow Appetite to use your location to find nearby restaurants and dispatch deliveries accurately.",
@@ -42,6 +49,7 @@
       "intentFilters": [
         {
           "action": "VIEW",
+          "autoVerify": true,
           "data": [
             {
               "scheme": "https",
@@ -56,7 +64,7 @@
         }
       ],
       "package": "com.appetite.delivery",
-      "versionCode": 26,
+      "versionCode": 32,
       "googleServicesFile": "./google-services.json",
       "config": {
         "googleMaps": {
@@ -70,8 +78,15 @@
       "output": "single"
     },
     "plugins": [
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.707903087617-v1qf87j440t8gll84lgh3uf7dujrlqv8"
+        }
+      ],
       "expo-font",
       "expo-secure-store",
+      "expo-apple-authentication",
       [
         "expo-location",
         {
@@ -94,7 +109,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "45c51f2f-51a5-475c-a2be-f287a73356a7"
+        "projectId": "2b78d579-3b9d-4e47-95fe-9e230c7b016a"
       }
     }
   }
