@@ -32,6 +32,7 @@ export const RestaurantMenu = () => {
     const [isEditing, setIsEditing] = useState<any>(null); // null, 'new', or item object
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const [editImageUrl, setEditImageUrl] = useState<string>('');
+    const [editCategoryId, setEditCategoryId] = useState<string>('');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [addons, setAddons] = useState<{ name: string; price: number }[]>([]);
     const [branchAvailabilityItem, setBranchAvailabilityItem] = useState<any>(null); // item object if modal open
@@ -106,6 +107,7 @@ export const RestaurantMenu = () => {
             setIsEditing(null);
             setIsDeleting(null);
             setEditImageUrl('');
+            setEditCategoryId('');
         },
         onError: (err: any) => alert(err.message)
     };
@@ -209,6 +211,7 @@ export const RestaurantMenu = () => {
     const openEditModal = async (item: any) => {
         setIsEditing(item);
         setEditImageUrl(item === 'new' ? '' : (item?.image_url || ''));
+        setEditCategoryId(item === 'new' ? '' : (item?.category_id || ''));
         setAddons(item === 'new' ? [] : (item?.add_ons || []));
         setSelectedSuggestedCategories(item === 'new' ? [] : (item?.suggested_addon_category_ids || []));
         
@@ -481,7 +484,7 @@ export const RestaurantMenu = () => {
                     <div className="w-full max-w-xl glass p-8 space-y-8 max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center">
                             <h2 className="text-xl font-bold">{isEditing === 'new' ? 'Add Menu Item' : 'Edit Menu Item'}</h2>
-                            <button onClick={() => { setIsEditing(null); setEditImageUrl(''); }} className="text-muted hover:text-white">
+                            <button onClick={() => { setIsEditing(null); setEditImageUrl(''); setEditCategoryId(''); }} className="text-muted hover:text-white">
                                 <Plus size={24} className="rotate-45" />
                             </button>
                         </div>
@@ -530,7 +533,8 @@ export const RestaurantMenu = () => {
                                     <select 
                                         name="category_id" 
                                         required 
-                                        defaultValue={isEditing?.category_id} 
+                                        value={editCategoryId} 
+                                        onChange={(e) => setEditCategoryId(e.target.value)}
                                         className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-accent/50 text-white"
                                     >
                                         <option value="">Select Category</option>
@@ -692,7 +696,7 @@ export const RestaurantMenu = () => {
                             </div>
 
                             <div className="flex gap-4 pt-4">
-                                <button type="button" onClick={() => { setIsEditing(null); setEditImageUrl(''); }} className="flex-1 px-6 py-3 rounded-xl border border-white/10 font-bold hover:bg-white/5 transition-colors">Cancel</button>
+                                <button type="button" onClick={() => { setIsEditing(null); setEditImageUrl(''); setEditCategoryId(''); }} className="flex-1 px-6 py-3 rounded-xl border border-white/10 font-bold hover:bg-white/5 transition-colors">Cancel</button>
                                 <button type="submit" className="flex-1 btn-primary py-3 font-bold">
                                     {isEditing === 'new' ? 'Create Item' : 'Save Changes'}
                                 </button>
