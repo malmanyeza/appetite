@@ -1,9 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, View, useColorScheme, Text, LogBox } from 'react-native';
+import { ActivityIndicator, View, useColorScheme, Text, LogBox, TextInput } from 'react-native';
 import * as ExpoLinking from 'expo-linking';
 
 // Ignore all React Native LogBox notifications in the app completely
 LogBox.ignoreAllLogs();
+
+// Disable system font scaling globally on Android and iOS
+(Text as any).defaultProps = (Text as any).defaultProps || {};
+(Text as any).defaultProps.allowFontScaling = false;
+(TextInput as any).defaultProps = (TextInput as any).defaultProps || {};
+(TextInput as any).defaultProps.allowFontScaling = false;
+
 import { NavigationContainer } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './src/store/authStore';
