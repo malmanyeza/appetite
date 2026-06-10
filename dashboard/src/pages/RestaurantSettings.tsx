@@ -301,6 +301,125 @@ export const RestaurantSettings = () => {
         }
     });
 
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [selectedSourceRestaurantId, setSelectedSourceRestaurantId] = useState<string>('');
+    const [selectedSourceCategoryId, setSelectedSourceCategoryId] = useState<string>('');
+
+    // Fetch other restaurants
+    const { data: otherRestaurants } = useQuery({
+        queryKey: ['other-restaurants', restaurant?.id],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('restaurants')
+                .select('id, name')
+                .neq('id', restaurant?.id)
+                .order('name');
+            if (error) throw error;
+            return data || [];
+        },
+        enabled: !!restaurant?.id && isImportModalOpen
+    });
+
+    // Fetch categories of the selected source restaurant
+    const { data: sourceCategories } = useQuery({
+        queryKey: ['source-categories', selectedSourceRestaurantId],
+        queryFn: async () => {
+            if (!selectedSourceRestaurantId) return [];
+            const { data, error } = await supabase
+                .from('menu_categories')
+                .select('*')
+                .eq('restaurant_id', selectedSourceRestaurantId)
+                .order('sort_order', { ascending: true });
+            if (error) throw error;
+            return data || [];
+        },
+        enabled: !!selectedSourceRestaurantId
+    });
+
+    const importCategoryMutation = useMutation({
+        mutationFn: async ({ sourceRestaurantId, sourceCategoryId }: { sourceRestaurantId: string, sourceCategoryId: string }) => {
+            if (!restaurant?.id) throw new Error('Current restaurant not loaded');
+            
+            // 1. Fetch the source category details
+            const { data: sourceCategory, error: catError } = await supabase
+                .from('menu_categories')
+                .select('*')
+                .eq('id', sourceCategoryId)
+                .single();
+            if (catError || !sourceCategory) throw new Error('Failed to fetch source category');
+
+            // 2. Check if a category with the same name already exists in current restaurant
+            let targetCategoryId = '';
+            const { data: existingCat, error: existingCatError } = await supabase
+                .from('menu_categories')
+                .select('id')
+                .eq('restaurant_id', restaurant.id)
+                .eq('name', sourceCategory.name)
+                .maybeSingle();
+            
+            if (existingCat) {
+                targetCategoryId = existingCat.id;
+            } else {
+                // Create new category in current restaurant
+                const { data: newCat, error: insertCatError } = await supabase
+                    .from('menu_categories')
+                    .insert({
+                        restaurant_id: restaurant.id,
+                        name: sourceCategory.name,
+                        sort_order: sourceCategory.sort_order
+                    })
+                    .select('id')
+                    .single();
+                if (insertCatError || !newCat) throw new Error('Failed to create category: ' + insertCatError?.message);
+                targetCategoryId = newCat.id;
+            }
+
+            // 3. Fetch source menu items
+            const { data: sourceItems, error: itemsError } = await supabase
+                .from('menu_items')
+                .select('*')
+                .eq('restaurant_id', sourceRestaurantId)
+                .eq('category_id', sourceCategoryId);
+            
+            if (itemsError) throw new Error('Failed to fetch source menu items');
+            
+            if (sourceItems && sourceItems.length > 0) {
+                // 4. Copy each menu item
+                const itemsToInsert = sourceItems.map(item => ({
+                    restaurant_id: restaurant.id,
+                    category_id: targetCategoryId,
+                    name: item.name,
+                    description: item.description,
+                    price: item.price,
+                    image_url: item.image_url,
+                    add_ons: item.add_ons,
+                    category: sourceCategory.name,
+                    is_available: true
+                }));
+
+                const { error: insertItemsError } = await supabase
+                    .from('menu_items')
+                    .insert(itemsToInsert);
+                
+                if (insertItemsError) throw new Error('Failed to import menu items: ' + insertItemsError.message);
+            }
+
+            return { categoryName: sourceCategory.name, itemCount: sourceItems?.length || 0 };
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['menu-categories'] });
+            queryClient.invalidateQueries({ queryKey: ['restaurant-menu-all'] });
+            queryClient.invalidateQueries({ queryKey: ['restaurant-menu'] });
+            alert(`Successfully imported category "${data.categoryName}" and ${data.itemCount} menu items!`);
+            setIsImportModalOpen(false);
+            setSelectedSourceRestaurantId('');
+            setSelectedSourceCategoryId('');
+        },
+        onError: (err: any) => {
+            alert('Import failed: ' + err.message);
+        }
+    });
+
     if (isLoading) return <div className="animate-pulse space-y-8">
         <div className="h-64 glass rounded-2xl" />
         <div className="h-96 glass rounded-2xl" />
@@ -805,16 +924,25 @@ export const RestaurantSettings = () => {
                                         <h3 className="text-xl font-bold flex items-center gap-2"><Utensils size={20} className="text-accent" /> Menu Categories</h3>
                                         <p className="text-sm text-muted">Create categories for your menu items (e.g. Promos, Burgers, Drinks).</p>
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const name = prompt('Enter category name:');
-                                            if (name) addCategory.mutate(name);
-                                        }}
-                                        className="btn-primary px-4 py-2 text-sm flex items-center gap-2"
-                                    >
-                                        <Plus size={16} /> Add Category
-                                    </button>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsImportModalOpen(true)}
+                                            className="px-4 py-2 text-sm flex items-center gap-2 border border-white/10 hover:bg-white/5 rounded-xl font-semibold text-white transition-colors"
+                                        >
+                                            <Wand2 size={16} className="text-accent" /> Import Category
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const name = prompt('Enter category name:');
+                                                if (name) addCategory.mutate(name);
+                                            }}
+                                            className="btn-primary px-4 py-2 text-sm flex items-center gap-2"
+                                        >
+                                            <Plus size={16} /> Add Category
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6">
@@ -1239,6 +1367,97 @@ export const RestaurantSettings = () => {
                                     disabled={upsertLocation.isPending}
                                 >
                                     {upsertLocation.isPending ? 'Saving...' : 'Save Location'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {/* Import Category Modal */}
+                {isImportModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+                        <div className="w-full max-w-lg glass p-8 space-y-6 max-h-[90vh] overflow-y-auto">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+                                        <Wand2 className="text-accent" size={20} /> Import Category
+                                    </h2>
+                                    <p className="text-xs text-muted mt-1">Copy a menu category and all its items from another store</p>
+                                </div>
+                                <button 
+                                    onClick={() => {
+                                        setIsImportModalOpen(false);
+                                        setSelectedSourceRestaurantId('');
+                                        setSelectedSourceCategoryId('');
+                                    }} 
+                                    className="text-muted hover:text-white transition-colors"
+                                >
+                                    <X size={24} />
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-semibold text-muted">Select Source Restaurant</label>
+                                    <select
+                                        value={selectedSourceRestaurantId}
+                                        onChange={(e) => {
+                                            setSelectedSourceRestaurantId(e.target.value);
+                                            setSelectedSourceCategoryId('');
+                                        }}
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-accent/50 text-white"
+                                    >
+                                        <option value="" className="bg-neutral-900">Select Restaurant</option>
+                                        {otherRestaurants?.map((rest: any) => (
+                                            <option key={rest.id} value={rest.id} className="bg-neutral-900">
+                                                {rest.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {selectedSourceRestaurantId && (
+                                    <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                                        <label className="text-sm font-semibold text-muted">Select Category to Import</label>
+                                        <select
+                                            value={selectedSourceCategoryId}
+                                            onChange={(e) => setSelectedSourceCategoryId(e.target.value)}
+                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-accent/50 text-white"
+                                        >
+                                            <option value="" className="bg-neutral-900">Select Category</option>
+                                            {sourceCategories?.map((cat: any) => (
+                                                <option key={cat.id} value={cat.id} className="bg-neutral-900">
+                                                    {cat.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex gap-4 pt-4 border-t border-white/5">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsImportModalOpen(false);
+                                        setSelectedSourceRestaurantId('');
+                                        setSelectedSourceCategoryId('');
+                                    }}
+                                    className="flex-1 px-6 py-3 rounded-xl border border-white/10 font-bold hover:bg-white/5 transition-colors text-white text-sm"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={!selectedSourceRestaurantId || !selectedSourceCategoryId || importCategoryMutation.isPending}
+                                    onClick={() => {
+                                        importCategoryMutation.mutate({
+                                            sourceRestaurantId: selectedSourceRestaurantId,
+                                            sourceCategoryId: selectedSourceCategoryId
+                                        });
+                                    }}
+                                    className="flex-1 btn-primary py-3 font-bold text-sm shadow-lg shadow-accent/20 flex items-center justify-center gap-2"
+                                >
+                                    {importCategoryMutation.isPending ? 'Importing...' : 'Import Now'}
                                 </button>
                             </div>
                         </div>

@@ -4,7 +4,7 @@
     "slug": "appetite-mobile",
     "owner": "solidifiedmal",
     "scheme": "appetite",
-    "version": "1.7.0",
+    "version": "1.7.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -18,7 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.appetite.mobile",
-      "buildNumber": "32",
+      "buildNumber": "33",
       "config": {
         "googleMapsApiKey": "AIzaSyAfW8js09sB0cfQzz19aRBkSE7sDMy5cu0"
       },
@@ -64,7 +64,7 @@
         }
       ],
       "package": "com.appetite.delivery",
-      "versionCode": 32,
+      "versionCode": 33,
       "googleServicesFile": "./google-services.json",
       "config": {
         "googleMaps": {

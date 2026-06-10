@@ -65,6 +65,7 @@ export const CustomerHome = () => {
     const [landmark, setLandmark] = React.useState('');
     const [isFetchingLocation, setIsFetchingLocation] = React.useState(false);
     const [modalLocationFetched, setModalLocationFetched] = React.useState(false);
+    const [activeBannerIndex, setActiveBannerIndex] = React.useState(0);
 
     const { selectedLocation, setSelectedLocation, splashHasFinished, hasAutoPrompted, setHasAutoPrompted } = useLocationStore();
     const { profile } = useAuthStore();
@@ -366,11 +367,11 @@ export const CustomerHome = () => {
             modalY.setValue(0);
             setIsModalDown(false);
 
-            // Animate SLIDE UP
-            Animated.spring(modalEntryAnim, {
+            // Animate SLIDE UP (slowly and smoothly)
+            Animated.timing(modalEntryAnim, {
                 toValue: 0,
-                tension: 40,
-                friction: 8,
+                duration: 700, // slower, smooth transition
+                easing: Easing.out(Easing.cubic),
                 useNativeDriver: true,
             }).start();
 
@@ -493,43 +494,88 @@ export const CustomerHome = () => {
         return () => bannerPan.removeListener(id);
     }, [bannerPan]);
 
-    const startBannerAnimation = React.useCallback(() => {
-        if (!randomBanners || randomBanners.length === 0) return;
-        const cardWidth = Dimensions.get('window').width - 24;
-        const originalScrollWidth = randomBanners.length * cardWidth;
-        
-        let currentOffset = bannerPanValue.current;
-        if (currentOffset > 0) currentOffset = 0; 
-        
-        let remainingDistance = originalScrollWidth + currentOffset; 
-        if (remainingDistance <= 0) {
-            bannerPan.setValue(0);
-            remainingDistance = originalScrollWidth;
-        }
+    const currentBannerIndex = React.useRef(0);
+    const bannerTimerRef = React.useRef<any>(null);
+    const animateToBannerIndexRef = React.useRef<((index: number) => void) | null>(null);
 
-        const duration = (remainingDistance / originalScrollWidth) * 45000; // 45 seconds per loop
+    const stopBannerTimer = React.useCallback(() => {
+        if (bannerTimerRef.current) {
+            clearTimeout(bannerTimerRef.current);
+            bannerTimerRef.current = null;
+        }
+    }, []);
+
+    const resetBannerTimer = React.useCallback(() => {
+        stopBannerTimer();
+        bannerTimerRef.current = setTimeout(() => {
+            const nextIndex = currentBannerIndex.current + 1;
+            if (animateToBannerIndexRef.current) {
+                animateToBannerIndexRef.current(nextIndex);
+            }
+        }, 4000); // 4 seconds standard interval
+    }, [stopBannerTimer]);
+
+    const animateToBannerIndex = React.useCallback((index: number) => {
+        const N = randomBanners.length;
+        if (N === 0) return;
+        const cardWidth = Dimensions.get('window').width; // exactly full screen width
+
+        // Update dot highlights immediately as transition starts
+        setActiveBannerIndex(index % N);
 
         Animated.timing(bannerPan, {
-            toValue: bannerPanValue.current - remainingDistance,
-            duration: duration,
-            easing: Easing.linear,
-            useNativeDriver: false, // Must be false to sync perfectly with JS PanResponder
+            toValue: -index * cardWidth,
+            duration: 450, // smooth 450ms transition
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: false,
         }).start(({ finished }) => {
             if (finished) {
-                bannerPan.setValue(0);
-                startBannerAnimation();
+                let nextIndex = index;
+                if (index < N) {
+                    nextIndex = index + N;
+                    bannerPan.setValue(-nextIndex * cardWidth);
+                } else if (index >= 2 * N) {
+                    nextIndex = index - N;
+                    bannerPan.setValue(-nextIndex * cardWidth);
+                }
+                currentBannerIndex.current = nextIndex;
+                resetBannerTimer();
             }
         });
-    }, [randomBanners]);
+    }, [randomBanners, bannerPan, resetBannerTimer]);
 
+    // Keep the ref updated to avoid dependency loops
     React.useEffect(() => {
-        startBannerAnimation();
-    }, [startBannerAnimation]);
+        animateToBannerIndexRef.current = animateToBannerIndex;
+    }, [animateToBannerIndex]);
+
+    // Initialize/Reset banner position and timer when banners change
+    React.useEffect(() => {
+        if (randomBanners && randomBanners.length > 0) {
+            const cardWidth = Dimensions.get('window').width; // exactly full screen width
+            const N = randomBanners.length;
+            currentBannerIndex.current = N;
+            bannerPan.setValue(-N * cardWidth);
+            setActiveBannerIndex(0);
+            resetBannerTimer();
+        }
+        return () => {
+            stopBannerTimer();
+        };
+    }, [randomBanners, resetBannerTimer, stopBannerTimer, bannerPan]);
 
     const bannerPanResponder = React.useMemo(() => PanResponder.create({
         onStartShouldSetPanResponder: () => false, 
-        onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dx) > 10, 
+        onStartShouldSetPanResponderCapture: () => false,
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+            return Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+        }, 
+        onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+            return Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+        },
+        onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: () => {
+            stopBannerTimer();
             bannerPan.stopAnimation();
             bannerPan.setOffset(bannerPanValue.current);
             bannerPan.setValue(0);
@@ -538,26 +584,41 @@ export const CustomerHome = () => {
             [null, { dx: bannerPan }],
             { useNativeDriver: false } 
         ),
-        onPanResponderRelease: () => {
+        onPanResponderRelease: (_, gestureState) => {
             bannerPan.flattenOffset();
-            const cardWidth = Dimensions.get('window').width - 24;
-            const originalScrollWidth = randomBanners.length * cardWidth;
+            const cardWidth = Dimensions.get('window').width; // exactly full screen width
+            const N = randomBanners.length;
+            if (N === 0) return;
             
-            let finalValue = bannerPanValue.current;
-            if (finalValue > 0) {
-                finalValue -= originalScrollWidth;
-                bannerPan.setValue(finalValue);
-            } else if (finalValue < -originalScrollWidth * 2) {
-                finalValue += originalScrollWidth;
-                bannerPan.setValue(finalValue);
+            // Determine nearest index
+            let targetIndex = Math.round(-bannerPanValue.current / cardWidth);
+            
+            // Adjust for swipe speed/velocity if they did a quick flick
+            if (gestureState.vx < -0.3) {
+                targetIndex = Math.ceil(-bannerPanValue.current / cardWidth);
+            } else if (gestureState.vx > 0.3) {
+                targetIndex = Math.floor(-bannerPanValue.current / cardWidth);
             }
-            startBannerAnimation();
+            
+            // Wrap index within bounds [0, 3N - 1]
+            if (targetIndex < 0) targetIndex = 0;
+            if (targetIndex >= 3 * N) targetIndex = 3 * N - 1;
+            
+            animateToBannerIndex(targetIndex);
         },
         onPanResponderTerminate: () => {
             bannerPan.flattenOffset();
-            startBannerAnimation();
+            const cardWidth = Dimensions.get('window').width; // exactly full screen width
+            const N = randomBanners.length;
+            if (N === 0) return;
+            
+            let targetIndex = Math.round(-bannerPanValue.current / cardWidth);
+            if (targetIndex < 0) targetIndex = 0;
+            if (targetIndex >= 3 * N) targetIndex = 3 * N - 1;
+            
+            animateToBannerIndex(targetIndex);
         }
-    }), [randomBanners, startBannerAnimation]);
+    }), [randomBanners, stopBannerTimer, animateToBannerIndex, bannerPan]);
 
     const tempCoords = React.useRef<{ lat: number, lng: number } | null>(null);
 
@@ -697,58 +758,130 @@ export const CustomerHome = () => {
                             <Animated.View 
                                 style={[
                                     styles.bannersContainer, 
-                                    { flexDirection: 'row', transform: [{ translateX: bannerPan }] }
+                                    { 
+                                        flexDirection: 'row', 
+                                        paddingHorizontal: 0, 
+                                        gap: 0, 
+                                        width: Dimensions.get('window').width * randomBanners.length * 3,
+                                        transform: [{ translateX: bannerPan }] 
+                                    }
                                 ]}
                                 {...bannerPanResponder.panHandlers}
                             >
                                 {[...randomBanners, ...randomBanners, ...randomBanners].map((banner: any, index: number) => (
-                                    <TouchableOpacity 
-                                        key={`banner-${banner.id}-${index}`}
-                                        style={[styles.bannerCard, { backgroundColor: theme.surface, marginRight: 16 }]}
-                                        onPress={() => {
-                                            if (banner.menuItem) {
-                                                navigation.navigate('FoodItemDetail', {
-                                                    item: banner.menuItem,
-                                                    restaurantId: banner.restaurant_id,
-                                                    locationId: banner.locationId
-                                                });
-                                            } else {
-                                                navigation.navigate('RestaurantDetails', { id: banner.locationId });
-                                            }
-                                        }}
-                                        activeOpacity={0.9}
+                                    <View 
+                                        key={`banner-wrap-${banner.id}-${index}`}
+                                        style={{ width: Dimensions.get('window').width, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
                                     >
-                                        <Image
-                                            source={getOriginalUrl(banner.image_url) || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'}
-                                            style={styles.bannerImage}
-                                            contentFit="cover"
-                                            transition={300}
-                                        />
-                                        <LinearGradient 
-                                            colors={['transparent', 'rgba(0,0,0,0.8)']}
-                                            style={styles.bannerOverlay}
+                                        <TouchableOpacity 
+                                            key={`banner-${banner.id}-${index}`}
+                                            style={[styles.bannerCard, { backgroundColor: theme.surface }]}
+                                            onPress={() => {
+                                                if (banner.menuItem) {
+                                                    navigation.navigate('FoodItemDetail', {
+                                                        item: banner.menuItem,
+                                                        restaurantId: banner.restaurant_id,
+                                                        locationId: banner.locationId
+                                                    });
+                                                } else {
+                                                    navigation.navigate('RestaurantDetails', { id: banner.locationId });
+                                                }
+                                            }}
+                                            activeOpacity={0.9}
                                         >
-                                            <Text style={styles.bannerTitle} numberOfLines={1}>{banner.title || banner.restaurantName}</Text>
-                                            <TouchableOpacity 
-                                                style={[styles.bannerBuyNow, { backgroundColor: theme.accent }]}
-                                                onPress={() => {
-                                                    if (banner.menuItem) {
-                                                        navigation.navigate('FoodItemDetail', {
-                                                            item: banner.menuItem,
-                                                            restaurantId: banner.restaurant_id,
-                                                            locationId: banner.locationId
-                                                        });
-                                                    } else {
-                                                        navigation.navigate('RestaurantDetails', { id: banner.locationId });
-                                                    }
-                                                }}
+                                            <Image
+                                                source={getOriginalUrl(banner.image_url) || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'}
+                                                style={styles.bannerImage}
+                                                contentFit="cover"
+                                                transition={300}
+                                            />
+                                            <LinearGradient 
+                                                colors={['transparent', 'rgba(0,0,0,0.8)']}
+                                                style={styles.bannerOverlay}
                                             >
-                                                <Text style={styles.bannerBuyNowText}>Buy Now</Text>
-                                            </TouchableOpacity>
-                                        </LinearGradient>
-                                    </TouchableOpacity>
+                                                <Text style={styles.bannerTitle} numberOfLines={1}>{banner.title || banner.restaurantName}</Text>
+                                                <TouchableOpacity 
+                                                    style={[styles.bannerBuyNow, { backgroundColor: theme.accent }]}
+                                                    onPress={() => {
+                                                        if (banner.menuItem) {
+                                                            navigation.navigate('FoodItemDetail', {
+                                                                item: banner.menuItem,
+                                                                restaurantId: banner.restaurant_id,
+                                                                locationId: banner.locationId
+                                                            });
+                                                        } else {
+                                                            navigation.navigate('RestaurantDetails', { id: banner.locationId });
+                                                        }
+                                                    }}
+                                                >
+                                                    <Text style={styles.bannerBuyNowText}>Buy Now</Text>
+                                                </TouchableOpacity>
+                                            </LinearGradient>
+                                        </TouchableOpacity>
+                                    </View>
                                 ))}
                             </Animated.View>
+                        </View>
+                        {/* Pagination Dots (Sliding window pattern for large lists) */}
+                        <View style={styles.dotsContainer}>
+                            {(() => {
+                                const N = randomBanners.length;
+                                const MAX_DOTS = 5;
+                                if (N <= MAX_DOTS) {
+                                    return randomBanners.map((_, idx) => (
+                                        <View
+                                            key={`dot-${idx}`}
+                                            style={[
+                                                styles.dot,
+                                                {
+                                                    backgroundColor: idx === activeBannerIndex ? theme.accent : theme.textMuted + '40',
+                                                    width: idx === activeBannerIndex ? 16 : 8,
+                                                    height: 8,
+                                                    borderRadius: 4,
+                                                }
+                                            ]}
+                                        />
+                                    ));
+                                } else {
+                                    // Sliding window logic (Instagram/Airbnb style)
+                                    let startIdx = Math.max(0, activeBannerIndex - 2);
+                                    let endIdx = Math.min(N - 1, startIdx + MAX_DOTS - 1);
+                                    if (endIdx - startIdx < MAX_DOTS - 1) {
+                                        startIdx = Math.max(0, endIdx - MAX_DOTS + 1);
+                                    }
+
+                                    const visibleDots = [];
+                                    for (let idx = startIdx; idx <= endIdx; idx++) {
+                                        const isActive = idx === activeBannerIndex;
+                                        const isFirst = idx === startIdx;
+                                        const isLast = idx === endIdx;
+                                        
+                                        // Render smaller dots on boundaries to indicate scroll potential
+                                        let dotSize = 8;
+                                        if (isFirst && startIdx > 0) {
+                                            dotSize = 4;
+                                        } else if (isLast && endIdx < N - 1) {
+                                            dotSize = 4;
+                                        }
+
+                                        visibleDots.push(
+                                            <View
+                                                key={`dot-${idx}`}
+                                                style={[
+                                                    styles.dot,
+                                                    {
+                                                        backgroundColor: isActive ? theme.accent : theme.textMuted + '40',
+                                                        width: isActive ? 16 : dotSize,
+                                                        height: dotSize,
+                                                        borderRadius: dotSize / 2,
+                                                    }
+                                                ]}
+                                            />
+                                        );
+                                    }
+                                    return visibleDots;
+                                }
+                            })()}
                         </View>
                     </View>
                 )}
@@ -1395,6 +1528,17 @@ const styles = StyleSheet.create({
     categoryText: { fontWeight: '600' },
     bannersSection: { marginBottom: 24 },
     bannersContainer: { paddingHorizontal: 20, gap: 16 },
+    dotsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 12,
+        gap: 6
+    },
+    dot: {
+        height: 8,
+        borderRadius: 4,
+    },
     bannerCard: { 
         width: Dimensions.get('window').width - 40, 
         height: 180, 

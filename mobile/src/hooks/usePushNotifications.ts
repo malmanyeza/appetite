@@ -100,7 +100,7 @@ async function registerForPushNotificationsAsync() {
             const projectId =
                 Constants?.expoConfig?.extra?.eas?.projectId ?? 
                 Constants?.easConfig?.projectId ??
-                '45c51f2f-51a5-475c-a2be-f287a73356a7'; // Hard fallback based on app.json check
+                '2b78d579-3b9d-4e47-95fe-9e230c7b016a'; // Hard fallback based on app.json check
 
             if (projectId) {
                 token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
