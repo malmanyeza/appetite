@@ -102,12 +102,42 @@ export const RestaurantDetails = ({ route, navigation }: any) => {
         const cats = filteredMenu.map((i: any) => i.menu_categories?.name || i.category || 'Uncategorized');
         const uniqueCats = Array.from(new Set(cats)) as string[];
         
-        // Sort: "promos" first, then alphabetical
+        const isPromo = (name: string) => name.toLowerCase().includes('promo');
+        const isDrinkOrSideOrExtra = (name: string) => {
+            const n = name.toLowerCase();
+            return (
+                n.includes('drink') ||
+                n.includes('beverage') ||
+                n.includes('soda') ||
+                n.includes('juice') ||
+                n.includes('wine') ||
+                n.includes('beer') ||
+                n.includes('water') ||
+                n.includes('alcohol') ||
+                n.includes('cocktail') ||
+                n.includes('salad') ||
+                n.includes('dessert') ||
+                n.includes('side') ||
+                n.includes('extra') ||
+                n.includes('add-on') ||
+                n.includes('sauce')
+            );
+        };
+        
         return uniqueCats.sort((a, b) => {
-            const aL = a.toLowerCase();
-            const bL = b.toLowerCase();
-            if (aL.includes('promo')) return -1;
-            if (bL.includes('promo')) return 1;
+            const aPromo = isPromo(a);
+            const bPromo = isPromo(b);
+            if (aPromo && !bPromo) return -1;
+            if (!aPromo && bPromo) return 1;
+            
+            const aSecondary = isDrinkOrSideOrExtra(a);
+            const bSecondary = isDrinkOrSideOrExtra(b);
+            
+            // Primary food items (not drinks/sides/extras) come before secondary items
+            if (aSecondary && !bSecondary) return 1;
+            if (!aSecondary && bSecondary) return -1;
+            
+            // Fallback to alphabetical sorting within the same group
             return a.localeCompare(b);
         });
     }, [filteredMenu]);
