@@ -525,10 +525,22 @@ export const RestaurantMenu = () => {
                             e.preventDefault();
                             const formData = new FormData(e.currentTarget);
                             const data = Object.fromEntries(formData.entries());
-                            const categoryName = menuCategories?.find((c: any) => c.id === data.category_id)?.name || '';
                             
+                            const selectedCatId = (data.category_id as string) || '';
+                            let finalCategoryId = null;
+                            let categoryName = '';
+                            
+                            if (selectedCatId && selectedCatId !== '') {
+                                finalCategoryId = selectedCatId;
+                                categoryName = menuCategories?.find((c: any) => c.id === selectedCatId)?.name || '';
+                            } else if (isEditing && isEditing !== 'new') {
+                                finalCategoryId = isEditing.category_id || null;
+                                categoryName = isEditing.category || '';
+                            }
+
                             const itemData = {
                                 ...data,
+                                category_id: finalCategoryId,
                                 category: categoryName,
                                 price: parseFloat(data.price as string),
                                 image_url: editImageUrl || null,
@@ -564,12 +576,16 @@ export const RestaurantMenu = () => {
                                     <label className="text-sm font-medium text-muted">Category</label>
                                     <select 
                                         name="category_id" 
-                                        required 
+                                        required={isEditing === 'new' || !(isEditing?.category_id || isEditing?.category)} 
                                         value={editCategoryId} 
                                         onChange={(e) => setEditCategoryId(e.target.value)}
                                         className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-accent/50 text-white"
                                     >
-                                        <option value="">Select Category</option>
+                                        {isEditing?.category && !editCategoryId ? (
+                                            <option value="">{isEditing.category} (Legacy)</option>
+                                        ) : (
+                                            <option value="">Select Category</option>
+                                        )}
                                         {menuCategories?.map((cat: any) => (
                                             <option key={cat.id} value={cat.id}>{cat.name}</option>
                                         ))}
