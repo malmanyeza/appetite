@@ -71,6 +71,22 @@ export const RestaurantMenu = () => {
         enabled: !!paramId || !!profile?.id
     });
 
+    useEffect(() => {
+        if (isEditing && isEditing !== 'new' && !editCategoryId && menuCategories) {
+            if (isEditing.category_id) {
+                setEditCategoryId(isEditing.category_id);
+            } else if (isEditing.category) {
+                const normName = (name: string) => name.toLowerCase().trim().replace(/s$/, '');
+                const match = menuCategories.find((c: any) => 
+                    normName(c.name) === normName(isEditing.category)
+                );
+                if (match) {
+                    setEditCategoryId(match.id);
+                }
+            }
+        }
+    }, [isEditing, menuCategories, editCategoryId]);
+
     const { data: modifierGroups } = useQuery({
         queryKey: ['modifier-groups', paramId || profile?.id],
         queryFn: async () => {
@@ -211,7 +227,23 @@ export const RestaurantMenu = () => {
     const openEditModal = async (item: any) => {
         setIsEditing(item);
         setEditImageUrl(item === 'new' ? '' : (item?.image_url || ''));
-        setEditCategoryId(item === 'new' ? '' : (item?.category_id || ''));
+        
+        let catId = '';
+        if (item !== 'new') {
+            if (item.category_id) {
+                catId = item.category_id;
+            } else if (item.category && menuCategories) {
+                const normName = (name: string) => name.toLowerCase().trim().replace(/s$/, '');
+                const match = menuCategories.find((c: any) => 
+                    normName(c.name) === normName(item.category)
+                );
+                if (match) {
+                    catId = match.id;
+                }
+            }
+        }
+        setEditCategoryId(catId);
+        
         setAddons(item === 'new' ? [] : (item?.add_ons || []));
         setSelectedSuggestedCategories(item === 'new' ? [] : (item?.suggested_addon_category_ids || []));
         
@@ -542,7 +574,7 @@ export const RestaurantMenu = () => {
                                             <option key={cat.id} value={cat.id}>{cat.name}</option>
                                         ))}
                                     </select>
-                                    {isEditing?.category && !isEditing?.category_id && (
+                                    {isEditing?.category && !editCategoryId && (
                                         <p className="text-[10px] text-accent/60 mt-1 italic">Legacy category: {isEditing.category} (please re-assign above)</p>
                                     )}
                                     <p className="text-[10px] text-muted mt-1 italic">💡 Manage categories in Restaurant Settings</p>
