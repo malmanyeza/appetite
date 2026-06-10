@@ -142,11 +142,7 @@ export const FoodItemDetail = ({ route, navigation }: any) => {
                     height: insets.top + 64,
                     backgroundColor: theme.background,
                     borderBottomColor: theme.border,
-                    borderBottomWidth: scrollY.interpolate({
-                        inputRange: [0, 100],
-                        outputRange: [0, StyleSheet.hairlineWidth],
-                        extrapolate: 'clamp'
-                    }),
+                    borderBottomWidth: StyleSheet.hairlineWidth,
                     opacity: scrollY.interpolate({
                         inputRange: [0, 120],
                         outputRange: [0, 1],
